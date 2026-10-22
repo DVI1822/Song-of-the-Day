@@ -30,6 +30,13 @@ Your `main` branch now has the app in it. Vercel will build from `main`.
      password manager. You won't need it day to day. Don't share it with anyone,
      including me.
    - **Region:** pick the one closest to you (for Chicago, `East US` or `Central US`).
+   - **Security:** set the three boxes like this:
+     - **Enable Data API:** on. The app talks to the database through it.
+     - **Automatically expose new tables:** off, as Supabase recommends. The
+       database code grants exactly the access the app needs, nothing more.
+     - **Enable automatic RLS:** on. The database code turns on row level
+       security for every table anyway, and this is a safety net for any
+       table added later.
 3. Click **Create new project** and wait a minute or two while it sets up.
 
 ### Create the tables
