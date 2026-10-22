@@ -67,15 +67,42 @@ spaces don't matter.
 
 ### Copy your two keys
 
-1. Click the **Connect** button at the top of your project page (or go to
-   **Project Settings → API Keys**).
-2. Find and copy these two values somewhere handy:
-   - **Project URL**, which looks like `https://abcdefgh.supabase.co`
-   - **Publishable key**, which starts with `sb_publishable_`
-     (on older projects this is called the **anon public** key)
+Vercel needs two values from Supabase. Open a note on your computer or phone to
+paste them into while you go.
 
-These two are fine to paste into Vercel and fine to share with me. Never share
-the **secret** key or the **service_role** key: the app doesn't use them.
+**1. The Project URL**
+
+Look at your browser's address bar while you're in your Supabase project. It
+looks like this:
+
+```
+supabase.com/dashboard/project/abcdefghijklmnop
+```
+
+That last part (`abcdefghijklmnop`) is your project's ID. Your Project URL is
+`https://` + that ID + `.supabase.co`, for example:
+
+```
+https://abcdefghijklmnop.supabase.co
+```
+
+Write that down. (It's also shown under **Project Settings → Data API**, if
+you'd rather copy it.)
+
+**2. The Publishable key**
+
+1. Click the **gear icon** (Project Settings) at the bottom of the left sidebar.
+2. Click **API Keys**.
+3. Find the key labeled **Publishable key**. It starts with `sb_publishable_`.
+   Click the copy button next to it and paste it into your note.
+
+If that page only shows **anon** and **service_role** keys (older projects),
+copy the **anon** / **public** one instead. It works the same way.
+
+**Which keys are safe?** The URL and the publishable (or anon) key are meant
+to be public, so they're fine to paste into Vercel and fine to share with me.
+**Never** share the **secret** key or the **service_role** key. The app
+doesn't need them.
 
 ---
 
