@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* Lake Michigan palette: turquoise water, deep blue, lighthouse red. */
+@theme inline {
+  --color-void: #021114;
+  --color-ink: #e9fbf8;
+  --color-muted: #9cd3cc;
+  --color-accent: #d7262b;
+  --color-accent-deep: #b3161c;
+  --color-ring: #ff4a4f;
+  --color-card: #ffffff;
+  --color-card-ink: #0d2a3f;
+  --color-card-muted: #44606f;
+  --color-soft: #e3f3f1;
+  --color-line: #d0e6e2;
+  --color-nav: #08242a;
+  --color-glow: #d9fff8;
+  --color-tile-back: #0f4a52;
+  --font-sans: var(--font-outfit), system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* The soft turquoise glow behind everything. */
+.aura {
+  pointer-events: none;
+  border-radius: 9999px;
+  background: radial-gradient(
+    closest-side,
+    rgba(70, 210, 195, 0.3),
+    rgba(215, 38, 43, 0.11) 62%,
+    rgba(0, 0, 0, 0)
+  );
+}
+
+.display {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
