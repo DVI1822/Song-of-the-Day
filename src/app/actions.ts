@@ -31,6 +31,7 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
 
   if (error) {
     if (error.code === "23505") return { error: "That username is taken. Try another." };
+    if (error.code === "42501") return { error: "Your email isn't on the invite list yet." };
     return { error: error.message };
   }
   revalidatePath("/", "layout");

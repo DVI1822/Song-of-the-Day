@@ -135,25 +135,83 @@ create table public.follows (
 create index follows_following_idx on public.follows (following_id);
 
 -- ---------------------------------------------------------------------------
--- Row level security: everything is publicly readable (it's a public site),
--- and people can only change their own rows.
+-- Invite-only mode
+--
+-- While app_settings.invite_only is true (the default), only emails listed in
+-- `invites` can create a profile, and only people with a profile can see
+-- anything. To open the site to everyone, set invite_only to false.
+-- ---------------------------------------------------------------------------
+
+create table public.app_settings (
+  id boolean primary key default true check (id), -- there is only ever one row
+  invite_only boolean not null default true
+);
+insert into public.app_settings default values;
+
+create table public.invites (
+  email text primary key check (email = lower(btrim(email)) and email like '%@%'),
+  note text,
+  created_at timestamptz not null default now()
+);
+
+-- Lowercase and trim emails typed into the Table Editor, so "Maya@Gmail.com "
+-- still matches.
+create function public.normalize_invite() returns trigger
+language plpgsql as $$
+begin
+  new.email := lower(btrim(new.email));
+  return new;
+end;
+$$;
+
+create trigger invites_normalize
+  before insert or update on public.invites
+  for each row execute function public.normalize_invite();
+
+-- May the signed-in person join?
+create function public.is_invited() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select not (select s.invite_only from public.app_settings s)
+    or exists (
+      select 1 from public.invites i
+      where i.email = lower(coalesce(auth.jwt() ->> 'email', ''))
+    );
+$$;
+
+-- May the current visitor see the site's content?
+create function public.can_view() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select not (select s.invite_only from public.app_settings s)
+    or exists (select 1 from public.profiles p where p.id = auth.uid());
+$$;
+
+grant execute on function public.is_invited(), public.can_view() to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Row level security: content is readable by everyone once the site is
+-- public (by members only while it's invite-only), and people can only
+-- change their own rows.
 -- ---------------------------------------------------------------------------
 
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
 alter table public.follows enable row level security;
 alter table public.post_redos enable row level security;
+-- No policies on these two: they're only changed from the Supabase dashboard.
+alter table public.app_settings enable row level security;
+alter table public.invites enable row level security;
 
 create policy "Profiles are public" on public.profiles
-  for select using (true);
+  for select using (id = (select auth.uid()) or public.can_view());
 create policy "Create your own profile" on public.profiles
-  for insert to authenticated with check (id = (select auth.uid()));
+  for insert to authenticated
+  with check (id = (select auth.uid()) and public.is_invited());
 create policy "Edit your own profile" on public.profiles
   for update to authenticated using (id = (select auth.uid()))
   with check (id = (select auth.uid()));
 
 create policy "Posts are public" on public.posts
-  for select using (true);
+  for select using (public.can_view());
 create policy "Post as yourself" on public.posts
   for insert to authenticated with check (user_id = (select auth.uid()));
 -- You can take back today's song once (see post_redos), but the archive
@@ -167,7 +225,7 @@ create policy "See your own redos" on public.post_redos
   for select to authenticated using (user_id = (select auth.uid()));
 
 create policy "Follows are public" on public.follows
-  for select using (true);
+  for select using (public.can_view());
 create policy "Follow as yourself" on public.follows
   for insert to authenticated with check (follower_id = (select auth.uid()));
 create policy "Unfollow as yourself" on public.follows

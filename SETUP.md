@@ -43,7 +43,20 @@ Your `main` branch now has the app in it. Vercel will build from `main`.
 4. Click **Run**. You should see "Success. No rows returned."
 
 You can check it worked under **Table Editor**: there should be `profiles`,
-`posts` and `follows` tables.
+`posts`, `follows`, `invites` and `app_settings` tables.
+
+### Invite yourself
+
+The site starts out **invite-only**: only emails on the invite list can join,
+and only people who've joined can see anything.
+
+1. Open **Table Editor → invites**.
+2. Click **Insert → Insert row**.
+3. Type your email in **email** (the **note** box is optional, like "me").
+4. Click **Save**.
+
+Do the same for each friend you want to let in. Capital letters and stray
+spaces don't matter.
 
 ### Copy your two keys
 
@@ -94,16 +107,30 @@ Sign-in works by emailing you a link, so Supabase needs to know your site's addr
 
 ## Part 5: Try it
 
-1. Open your site, click **Get started**, and enter your email.
+1. Open your site, click **Get started**, and enter the email you invited.
 2. Open the link in the email **on the same phone or browser** you asked from.
 3. Pick your name and username.
 4. Tap **+**, paste a Spotify link, write a caption, and share.
-5. Send the link to a friend, have them sign up, and follow each other from
-   **People → Follow**. Their tile appears on your Globe.
+5. Add a friend's email to **invites**, send them the link, and follow each
+   other from **People → Follow**. Their tile appears on your Globe.
 
 You can also open `/demo` on your site to see a Globe full of made-up friends.
 
 ---
+
+## Going public later
+
+When you're ready for anyone to join:
+
+1. In Supabase, open **Table Editor → app_settings**.
+2. Change **invite_only** from `TRUE` to `FALSE` and save.
+
+That's it: anyone can sign up, and profiles and songs become visible to
+visitors who aren't signed in. Switch it back to `TRUE` to close it again
+(people who already joined stay in).
+
+Someone who isn't invited can still request a sign-in email, but after
+clicking it they only see an "invite only, for now" page.
 
 ## Good to know
 
