@@ -8,7 +8,7 @@ import type { ResolvedSong } from "@/lib/songs";
 
 const MAX = 100;
 
-export function Composer() {
+export function Composer({ redoUsed }: { redoUsed: boolean }) {
   const [link, setLink] = useState("");
   const [song, setSong] = useState<ResolvedSong | null>(null);
   const [title, setTitle] = useState("");
@@ -99,6 +99,7 @@ export function Composer() {
             <input type="hidden" name="page_url" value={song.pageUrl ?? ""} />
             <input type="hidden" name="artwork_url" value={song.artworkUrl ?? ""} />
             <input type="hidden" name="links" value={JSON.stringify(song.links)} />
+            {redoUsed && <p className="text-xs text-card-muted">You&apos;ve used today&apos;s redo, so this one is final.</p>}
             {state?.error && <p className="text-sm text-accent-deep">{state.error}</p>}
             <button className={buttonClass} disabled={posting}>
               {posting ? "Sharing…" : "Share today's song"}

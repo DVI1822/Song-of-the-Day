@@ -82,6 +82,34 @@ create trigger posts_stamp
   before insert on public.posts
   for each row execute function public.stamp_post();
 
+-- One redo per day: you can take back today's song once and pick another,
+-- but not a second time. Taking a song back records the day here, and a
+-- second take-back on the same day hits the primary key and is refused.
+create table public.post_redos (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  day date not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, day)
+);
+
+create function public.record_redo() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  -- Deleting a whole account removes its posts too; that isn't a redo.
+  if not exists (select 1 from public.profiles where id = old.user_id) then
+    return old;
+  end if;
+  insert into public.post_redos (user_id, day) values (old.user_id, old.day);
+  return old;
+exception when unique_violation then
+  raise exception 'You already used today''s redo.' using errcode = 'P0001';
+end;
+$$;
+
+create trigger posts_record_redo
+  before delete on public.posts
+  for each row execute function public.record_redo();
+
 -- Each person's song for their own "today". Anyone without a row hasn't
 -- posted yet.
 create view public.today_posts with (security_invoker = true) as
@@ -114,6 +142,7 @@ create index follows_following_idx on public.follows (following_id);
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
 alter table public.follows enable row level security;
+alter table public.post_redos enable row level security;
 
 create policy "Profiles are public" on public.profiles
   for select using (true);
@@ -127,12 +156,15 @@ create policy "Posts are public" on public.posts
   for select using (true);
 create policy "Post as yourself" on public.posts
   for insert to authenticated with check (user_id = (select auth.uid()));
--- You can take back today's song (and post a different one), but the
--- archive is permanent.
+-- You can take back today's song once (see post_redos), but the archive
+-- is permanent.
 create policy "Delete your post from today" on public.posts
   for delete to authenticated
   using (user_id = (select auth.uid())
          and day = public.current_day((select auth.uid())));
+
+create policy "See your own redos" on public.post_redos
+  for select to authenticated using (user_id = (select auth.uid()));
 
 create policy "Follows are public" on public.follows
   for select using (true);
@@ -143,6 +175,7 @@ create policy "Unfollow as yourself" on public.follows
 
 grant select on public.profiles, public.posts, public.follows, public.today_posts
   to anon, authenticated;
+grant select on public.post_redos to authenticated;
 grant insert, update on public.profiles to authenticated;
 grant insert, delete on public.posts to authenticated;
 grant insert, delete on public.follows to authenticated;

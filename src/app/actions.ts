@@ -96,10 +96,13 @@ export async function createPost(_: FormState, form: FormData): Promise<FormStat
   redirect("/");
 }
 
-export async function deleteTodayPost(postId: string) {
+// Take back today's song so you can post another. One redo per day; the
+// database refuses a second one.
+export async function deleteTodayPost(postId: string): Promise<FormState> {
   const { supabase, userId } = await getSession();
   if (!userId) redirect("/login");
-  await supabase.from("posts").delete().eq("id", postId);
+  const { error } = await supabase.from("posts").delete().eq("id", postId);
+  if (error) return { error: error.code === "P0001" ? "You've already used today's redo." : error.message };
   revalidatePath("/", "layout");
 }
 
