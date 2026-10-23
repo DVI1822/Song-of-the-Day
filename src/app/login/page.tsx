@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <h1 className="display text-4xl">Song of the Day</h1>
           <p className="mt-2 text-muted">One song a day. The one that hit hardest.</p>
         </div>
-        <LoginForm initialError={error ? "That sign-in link didn't work. Try sending a new one." : undefined} />
+        <LoginForm initialError={error ? "That sign-in didn't work. Try again." : undefined} />
       </div>
     </Shell>
   );

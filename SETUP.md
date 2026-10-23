@@ -142,6 +142,31 @@ Sign-in works by emailing you a link, so Supabase needs to know your site's addr
 
 ---
 
+## Part 4b: Sign in with Spotify (optional)
+
+The sign-in page has a "Continue with Spotify" button above the email box. It
+works once Spotify and Supabase know about each other.
+
+1. In Supabase, open **Authentication → Sign In / Providers → Spotify** and
+   copy the **Callback URL** it shows. It looks like
+   `https://<your-project>.supabase.co/auth/v1/callback`. Leave the tab open.
+2. Go to <https://developer.spotify.com/dashboard>, sign in with your Spotify
+   account (it must be Premium), and click **Create app**.
+   - Name: Song of the Day. Description: anything.
+   - Redirect URI: paste the Supabase Callback URL from step 1 and click **Add**.
+   - Under "Which API/SDKs are you planning to use?", tick **Web API**.
+   - Agree to the terms and **Save**.
+3. In the new app, open **Settings**. Copy the **Client ID**, then click
+   **View client secret** and copy that too.
+4. Back in Supabase's Spotify provider, switch it on, paste the Client ID and
+   Client Secret, and **Save**.
+5. Back in the Spotify app, open **User Management** and add each friend's
+   name and the email address of their Spotify account.
+
+Spotify keeps new apps in development mode: only people on that User
+Management list can sign in, up to 5 of them. Anyone else uses the email link.
+Their Spotify email still needs to be on the invite list in Supabase.
+
 ## Part 5: Try it
 
 1. Open your site, click **Get started**, and enter the email you invited.
