@@ -5,6 +5,7 @@ import { todayIn } from "@/lib/day";
 import type { Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
+import { WeatherFront, WeatherSky, useWeather } from "./Weather";
 import { Compose } from "./Compose";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -171,6 +172,10 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const sim = useRef(new TileSim());
   const els = useRef(new Map<number, TileEls>());
   const R = useRef(newEls());
+  const weather = useWeather((lat, lon) => {
+    m.current.geo = { lat, lon };
+    m.current.sunAt = 0;
+  });
 
   // Everything the frame loop needs from the latest render.
   const live = useRef({ keys, half, Rb, L, zFeat, friends });
@@ -186,18 +191,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     const measure = () => setSize({ w: window.innerWidth, h: window.innerHeight });
     measure();
     window.addEventListener("resize", measure);
+    // a guess from the timezone until the weather says where you are
     m.current.geo = guessGeo();
-    // Real location only if it's already been allowed; otherwise the timezone guess stands.
-    navigator.permissions
-      ?.query({ name: "geolocation" as PermissionName })
-      .then((ps) => {
-        if (ps.state === "granted")
-          navigator.geolocation.getCurrentPosition((g) => {
-            m.current.geo = { lat: g.coords.latitude, lon: g.coords.longitude };
-            m.current.sunAt = 0;
-          });
-      })
-      .catch(() => {});
     return () => window.removeEventListener("resize", measure);
   }, []);
 
@@ -635,6 +630,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             />
           </div>
         </div>
+        {size && <WeatherSky weather={weather} dark={darkOn} w={L.w} h={L.h} />}
         {size && <Ambient dark={darkOn} w={L.w} h={L.h} />}
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div
@@ -671,6 +667,19 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           </button>
         </div>
       </div>
+
+      {size && (
+        <WeatherFront
+          weather={weather}
+          dark={darkOn}
+          w={L.w}
+          h={L.h}
+          globe={() => {
+            const s = m.current;
+            return { cx: L.cx, cy: L.cy, r: L.R * s.zoom, open: s.featOn || s.coreOn || s.lens !== null };
+          }}
+        />
+      )}
 
       {/* + until you've posted, then the countdown to midnight */}
       <div
