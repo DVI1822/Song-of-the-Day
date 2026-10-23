@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type Ref } from "react";
+import type { Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post } from "@/lib/types";
 import { Magma } from "./Magma";
@@ -14,6 +14,7 @@ export function Feature({
   who,
   timeZone,
   cover,
+  dark,
   left,
   top,
   flipped,
@@ -28,6 +29,7 @@ export function Feature({
   who: string;
   timeZone: string;
   cover: number;
+  dark: boolean;
   left: number;
   top: number;
   flipped: boolean;
@@ -38,7 +40,6 @@ export function Feature({
   backdropRef: Ref<HTMLDivElement>;
   cardRef: Ref<HTMLDivElement>;
 }) {
-  const [player, setPlayer] = useState<string | null>(null);
   const time = formatTime(post.created_at, timeZone);
   const radius = coverRadius(cover);
   const face = "absolute inset-0 overflow-hidden backface-hidden";
@@ -48,6 +49,11 @@ export function Feature({
       <div ref={backdropRef} className="absolute inset-0" />
       <button type="button" onClick={onClose} aria-label="Back to the globe" className="absolute inset-0 cursor-default" />
       <div ref={cardRef} className="absolute flex flex-col gap-3.5" style={{ left, top, width: cover, opacity: 0 }}>
+        <div
+          aria-hidden
+          className={`absolute -inset-x-3.5 -bottom-4 -top-2 rounded-[30px] border border-white/50 backdrop-blur-2xl ${dark ? "bg-white/85" : "bg-white/60"}`}
+          style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.45)" }}
+        />
         <div className="relative flex h-7 items-center justify-between">
           <div className="text-xs text-muted">
             {time} · {who}
@@ -56,15 +62,6 @@ export function Feature({
             <CloseIcon size={20} />
           </button>
         </div>
-        {player && (
-          <iframe
-            title="Spotify player"
-            src={player}
-            className="rise-in absolute z-10 border-0"
-            style={{ top: 42, width: cover, height: cover, borderRadius: radius }}
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          />
-        )}
         <button
           type="button"
           onClick={onFlip}
@@ -113,7 +110,6 @@ export function Feature({
             post={post}
             id={`feat-${post.id}`}
             big
-            onEmbed={setPlayer}
             extra={
               <button
                 type="button"

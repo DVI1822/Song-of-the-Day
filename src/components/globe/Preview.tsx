@@ -5,12 +5,19 @@ import { embedFor } from "@/lib/songs";
 import type { Post } from "@/lib/types";
 
 // One shared audio element for 30-second previews, so starting one song
-// stops the last.
-type PreviewState = { key: string | null; at: number; play(key: string, url: string): void; stop(): void };
+// stops the last. Spotify's player claims the same slot with its own stop.
+type PreviewState = {
+  key: string | null;
+  at: number;
+  play(key: string, url: string): void;
+  claim(key: string, stop: () => void): void;
+  stop(): void;
+};
 const Ctx = createContext<PreviewState | null>(null);
 
 export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const audio = useRef<HTMLAudioElement | null>(null);
+  const other = useRef<(() => void) | null>(null);
   const [key, setKey] = useState<string | null>(null);
   const [at, setAt] = useState(0);
 
@@ -27,28 +34,79 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     return () => a.pause();
   }, []);
 
-  const stop = useCallback(() => {
+  const silence = useCallback(() => {
     audio.current?.pause();
+    other.current?.();
+    other.current = null;
+  }, []);
+
+  const stop = useCallback(() => {
+    silence();
     setKey(null);
     setAt(0);
-  }, []);
+  }, [silence]);
 
-  const play = useCallback((k: string, url: string) => {
-    const a = audio.current;
-    if (!a) return;
-    a.src = url;
-    a.currentTime = 0;
-    setAt(0);
-    setKey(k);
-    a.play().catch(() => setKey(null));
-  }, []);
+  const claim = useCallback(
+    (k: string, stopIt: () => void) => {
+      silence();
+      other.current = stopIt;
+      setAt(0);
+      setKey(k);
+    },
+    [silence],
+  );
 
-  return <Ctx.Provider value={{ key, at, play, stop }}>{children}</Ctx.Provider>;
+  const play = useCallback(
+    (k: string, url: string) => {
+      const a = audio.current;
+      if (!a) return;
+      silence();
+      a.src = url;
+      a.currentTime = 0;
+      setAt(0);
+      setKey(k);
+      a.play().catch(() => setKey(null));
+    },
+    [silence],
+  );
+
+  return <Ctx.Provider value={{ key, at, play, claim, stop }}>{children}</Ctx.Provider>;
 }
 
 export function usePreview() {
   return useContext(Ctx)!;
 }
+
+// Spotify's iFrame API lets our own play button drive its player, which we
+// keep out of sight. https://developer.spotify.com/documentation/embeds/references/iframe-api
+type SpotifyUpdate = { data: { isPaused: boolean; isBuffering: boolean; position: number; duration: number } };
+type SpotifyController = {
+  play(): void;
+  resume(): void;
+  pause(): void;
+  destroy(): void;
+  addListener(event: "ready", cb: () => void): void;
+  addListener(event: "playback_update", cb: (e: SpotifyUpdate) => void): void;
+};
+type SpotifyApi = {
+  createController(el: HTMLElement, opts: { uri: string; width: string; height: number }, cb: (c: SpotifyController) => void): void;
+};
+let spotifyApi: Promise<SpotifyApi> | null = null;
+function loadSpotify() {
+  spotifyApi ??= new Promise((resolve) => {
+    (window as unknown as { onSpotifyIframeApiReady(api: SpotifyApi): void }).onSpotifyIframeApiReady = resolve;
+    const tag = document.createElement("script");
+    tag.src = "https://open.spotify.com/embed/iframe-api/v1";
+    tag.async = true;
+    document.body.appendChild(tag);
+  });
+  return spotifyApi;
+}
+
+const clock = (ms: number) => {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
 
 export function spotifyHref(post: Pick<Post, "platform_links" | "title" | "artist">) {
   return (
@@ -72,49 +130,123 @@ export const OpenIcon = () => (
   </svg>
 );
 
-// Play opens Spotify's own player. Anyone signed in to Spotify in this
-// browser hears the whole song; everyone else gets Spotify's preview. Songs
-// from elsewhere use our 30-second preview, then that platform's player.
-// `onEmbed` lets the song card put Spotify's player in the square.
+// One play button. Spotify songs play through Spotify's player, hidden: anyone
+// signed in to Spotify in this browser hears the whole song, everyone else
+// Spotify's 30 seconds. If a browser won't let our button start it (some
+// phones insist on a tap inside Spotify's own player), the player shows up
+// below so it can be tapped. Songs from elsewhere use our 30-second preview,
+// then that platform's player.
 export function SongPlayer({
   post,
   id,
   big = false,
   extra,
-  onEmbed,
 }: {
   post: Post;
   id: string;
   big?: boolean;
   extra?: React.ReactNode;
-  onEmbed?: (src: string | null) => void;
 }) {
   const pv = usePreview();
   const [embedOpen, setEmbedOpen] = useState(false);
   const embed = embedFor(post.platform_links ?? {}, post.song_url);
-  const spotify = embed?.platform === "spotify" ? embed : null;
-  const previewOn = pv.key === id;
+  const uri = embed?.platform === "spotify" ? embed.src.match(/\/embed\/(track|album)\/([A-Za-z0-9]+)/) : null;
+  const spotifyUri = uri ? `spotify:${uri[1]}:${uri[2]}` : null;
+
+  const host = useRef<HTMLDivElement>(null);
+  const ctl = useRef<Promise<SpotifyController> | null>(null);
+  const started = useRef(false);
+  const [sp, setSp] = useState({ playing: false, position: 0, duration: 0 });
+  const [waiting, setWaiting] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(false);
+
+  const controller = useCallback(() => {
+    if (!spotifyUri || !host.current) return null;
+    const el = document.createElement("div");
+    host.current.appendChild(el);
+    ctl.current ??= loadSpotify().then(
+      (api) =>
+        new Promise<SpotifyController>((resolve) =>
+          api.createController(el, { uri: spotifyUri, width: "100%", height: 80 }, (c) => {
+            c.addListener("playback_update", (e) => {
+              const { isPaused, position, duration } = e.data;
+              setSp({ playing: !isPaused, position, duration });
+              if (!isPaused) {
+                setWaiting(false);
+                setShowPlayer(false);
+              }
+            });
+            resolve(c);
+          }),
+        ),
+    );
+    return ctl.current;
+  }, [spotifyUri]);
+
+  // the big card gets Spotify ready as soon as it opens, so play is instant
+  useEffect(() => {
+    if (big) controller();
+  }, [big, controller]);
+  useEffect(
+    () => () => {
+      ctl.current?.then((c) => c.destroy());
+      ctl.current = null;
+    },
+    [],
+  );
+  // another song started
+  useEffect(() => {
+    if (pv.key !== id) ctl.current?.then((c) => c.pause());
+  }, [pv.key, id]);
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => {
+      setWaiting(false);
+      setShowPlayer(true);
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [waiting]);
+
+  const previewOn = pv.key === id && !spotifyUri;
+  const spotifyOn = pv.key === id && Boolean(spotifyUri) && (sp.playing || waiting);
   const canPlay = Boolean(embed || post.preview_url);
   const size = big ? 54 : 44;
-  const sec = previewOn ? Math.floor(pv.at) : 0;
-  const playing = embedOpen || previewOn;
-
-  useEffect(() => () => onEmbed?.(null), [onEmbed]);
+  const playing = embedOpen || previewOn || spotifyOn;
 
   const toggle = () => {
     if (playing) {
       setEmbedOpen(false);
-      onEmbed?.(null);
-      if (previewOn) pv.stop();
+      setWaiting(false);
+      pv.stop();
       return;
     }
-    pv.stop();
-    if (spotify) {
+    if (spotifyUri) {
+      const c = controller();
+      if (!c) return;
+      pv.claim(id, () => {
+        ctl.current?.then((x) => x.pause());
+      });
+      setWaiting(true);
+      c.then((x) => {
+        if (started.current) x.resume();
+        else x.play();
+        started.current = true;
+      });
+    } else if (post.preview_url) {
+      pv.play(id, post.preview_url);
+    } else if (embed) {
+      pv.stop();
       setEmbedOpen(true);
-      onEmbed?.(spotify.src);
-    } else if (post.preview_url) pv.play(id, post.preview_url);
-    else if (embed) setEmbedOpen(true);
+    }
   };
+
+  const progress = spotifyUri
+    ? sp.duration > 0 && (spotifyOn || sp.position > 0)
+      ? { at: sp.position, of: sp.duration, preview: sp.duration <= 31_000 }
+      : null
+    : previewOn
+      ? { at: pv.at * 1000, of: 30_000, preview: true }
+      : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -123,7 +255,7 @@ export function SongPlayer({
           <button
             type="button"
             onClick={toggle}
-            aria-label={playing ? "Close the player" : "Play"}
+            aria-label={playing ? "Pause" : "Play"}
             className="flex flex-none items-center justify-center rounded-full bg-accent text-white"
             style={{ width: size, height: size }}
           >
@@ -142,25 +274,33 @@ export function SongPlayer({
         </a>
         {extra}
       </div>
-      {previewOn && (
+      {progress && (
         <div className="flex flex-col gap-1.5">
           <div className="relative h-[3px] overflow-hidden rounded-sm bg-card-ink/12">
             <div
               className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-300 ease-linear"
-              style={{ width: `${Math.min(100, (pv.at / 30) * 100)}%` }}
+              style={{ width: `${Math.min(100, (progress.at / progress.of) * 100)}%` }}
             />
           </div>
           <div className="flex justify-between text-[10px] text-muted">
-            <span>0:{String(sec).padStart(2, "0")}</span>
-            <span>preview 0:30</span>
+            <span>{clock(progress.at)}</span>
+            <span>{progress.preview ? `preview ${clock(progress.of)}` : clock(progress.of)}</span>
           </div>
         </div>
       )}
-      {embed && embedOpen && !(spotify && onEmbed) && (
+      {spotifyUri && (
+        <div
+          ref={host}
+          aria-hidden={!showPlayer}
+          className={showPlayer ? "rise-in overflow-hidden rounded-xl" : "pointer-events-none fixed left-0 top-0 -z-10 h-20 w-[300px] opacity-0"}
+        />
+      )}
+      {showPlayer && <p className="-mt-1 text-[11px] text-muted">This browser needs one tap on Spotify&apos;s play button to start.</p>}
+      {embed && embedOpen && !spotifyUri && (
         <iframe
           title="Player"
           src={embed.src}
-          height={embed.platform === "spotify" ? 152 : embed.height}
+          height={embed.height}
           className="rise-in w-full rounded-2xl border-0"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"
