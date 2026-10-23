@@ -94,6 +94,7 @@ function newMotion(posted: boolean) {
     profP: 0,
     dk: 0,
     darkOn: false,
+    override: null as null | boolean, // the pull chain beats the clock until reload
     pull: null as null | { x: number; y: number },
     pullY: 0,
     pullV: 0,
@@ -122,6 +123,8 @@ function newEls() {
     stars: null as HTMLDivElement | null,
     starsB: null as HTMLDivElement | null,
     sunGlow: null as HTMLDivElement | null,
+    sunDisc: null as HTMLDivElement | null,
+    day: null as HTMLDivElement | null,
     sunShadow: null as HTMLDivElement | null,
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
@@ -345,9 +348,20 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       s.t += dt;
       s.mt += dt;
 
-      // lights: fade the room out to space; the pull chain springs back and swings
-      const dGoal = s.darkOn ? 1 : 0;
-      s.dk = Math.abs(dGoal - s.dk) < 0.01 ? dGoal : s.dk + (dGoal - s.dk) * Math.min(1, dt * 5);
+      // the sun moves slowly; work it out once a second
+      if (!s.sun || now - s.sunAt > 1000) {
+        s.sun = sunLight(new Date(), s.geo);
+        s.sunAt = now;
+      }
+      // the sky follows the real time of day: space at night, light blue by
+      // day. The pull chain overrides it.
+      const dGoal = s.override === null ? 1 - s.sun.day : s.override ? 1 : 0;
+      s.dk = s.t === 0 || Math.abs(dGoal - s.dk) < 0.01 ? dGoal : s.dk + (dGoal - s.dk) * Math.min(1, dt * 5);
+      if (s.dk > 0.5 !== s.darkOn) {
+        s.darkOn = s.dk > 0.5;
+        setDarkOn(s.darkOn);
+      }
+      // the pull chain springs back and swings
       if (!s.pull) {
         s.pullV += (-260 * s.pullY - 16 * s.pullV) * dt;
         s.pullY += s.pullV * dt;
@@ -411,12 +425,6 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       }
       if (s.lens !== null && !s.featOn && s.featFly === null && s.zoomTarget === null && s.zoom < 1.03) s.lens = null;
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
-
-      // the sun moves slowly; work it out once a second
-      if (!s.sun || now - s.sunAt > 1000) {
-        s.sun = sunLight(new Date(), s.geo);
-        s.sunAt = now;
-      }
       draw(s, R.current, els.current, sim.current, live.current);
       raf = requestAnimationFrame(tick);
     };
@@ -505,10 +513,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     const s = m.current;
     if (!s.pull) return;
     s.pull = null;
-    if (s.pullY > 26) {
-      s.darkOn = !s.darkOn;
-      setDarkOn(s.darkOn);
-    }
+    if (s.pullY > 26) s.override = !s.darkOn;
     s.pullV = -s.pullY * 4;
     s.swV += (Math.random() < 0.5 ? -1 : 1) * (0.6 + s.pullY * 0.02);
   };
@@ -632,6 +637,11 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         style={{ perspective: PERSPECTIVE, perspectiveOrigin: `${L.cx}px ${L.cy}px` }}
       >
         <div
+          ref={(el) => void (R.current.day = el)}
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse 120% 90% at 50% 40%, #FFFFFF 0%, #EEF6FD 50%, #D9EAF8 100%)" }}
+        />
+        <div
           ref={(el) => void (R.current.space = el)}
           className="pointer-events-none absolute inset-0"
           style={{ opacity: 0, background: "radial-gradient(ellipse 120% 90% at 50% 46%, #121A3A 0%, #070B1E 45%, #020309 100%)" }}
@@ -676,8 +686,19 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           }}
         />
         <div
+          ref={(el) => void (R.current.sunDisc = el)}
+          className="pointer-events-none absolute rounded-full"
+          style={{
+            width: 46 * L.s,
+            height: 46 * L.s,
+            marginLeft: -23 * L.s,
+            marginTop: -23 * L.s,
+            background: "radial-gradient(circle at 45% 42%, #FFFFFF 0%, #FFF8DC 45%, #FFE39A 75%, #FFC861 100%)",
+          }}
+        />
+        <div
           ref={(el) => void (R.current.world = el)}
-          className="preserve-3d absolute h-0 w-0"
+          className="preserve-3d absolute z-[1] h-0 w-0"
           style={{ left: L.cx, top: L.cy }}
         >
           <TileLayer tiles={tiles} half={half} Rb={Rb} focus={focus} els={els} onPick={pick} />
@@ -707,8 +728,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                m.current.darkOn = !m.current.darkOn;
-                setDarkOn(m.current.darkOn);
+                m.current.override = !m.current.darkOn;
               }
             }}
             aria-label={darkOn ? "Pull to turn the lights on" : "Pull to turn the lights off"}
@@ -1033,13 +1053,28 @@ sim: TileSim,
     st.filter = `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day)).toFixed(1)}px)`;
   }
   if (r.floor) r.floor.style.opacity = roomOp.toFixed(3);
+  // The sun orbits the globe as if it were the centre of the universe, at
+  // its real place in the sky: east is screen-right, the noon sun sits
+  // between you and the globe.
+  const orbit = 1.75 * L.R;
+  const sz = Lc[2] * orbit,
+    proj = PERSPECTIVE / (PERSPECTIVE - sz);
+  const sx = L.cx + Lc[0] * orbit * proj,
+    sy = L.cy + Lc[1] * orbit * proj;
+  const warm = 1 - clamp01((sun.el * 180) / Math.PI / 25);
+  if (r.sunDisc) {
+    const st = r.sunDisc.style;
+    st.left = sx.toFixed(1) + "px";
+    st.top = sy.toFixed(1) + "px";
+    st.transform = `scale(${proj.toFixed(3)})`;
+    st.zIndex = sz > 0 ? "2" : "0";
+    st.opacity = ((1 - reveal) * (1 - lensP)).toFixed(3);
+    st.boxShadow = `0 0 ${(30 + 30 * (1 - warm)).toFixed(0)}px ${(10 + 8 * dk).toFixed(0)}px rgba(255,${Math.round(214 - 60 * warm)},${Math.round(140 - 80 * warm)},${(0.55 + 0.25 * dk).toFixed(2)})`;
+  }
   if (r.sunGlow) {
-    const warm = 1 - clamp01((sun.el * 180) / Math.PI / 25);
     const c = [255, Math.round(244 - 70 * warm), Math.round(214 - 110 * warm)].join(",");
-    const x = 50 + 62 * Math.sin(sun.az),
-      y = -12 + 40 * (1 - Math.min(1, Math.max(0, sun.el) / 1.2));
-    r.sunGlow.style.opacity = ((1 - reveal) * day * (1 - dk)).toFixed(3);
-    r.sunGlow.style.background = `radial-gradient(circle at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(${c},0.55), rgba(${c},0.18) 30%, rgba(${c},0) 62%)`;
+    r.sunGlow.style.opacity = ((1 - reveal) * Math.max(day, 0.35 * dk)).toFixed(3);
+    r.sunGlow.style.background = `radial-gradient(circle at ${sx.toFixed(1)}px ${sy.toFixed(1)}px, rgba(${c},${(0.55 - 0.3 * dk).toFixed(2)}), rgba(${c},${(0.18 - 0.1 * dk).toFixed(2)}) ${Math.round(L.R * 0.9)}px, rgba(${c},0) ${Math.round(L.R * 2)}px)`;
   }
   if (r.sphere) {
     const hx = 50 + 42 * Lc[0],

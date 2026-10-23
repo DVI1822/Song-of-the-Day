@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { findYouTube } from "@/app/actions";
-import { embedFor, youtubeId } from "@/lib/songs";
+import { embedFor } from "@/lib/songs";
 import type { Post } from "@/lib/types";
 
 // One shared audio element for 30-second previews, so starting one song
@@ -73,72 +72,47 @@ export const OpenIcon = () => (
   </svg>
 );
 
-export const ytEmbed = (id: string) =>
-  `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
-
-export function VideoFrame({ src, className = "" }: { src: string; className?: string }) {
-  return (
-    <iframe
-      title="Song player"
-      src={src}
-      className={`border-0 bg-black ${className}`}
-      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-      allowFullScreen
-    />
-  );
-}
-
-// Play plays the whole song, from YouTube. If no video can be found it falls
-// back to the 30-second preview, then to the platform's own embed. `onVideo`
-// lets the song card show the video where the cover is.
+// Play opens Spotify's own player. Anyone signed in to Spotify in this
+// browser hears the whole song; everyone else gets Spotify's preview. Songs
+// from elsewhere use our 30-second preview, then that platform's player.
+// `onEmbed` lets the song card put Spotify's player in the square.
 export function SongPlayer({
   post,
   id,
   big = false,
   extra,
-  onVideo,
+  onEmbed,
 }: {
   post: Post;
   id: string;
   big?: boolean;
   extra?: React.ReactNode;
-  onVideo?: (src: string | null) => void;
+  onEmbed?: (src: string | null) => void;
 }) {
   const pv = usePreview();
-  const [video, setVideo] = useState<string | null>(null);
   const [embedOpen, setEmbedOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const known = youtubeId(post.platform_links?.youtube) ?? youtubeId(post.platform_links?.youtubeMusic);
-  const searchable = !post.song_url.includes("song.link/demo");
   const embed = embedFor(post.platform_links ?? {}, post.song_url);
-  const canPlay = Boolean(known || searchable || post.preview_url || embed);
+  const spotify = embed?.platform === "spotify" ? embed : null;
   const previewOn = pv.key === id;
+  const canPlay = Boolean(embed || post.preview_url);
   const size = big ? 54 : 44;
   const sec = previewOn ? Math.floor(pv.at) : 0;
-  const playing = Boolean(video) || previewOn || embedOpen;
+  const playing = embedOpen || previewOn;
 
-  const showVideo = (src: string | null) => {
-    setVideo(src);
-    onVideo?.(src);
-  };
-  useEffect(() => () => onVideo?.(null), [onVideo]);
+  useEffect(() => () => onEmbed?.(null), [onEmbed]);
 
-  const toggle = async () => {
+  const toggle = () => {
     if (playing) {
-      showVideo(null);
       setEmbedOpen(false);
+      onEmbed?.(null);
       if (previewOn) pv.stop();
       return;
     }
     pv.stop();
-    let vid = known;
-    if (!vid && searchable) {
-      setBusy(true);
-      vid = await findYouTube(post.title, post.artist).catch(() => null);
-      setBusy(false);
-    }
-    if (vid) showVideo(ytEmbed(vid));
-    else if (post.preview_url) pv.play(id, post.preview_url);
+    if (spotify) {
+      setEmbedOpen(true);
+      onEmbed?.(spotify.src);
+    } else if (post.preview_url) pv.play(id, post.preview_url);
     else if (embed) setEmbedOpen(true);
   };
 
@@ -149,18 +123,11 @@ export function SongPlayer({
           <button
             type="button"
             onClick={toggle}
-            disabled={busy}
-            aria-label={playing ? "Stop" : "Play the full song"}
-            className="flex flex-none items-center justify-center rounded-full bg-accent text-white disabled:opacity-70"
+            aria-label={playing ? "Close the player" : "Play"}
+            className="flex flex-none items-center justify-center rounded-full bg-accent text-white"
             style={{ width: size, height: size }}
           >
-            {busy ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            ) : playing ? (
-              <PauseIcon size={big ? 20 : 16} />
-            ) : (
-              <PlayIcon size={big ? 20 : 16} />
-            )}
+            {playing ? <PauseIcon size={big ? 20 : 16} /> : <PlayIcon size={big ? 20 : 16} />}
           </button>
         )}
         <a
@@ -189,12 +156,11 @@ export function SongPlayer({
           </div>
         </div>
       )}
-      {video && !onVideo && <VideoFrame src={video} className="rise-in aspect-video w-full rounded-2xl" />}
-      {embed && embedOpen && (
+      {embed && embedOpen && !(spotify && onEmbed) && (
         <iframe
           title="Player"
           src={embed.src}
-          height={embed.platform === "spotify" ? 80 : embed.height}
+          height={embed.platform === "spotify" ? 152 : embed.height}
           className="rise-in w-full rounded-2xl border-0"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"

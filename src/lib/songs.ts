@@ -232,33 +232,6 @@ async function fromItunes(song: ResolvedSong): Promise<ItunesTrack | null> {
   );
 }
 
-// The video id in a YouTube link, if it has one.
-export function youtubeId(link: string | undefined | null): string | null {
-  if (!link) return null;
-  try {
-    const u = new URL(link);
-    const id = u.hostname === "youtu.be" ? u.pathname.slice(1) : u.searchParams.get("v");
-    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
-  } catch {
-    return null;
-  }
-}
-
-// Almost every song is on YouTube in full, so that's how full songs play in
-// the app for everyone. Takes the top search result, preferring the
-// official audio upload.
-export async function findYouTubeId(title: string, artist: string): Promise<string | null> {
-  const q = `${artist} ${title} audio`.trim();
-  const res = await fetch(`https://www.youtube.com/results?hl=en&search_query=${encodeURIComponent(q)}`, {
-    headers: { "accept-language": "en-US,en;q=0.9", "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36" },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) return null;
-  const html = await res.text();
-  const m = html.match(/"videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})"/) ?? html.match(/"videoId":"([A-Za-z0-9_-]{11})"/);
-  return m ? m[1] : null;
-}
-
 async function attempt<T>(fn: () => Promise<T | null>): Promise<T | null> {
   try {
     return await fn();
@@ -300,10 +273,6 @@ export async function resolveSong(raw: string): Promise<ResolvedSong | null> {
     song.album ||= it.collectionName ?? "";
     song.previewUrl = httpsOrNull(it.previewUrl);
     song.artworkUrl ||= biggerArtwork(httpsOrNull(it.artworkUrl100?.replace("100x100bb", "600x600bb")));
-  }
-  if (!youtubeId(song.links.youtube) && !youtubeId(song.links.youtubeMusic)) {
-    const id = await attempt(() => findYouTubeId(song.title, song.artist));
-    if (id) song.links.youtube = `https://www.youtube.com/watch?v=${id}`;
   }
   return song;
 }
