@@ -5,7 +5,8 @@ import { todayIn } from "@/lib/day";
 import type { Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
-import { WeatherFront, WeatherSky, useWeather } from "./Weather";
+import { WeatherSky, override as weatherOverride, useWeather } from "./Weather";
+import { WeatherSim } from "./weather3d";
 import { Compose } from "./Compose";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -87,6 +88,8 @@ function newMotion(posted: boolean) {
     t: 0,
     mt: 0,
     last: 0,
+    wxShow: 0,
+    cam: { yaw: 0, pitch: 0, roll: 0 } as Camera,
     target: null as null | { yaw: number; pitch: number },
     zoomTarget: null as null | number,
     featFly: null as null | number,
@@ -124,6 +127,10 @@ function newEls() {
     starsB: null as HTMLDivElement | null,
     day: null as HTMLDivElement | null,
     sunShadow: null as HTMLDivElement | null,
+    wxFall: null as HTMLDivElement | null,
+    wxSkin: null as HTMLDivElement | null,
+    wxFlash: null as HTMLDivElement | null,
+    wxFloor: null as HTMLCanvasElement | null,
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
     chrome: [] as (HTMLElement | null)[],
@@ -175,6 +182,11 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const weather = useWeather((lat, lon) => {
     m.current.geo = { lat, lon };
     m.current.sunAt = 0;
+  });
+  const wx = useRef({ weather, dark: false, sim: null as WeatherSim | null });
+  useLayoutEffect(() => {
+    wx.current.weather = weather;
+    wx.current.dark = darkOn;
   });
 
   // Everything the frame loop needs from the latest render.
@@ -406,10 +418,35 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       if (s.lens !== null && !s.featOn && s.featFly === null && s.zoomTarget === null && s.zoom < 1.03) s.lens = null;
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
       draw(s, R.current, els.current, sim.current, live.current);
+      const w = wx.current,
+        el = R.current;
+      if (!w.sim && el.wxFall && el.wxSkin) w.sim = new WeatherSim(el.wxFall, el.wxSkin, el.wxFlash, el.wxFloor, weatherOverride() !== null);
+      if (w.sim) {
+        const { L: Lw } = live.current;
+        const hide = s.lens !== null || s.coreOn || s.featOn;
+        s.wxShow += ((hide ? 0 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.wxShow) * ease(0.1, dt);
+        w.sim.step(dt, w.weather, {
+          cam: s.cam,
+          zoom: s.zoom,
+          show: s.wxShow < 0.02 ? 0 : s.wxShow,
+          w: Lw.w,
+          h: Lw.h,
+          cx: Lw.cx,
+          cy: Lw.cy,
+          R: Rb + 2,
+          floorY: 216 * Lw.s,
+          dark: w.dark,
+        });
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const w = wx.current;
+    return () => {
+      cancelAnimationFrame(raf);
+      w.sim?.destroy();
+      w.sim = null;
+    };
   }, []);
 
   // -------------------------------------------------------------------------
@@ -632,6 +669,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         </div>
         {size && <WeatherSky weather={weather} dark={darkOn} w={L.w} h={L.h} />}
         {size && <Ambient dark={darkOn} w={L.w} h={L.h} />}
+        <canvas ref={(el) => void (R.current.wxFloor = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div
           ref={(el) => void (R.current.sphere = el)}
@@ -656,6 +694,9 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           style={{ left: L.cx, top: L.cy }}
         >
           <TileLayer tiles={tiles} half={half} Rb={Rb} focus={focus} els={els} onPick={pick} />
+          {/* weather: falling things face the camera, water on the songs turns with them */}
+          <div ref={(el) => void (R.current.wxFall = el)} className="preserve-3d pointer-events-none absolute left-0 top-0 h-0 w-0" />
+          <div ref={(el) => void (R.current.wxSkin = el)} className="preserve-3d pointer-events-none absolute left-0 top-0 h-0 w-0" />
           <button
             ref={(el) => void (R.current.core = el)}
             type="button"
@@ -668,18 +709,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         </div>
       </div>
 
-      {size && (
-        <WeatherFront
-          weather={weather}
-          dark={darkOn}
-          w={L.w}
-          h={L.h}
-          globe={() => {
-            const s = m.current;
-            return { cx: L.cx, cy: L.cy, r: L.R * s.zoom, open: s.featOn || s.coreOn || s.lens !== null };
-          }}
-        />
-      )}
+      {/* lightning lights up everything */}
+      <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
       {/* + until you've posted, then the countdown to midnight */}
       <div
@@ -866,6 +897,7 @@ sim: TileSim,
   const reveal = s.lens !== null ? 0 : clamp01((s.zoom - 1.4) / 1.2);
   const lensP = s.lens !== null ? clamp01((s.zoom - 1) / (zFeat - 1)) : 0;
   const cam: Camera = { yaw: s.yaw, pitch: s.pitch, roll: 0 };
+  s.cam = cam;
   // the tilt leaves a centred tile leaning; roll the camera so the song lands upright
   if (s.lens !== null) {
     if (!s.featOn) {
