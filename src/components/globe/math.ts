@@ -78,7 +78,7 @@ export function sunLight(date: Date, geo: { lat: number; lon: number }): Sun {
   return { az, el, L, day };
 }
 
-export function starField(n: number, seed: number, size: number, alpha: number) {
+export function starField(n: number, seed: number, size: number, alpha: number, extent = 1000) {
   let x = seed;
   const rnd = () => {
     x = (x * 16807) % 2147483647;
@@ -87,7 +87,7 @@ export function starField(n: number, seed: number, size: number, alpha: number) 
   const out: string[] = [];
   for (let i = 0; i < n; i++)
     out.push(
-      `${Math.round(rnd() * 1000)}px ${Math.round(rnd() * 1000)}px 0 ${size}px rgba(255,255,255,${(alpha * (0.35 + 0.65 * rnd())).toFixed(2)})`,
+      `${Math.round(rnd() * extent)}px ${Math.round(rnd() * extent)}px 0 ${size}px rgba(255,255,255,${(alpha * (0.35 + 0.65 * rnd())).toFixed(2)})`,
     );
   return out.join(", ");
 }

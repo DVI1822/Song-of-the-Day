@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { todayIn } from "@/lib/day";
 import type { Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
+import { Ambient } from "./Ambient";
 import { Compose } from "./Compose";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -601,7 +602,15 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const muted = darkOn ? "#93A6B8" : "#6A818C";
   const tabTop = Math.max(100, L.cy - 240);
   const panelW = Math.min(296, L.w - 58);
-  const stars = useMemo(() => ({ a: starField(260, 7, 0.4, 0.9), b: starField(45, 99, 0.3, 1) }), []);
+  // The star field turns with the globe, so it covers the screen's diagonal.
+  const starBox = Math.ceil(Math.hypot(L.w, L.h) / 100) * 100 + 100;
+  const stars = useMemo(() => {
+    const k = (starBox / 1000) ** 2;
+    return {
+      a: starField(Math.round(320 * k), 7, 0.4, 0.9, starBox),
+      b: starField(Math.round(60 * k), 99, 0.3, 1, starBox),
+    };
+  }, [starBox]);
   const activeTab = (name: PanelName) =>
     panel === name && panelOn
       ? { background: "#FFFFFF", boxShadow: "inset 3px 0 0 #D7262B, 0 8px 30px -14px rgba(13,42,63,0.3)" }
@@ -639,7 +648,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         <div
           ref={(el) => void (R.current.day = el)}
           className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(ellipse 120% 90% at 50% 40%, #FFFFFF 0%, #EEF6FD 50%, #D9EAF8 100%)" }}
+          style={{ background: "linear-gradient(180deg, #CCE3F6 0%, #E4F0FA 40%, #F6FAFD 75%, #FFFFFF 100%)" }}
         />
         <div
           ref={(el) => void (R.current.space = el)}
@@ -655,8 +664,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           />
           <div
             ref={(el) => void (R.current.stars = el)}
-            className="absolute h-[1000px] w-[1000px]"
-            style={{ left: L.cx - 500, top: L.cy - 500 }}
+            className="absolute"
+            style={{ left: L.cx - starBox / 2, top: L.cy - starBox / 2, width: starBox, height: starBox }}
           >
             <div className="absolute left-0 top-0 h-px w-px rounded-full" style={{ boxShadow: stars.a }} />
             <div
@@ -667,6 +676,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           </div>
         </div>
         <div ref={(el) => void (R.current.sunGlow = el)} className="pointer-events-none absolute inset-0" />
+        {size && <Ambient dark={darkOn} w={L.w} h={L.h} />}
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div
           ref={(el) => void (R.current.sphere = el)}
@@ -689,10 +699,10 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           ref={(el) => void (R.current.sunDisc = el)}
           className="pointer-events-none absolute rounded-full"
           style={{
-            width: 46 * L.s,
-            height: 46 * L.s,
-            marginLeft: -23 * L.s,
-            marginTop: -23 * L.s,
+            width: 16 * L.s,
+            height: 16 * L.s,
+            marginLeft: -8 * L.s,
+            marginTop: -8 * L.s,
             background: "radial-gradient(circle at 45% 42%, #FFFFFF 0%, #FFF8DC 45%, #FFE39A 75%, #FFC861 100%)",
           }}
         />
@@ -1055,12 +1065,12 @@ sim: TileSim,
   if (r.floor) r.floor.style.opacity = roomOp.toFixed(3);
   // The sun orbits the globe as if it were the centre of the universe, at
   // its real place in the sky: east is screen-right, the noon sun sits
-  // between you and the globe.
-  const orbit = 1.75 * L.R;
-  const sz = Lc[2] * orbit,
-    proj = PERSPECTIVE / (PERSPECTIVE - sz);
-  const sx = L.cx + Lc[0] * orbit * proj,
-    sy = L.cy + Lc[1] * orbit * proj;
+  // between you and the globe. It's far off, so small and soft.
+  const orbit = Math.min(1.3 * L.R, Math.min(L.w, L.h) / 2 - 14);
+  const sz = Lc[2],
+    proj = 1 + 0.15 * sz;
+  const sx = L.cx + Lc[0] * orbit,
+    sy = L.cy + Lc[1] * orbit;
   const warm = 1 - clamp01((sun.el * 180) / Math.PI / 25);
   if (r.sunDisc) {
     const st = r.sunDisc.style;
@@ -1069,12 +1079,12 @@ sim: TileSim,
     st.transform = `scale(${proj.toFixed(3)})`;
     st.zIndex = sz > 0 ? "2" : "0";
     st.opacity = ((1 - reveal) * (1 - lensP)).toFixed(3);
-    st.boxShadow = `0 0 ${(30 + 30 * (1 - warm)).toFixed(0)}px ${(10 + 8 * dk).toFixed(0)}px rgba(255,${Math.round(214 - 60 * warm)},${Math.round(140 - 80 * warm)},${(0.55 + 0.25 * dk).toFixed(2)})`;
+    st.boxShadow = `0 0 ${(12 + 8 * (1 - warm)).toFixed(0)}px ${(3 + 3 * dk).toFixed(0)}px rgba(255,${Math.round(214 - 60 * warm)},${Math.round(140 - 80 * warm)},${(0.45 + 0.25 * dk).toFixed(2)})`;
   }
   if (r.sunGlow) {
     const c = [255, Math.round(244 - 70 * warm), Math.round(214 - 110 * warm)].join(",");
-    r.sunGlow.style.opacity = ((1 - reveal) * Math.max(day, 0.35 * dk)).toFixed(3);
-    r.sunGlow.style.background = `radial-gradient(circle at ${sx.toFixed(1)}px ${sy.toFixed(1)}px, rgba(${c},${(0.55 - 0.3 * dk).toFixed(2)}), rgba(${c},${(0.18 - 0.1 * dk).toFixed(2)}) ${Math.round(L.R * 0.9)}px, rgba(${c},0) ${Math.round(L.R * 2)}px)`;
+    r.sunGlow.style.opacity = ((1 - reveal) * Math.max(0.55 * day, 0.2 * dk)).toFixed(3);
+    r.sunGlow.style.background = `radial-gradient(circle at ${sx.toFixed(1)}px ${sy.toFixed(1)}px, rgba(${c},${(0.55 - 0.3 * dk).toFixed(2)}), rgba(${c},${(0.18 - 0.1 * dk).toFixed(2)}) ${Math.round(L.R * 0.45)}px, rgba(${c},0) ${Math.round(L.R * 1.3)}px)`;
   }
   if (r.sphere) {
     const hx = 50 + 42 * Lc[0],
