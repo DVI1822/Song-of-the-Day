@@ -667,8 +667,9 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             />
           </div>
         </div>
-        {size && <WeatherSky weather={weather} dark={darkOn} w={L.w} h={L.h} />}
-        {size && <Ambient dark={darkOn} w={L.w} h={L.h} />}
+        <WeatherSky weather={weather} dark={darkOn} />
+        {/* the little sky moments only on clear-ish days */}
+        {size && (!weather || weather.kind === "clear" || weather.kind === "partly") && <Ambient dark={darkOn} w={L.w} h={L.h} />}
         <canvas ref={(el) => void (R.current.wxFloor = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div

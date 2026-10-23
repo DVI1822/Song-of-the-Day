@@ -18,7 +18,6 @@ import { PERSPECTIVE, TILT, camInv, camV, type Camera, type V3 } from "./math";
 type Drop = { el: HTMLDivElement; x: number; y: number; z: number; vx: number; vy: number; len: number; drip: boolean };
 type Flake = { el: HTMLDivElement; x: number; y: number; z: number; vy: number; ph: number };
 type Bead = { el: HTMLDivElement; p: V3; r: number; age: number; hold: number; v: number; life: number };
-type Ring = { el: HTMLDivElement; a: V3; age: number };
 type Fog = { el: HTMLDivElement; x: number; y: number; z: number; w: number };
 
 export type WeatherFrame = {
@@ -38,10 +37,10 @@ const P = PERSPECTIVE;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const FLOOR_NEAR = 640;
+const FLOOR_NEAR = 920;
 const FLOOR_FAR = 1200;
-const NEAR = 720; // closest anything comes, so nothing swells past the camera
-const FAR = -1500;
+const NEAR = 320; // closest anything comes, so nothing big streaks across the songs
+const FAR = -1700;
 
 function div(parent: HTMLElement, css: string) {
   const el = document.createElement("div");
@@ -54,7 +53,6 @@ export class WeatherSim {
   private drops: Drop[] = [];
   private flakes: Flake[] = [];
   private beads: Bead[] = [];
-  private rings: Ring[] = [];
   private fogs: Fog[] = [];
   private puddleRings: { x: number; z: number; age: number }[] = [];
   private blobs: { x: number; z: number; k: number }[];
@@ -133,7 +131,7 @@ export class WeatherSim {
     const floorRad = 60 + this.level * 860;
 
     // ---------------------------------------------------------------- rain
-    const wantDrops = !wet || snow ? 0 : Math.round((storm ? 480 : drizzle ? 260 : 170 + 230 * intensity) * area * this.calm);
+    const wantDrops = !wet || snow ? 0 : Math.round((storm ? 300 : drizzle ? 170 : 150 + 140 * intensity) * area * this.calm);
     while (this.drops.filter((d) => !d.drip).length < wantDrops) this.drops.push(this.newDrop(halfW, topY, false));
     let spare = this.drops.filter((d) => !d.drip).length - wantDrops;
     for (let i = this.drops.length - 1; i >= 0; i--) {
@@ -149,14 +147,13 @@ export class WeatherSim {
         const hit = -Math.sqrt(Rh2 - d.x * d.x - d.z * d.z);
         if (py < hit && d.y >= hit) {
           const at = camInv([d.x / Rh, hit / Rh, d.z / Rh], cam);
-          if (Math.random() < 0.55) this.ring(at);
-          if (Math.random() < (storm ? 0.3 : drizzle ? 0.35 : 0.4) && this.beads.length < 130)
-            this.bead(at, drizzle ? rand(1.6, 3) : rand(2.2, 5.2), false);
+          if (Math.random() < (storm ? 0.14 : 0.2) && this.beads.length < 70)
+            this.bead(at, drizzle ? rand(1, 1.8) : rand(1.3, 2.8), false);
           done = true;
         }
       }
       if (!done && d.y >= f.floorY) {
-        if (Math.hypot(d.x, d.z) < floorRad * 0.9 && this.level > 0.02 && Math.random() < (d.drip ? 1 : 0.5))
+        if (Math.hypot(d.x, d.z) < floorRad * 0.9 && this.level > 0.02 && Math.random() < (d.drip ? 1 : 0.3))
           if (this.puddleRings.length < 120) this.puddleRings.push({ x: d.x, z: d.z, age: 0 });
         done = true;
       }
@@ -171,14 +168,14 @@ export class WeatherSim {
         this.resetDrop(d, halfW, topY);
       }
       const behind = d.z < 0 && d.x * d.x + d.y * d.y < Rh2;
-      const a = (storm ? 0.85 : drizzle ? 0.55 : 0.75) * (0.3 + 0.7 * clamp01((d.z - FAR) / (NEAR - FAR))) * (behind ? 0.3 : 1);
+      const a = (storm ? 0.55 : drizzle ? 0.32 : 0.45) * (0.35 + 0.65 * clamp01((d.z - FAR) / (NEAR - FAR))) * (behind ? 0.35 : 1);
       const ang = d.drip ? 0 : -Math.atan(lean);
       d.el.style.opacity = a.toFixed(2);
       d.el.style.transform = `translate3d(${d.x.toFixed(1)}px,${(d.y - d.len).toFixed(1)}px,${d.z.toFixed(1)}px) rotate(${ang.toFixed(3)}rad)`;
     }
 
     // ---------------------------------------------------------------- snow
-    const wantFlakes = snow ? Math.round((110 + 180 * intensity) * area * this.calm) : 0;
+    const wantFlakes = snow ? Math.round((80 + 110 * intensity) * area * this.calm) : 0;
     while (this.flakes.length < wantFlakes) this.flakes.push(this.newFlake(halfW, topY));
     for (let i = this.flakes.length - 1; i >= 0; i--) {
       const s = this.flakes[i];
@@ -203,7 +200,7 @@ export class WeatherSim {
         Object.assign(s, this.flakeSpot(halfW, topY));
       }
       const behind = s.z < 0 && s.x * s.x + s.y * s.y < Rh2;
-      s.el.style.opacity = ((0.5 + 0.5 * clamp01((s.z - FAR) / (NEAR - FAR))) * (behind ? 0.3 : 1)).toFixed(2);
+      s.el.style.opacity = ((0.35 + 0.5 * clamp01((s.z - FAR) / (NEAR - FAR))) * (behind ? 0.3 : 1)).toFixed(2);
       s.el.style.transform = `translate3d(${s.x.toFixed(1)}px,${s.y.toFixed(1)}px,${s.z.toFixed(1)}px)`;
     }
 
@@ -252,31 +249,11 @@ export class WeatherSim {
       b.el.style.transform = `rotateY(${lon.toFixed(4)}rad) rotateX(${Math.asin(sla).toFixed(4)}rad) translateZ(${(Rh + 0.6).toFixed(1)}px) rotateZ(${rot.toFixed(3)}rad) scale(1,${stretch.toFixed(2)})`;
     }
 
-    // ------------------------------------------------------------- ripples
-    for (let i = this.rings.length - 1; i >= 0; i--) {
-      const r = this.rings[i];
-      r.age += dt;
-      const life = 0.35;
-      if (r.age > life) {
-        r.el.remove();
-        this.rings.splice(i, 1);
-        continue;
-      }
-      const k = r.age / life;
-      r.el.style.opacity = ((1 - k) * 0.9).toFixed(2);
-      {
-        const n = r.a,
-          sla = -n[1],
-          lon = Math.atan2(n[0], n[2]);
-        r.el.style.transform = `rotateY(${lon.toFixed(4)}rad) rotateX(${Math.asin(sla).toFixed(4)}rad) translateZ(${(Rh + 0.8).toFixed(1)}px) scale(${(0.2 + 1.2 * k).toFixed(3)})`;
-      }
-    }
-
     // --------------------------------------------------------------- floor
     this.paintFloor(dt, f, snow || (this.kindDrawn === "snow" && !wet), floorRad);
 
     // ----------------------------------------------------------------- fog
-    const wantFog = fog ? 12 : 0;
+    const wantFog = fog ? 8 : 0;
     while (this.fogs.length < wantFog) {
       const z = rand(-1300, 450);
       const w = rand(500, 1000);
@@ -309,7 +286,7 @@ export class WeatherSim {
     if (this.flashEl) {
       this.flash = Math.max(0, this.flash - dt * 1.8);
       const k = this.flash;
-      this.flashEl.style.opacity = (k > 0.8 ? 0.55 : k > 0.7 ? 0.1 : k * 0.45).toFixed(3);
+      this.flashEl.style.opacity = (0.22 * k * k).toFixed(3);
     }
   }
 
@@ -329,13 +306,13 @@ export class WeatherSim {
     d.x = rand(-1.2, 1) * halfW(d.z);
     d.y = topY(d.z) - (scatter ? rand(-1.6, 0.1) * Math.abs(topY(d.z)) : rand(0, 200));
     d.vy = kind === "storm" ? rand(1500, 1900) : kind === "drizzle" ? rand(520, 700) : rand(1000, 1300);
-    d.len = kind === "storm" ? rand(44, 70) : kind === "drizzle" ? rand(9, 15) : rand(26, 44);
+    d.len = kind === "storm" ? rand(26, 40) : kind === "drizzle" ? rand(6, 10) : rand(16, 26);
     d.el.style.height = d.len.toFixed(0) + "px";
   }
 
   private paintDrop(d: Drop) {
-    const c = this.darkDrawn ? "195,214,242" : "58,84,110";
-    d.el.style.width = this.kindDrawn === "storm" ? "1.8px" : this.kindDrawn === "drizzle" ? "1.1px" : "1.5px";
+    const c = this.darkDrawn ? "205,218,238" : "92,112,132";
+    d.el.style.width = this.kindDrawn === "storm" ? "1.2px" : this.kindDrawn === "drizzle" ? "0.8px" : "1px";
     d.el.style.background = `linear-gradient(rgba(${c},0), rgba(${c},0.95))`;
   }
 
@@ -349,7 +326,7 @@ export class WeatherSim {
   }
 
   private newFlake(halfW: (z: number) => number, topY: (z: number) => number): Flake {
-    const r = rand(1.6, 4.2);
+    const r = rand(1, 2.6);
     const el = div(this.fall, `width:${r * 2}px;height:${r * 2}px;left:${-r}px;top:${-r}px;border-radius:50%`);
     const f: Flake = { el, ph: rand(0, 6.3), ...this.flakeSpot(halfW, topY, true) };
     this.paintFlake(f);
@@ -369,12 +346,12 @@ export class WeatherSim {
 
   private bead(p: V3, r: number, snow: boolean) {
     const el = div(this.skin, `width:${r * 2}px;height:${r * 2}px;left:${-r}px;top:${-r}px;border-radius:50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;opacity:0`);
+    // clear water: mostly see-through, a small highlight and a faint edge
     el.style.background = snow
-      ? "radial-gradient(circle, rgba(255,255,255,1) 45%, rgba(255,255,255,0) 75%)"
+      ? "radial-gradient(circle, rgba(255,255,255,0.95) 40%, rgba(255,255,255,0) 72%)"
       : this.darkDrawn
-        ? "radial-gradient(circle at 34% 30%, rgba(235,245,255,0.95) 0 14%, rgba(200,220,255,0.16) 26%, rgba(150,180,230,0.08) 58%, rgba(210,228,255,0.55) 72%, rgba(210,228,255,0) 80%)"
-        : "radial-gradient(circle at 34% 30%, rgba(255,255,255,1) 0 14%, rgba(255,255,255,0.25) 26%, rgba(200,220,235,0.12) 56%, rgba(13,42,63,0.3) 70%, rgba(255,255,255,0.8) 76%, rgba(255,255,255,0) 82%)";
-    if (!snow) el.style.boxShadow = `0 ${(r * 0.4).toFixed(1)}px ${(r * 0.7).toFixed(1)}px rgba(13,42,63,${this.darkDrawn ? 0.35 : 0.22})`;
+        ? "radial-gradient(circle at 35% 32%, rgba(235,245,255,0.75) 0 12%, rgba(200,220,255,0.06) 30%, rgba(200,220,255,0.04) 62%, rgba(210,228,255,0.3) 74%, rgba(210,228,255,0) 82%)"
+        : "radial-gradient(circle at 35% 32%, rgba(255,255,255,0.9) 0 12%, rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.05) 62%, rgba(255,255,255,0.45) 74%, rgba(255,255,255,0) 82%)";
     this.beads.push({ el, p: [...p] as V3, r, age: 0, hold: snow ? 0 : rand(0.8, 5), v: 0, life: snow ? rand(18, 40) : 999 });
   }
 
@@ -435,12 +412,12 @@ export class WeatherSim {
       const c = f.dark ? "40,64,110" : "86,122,155";
       const sc = f.dark ? "150,175,225" : "236,244,250";
       const g = ctx.createLinearGradient(0, top, 0, bottom);
-      g.addColorStop(0, `rgba(${sc},0.75)`);
-      g.addColorStop(0.18, `rgba(${c},0.5)`);
-      g.addColorStop(1, `rgba(${c},0.62)`);
+      g.addColorStop(0, `rgba(${sc},0.5)`);
+      g.addColorStop(0.2, `rgba(${c},0.26)`);
+      g.addColorStop(1, `rgba(${c},0.34)`);
       // a wet, bright rim, then the water
-      ctx.fillStyle = f.dark ? "rgba(150,180,235,0.3)" : "rgba(255,255,255,0.75)";
-      shape(10);
+      ctx.fillStyle = f.dark ? "rgba(150,180,235,0.14)" : "rgba(255,255,255,0.4)";
+      shape(6);
       ctx.fill("nonzero");
       ctx.globalCompositeOperation = "destination-out";
       ctx.fillStyle = "#000";
@@ -452,7 +429,7 @@ export class WeatherSim {
       // the globe's dark reflection in the water, just under it
       const [rx, ry] = proj(0, 40);
       const rg = ctx.createRadialGradient(rx, ry, 0, rx, ry, f.R * zoom * 1.1);
-      rg.addColorStop(0, f.dark ? "rgba(10,16,32,0.35)" : "rgba(30,55,80,0.22)");
+      rg.addColorStop(0, f.dark ? "rgba(10,16,32,0.22)" : "rgba(30,55,80,0.12)");
       rg.addColorStop(1, "rgba(0,0,0,0)");
       ctx.save();
       ctx.clip("nonzero");
@@ -476,20 +453,12 @@ export class WeatherSim {
       const [x, y] = proj(r.x, r.z);
       const ry2 = proj(r.x, r.z + 10)[1] - y;
       const kk = (zoom * P) / (P - r.z * zoom);
-      ctx.strokeStyle = f.dark ? `rgba(200,220,255,${(0.6 * (1 - k)).toFixed(3)})` : `rgba(255,255,255,${(0.85 * (1 - k)).toFixed(3)})`;
+      ctx.strokeStyle = f.dark ? `rgba(200,220,255,${(0.3 * (1 - k)).toFixed(3)})` : `rgba(255,255,255,${(0.5 * (1 - k)).toFixed(3)})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.ellipse(x, y, Math.max(0.5, (3 + 20 * k) * kk), Math.max(0.3, (3 + 20 * k) * Math.abs(ry2) / 10), 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y, Math.max(0.5, (2 + 13 * k) * kk), Math.max(0.3, ((2 + 13 * k) * Math.abs(ry2)) / 10), 0, 0, Math.PI * 2);
       ctx.stroke();
     }
-  }
-
-  private ring(a: V3) {
-    if (this.rings.length > 90) return;
-    const size = 14;
-    const el = div(this.skin, `width:${size}px;height:${size}px;left:${-size / 2}px;top:${-size / 2}px;border-radius:50%;backface-visibility:hidden;-webkit-backface-visibility:hidden`);
-    el.style.border = `1px solid ${this.darkDrawn ? "rgba(200,220,255,0.8)" : "rgba(255,255,255,0.95)"}`;
-    this.rings.push({ el, a: [...a] as V3, age: 0 });
   }
 
   private strike(halfW: (z: number) => number, topY: (z: number) => number, floorY: number) {
@@ -505,7 +474,7 @@ export class WeatherSim {
       if (i === 5) for (let j = 0, bx = x; j < 5; j++) branch.push(`${((bx += rand(8, 26)) + 120).toFixed(1)},${((height * (i + j * 0.7)) / n).toFixed(1)}`);
       x += rand(-28, 28);
     }
-    this.bolt.innerHTML = `<svg width="240" height="${height.toFixed(0)}" style="overflow:visible"><polyline points="${pts.join(" ")}" fill="none" stroke="#F4F7FF" stroke-width="2.4" stroke-linejoin="round"/><polyline points="${pts[5]} ${branch.join(" ")}" fill="none" stroke="#F4F7FF" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+    this.bolt.innerHTML = `<svg width="240" height="${height.toFixed(0)}" style="overflow:visible"><polyline points="${pts.join(" ")}" fill="none" stroke="#F4F7FF" stroke-width="1.4" stroke-linejoin="round"/><polyline points="${pts[5]} ${branch.join(" ")}" fill="none" stroke="#F4F7FF" stroke-width="0.8" stroke-linejoin="round"/></svg>`;
     this.bolt.style.transform = `translate3d(${(x0 - 120).toFixed(1)}px,${top.toFixed(1)}px,${z.toFixed(1)}px)`;
   }
 
@@ -517,8 +486,8 @@ export class WeatherSim {
       for (const f of this.flakes) this.paintFlake(f);
     }
     const fog = dark
-      ? "radial-gradient(closest-side, rgba(150,160,185,0.3), rgba(150,160,185,0))"
-      : "radial-gradient(closest-side, rgba(255,255,255,0.75), rgba(255,255,255,0))";
+      ? "radial-gradient(closest-side, rgba(150,160,185,0.16), rgba(150,160,185,0))"
+      : "radial-gradient(closest-side, rgba(255,255,255,0.4), rgba(255,255,255,0))";
     for (const g of this.fogs) g.el.style.background = fog;
   }
 }

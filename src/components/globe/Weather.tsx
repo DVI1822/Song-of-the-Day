@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PRESETS, type Weather, type WeatherKind, type WeatherReply } from "@/lib/weather";
 
 // The real weather where you are, laid over the day and night skies. This
@@ -69,42 +69,16 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
 // Behind the Globe: a greyer sky, drifting clouds, fog
 // ---------------------------------------------------------------------------
 
-const PUFFS = [
-  [0, 30, 90, 40],
-  [50, 8, 100, 60],
-  [120, 22, 90, 46],
-  [30, 40, 150, 30],
-];
-
-export function WeatherSky({ weather, dark, w, h }: { weather: Weather | null; dark: boolean; w: number; h: number }) {
-  const clouds = useMemo(() => {
-    if (!weather) return [];
-    const n = Math.round(weather.cloud * 8);
-    // spread out by index so they don't bunch up; fixed per weather
-    return Array.from({ length: n }, (_, i) => {
-      const r = (k: number) => {
-        const x = Math.sin((i + 1) * 12.9898 * k + weather.cloud * 78.233) * 43758.5453;
-        return x - Math.floor(x);
-      };
-      const dur = (110 + 70 * r(1)) / (1 + weather.wind / 10);
-      return { y: (0.02 + 0.5 * r(2)) * h, scale: 0.6 + 0.9 * r(3), dur, delay: -dur * ((i + r(4)) / n) };
-    });
-  }, [weather, h]);
-
+// A calm overcast: the sky greys over, and one soft bank of cloud drifts very
+// slowly across the top. No separate cloud shapes, nothing that pops in.
+export function WeatherSky({ weather, dark }: { weather: Weather | null; dark: boolean }) {
   if (!weather || weather.kind === "clear") return null;
+  const storm = weather.kind === "storm";
   const wet = weather.intensity > 0 || weather.kind === "fog";
-  const grey = weather.kind === "storm" ? 1 : wet ? 0.8 : Math.max(0, weather.cloud - 0.45) * 1.3;
-  const puff = dark
-    ? wet
-      ? "rgba(52,60,78,0.85)"
-      : "rgba(70,80,104,0.6)"
-    : weather.kind === "storm"
-      ? "#7D8894"
-      : wet
-        ? "#B4BFC9"
-      : weather.cloud > 0.8
-        ? "#D3DBE2"
-        : "#FFFFFF";
+  const grey = storm ? 1 : wet ? 0.8 : Math.max(0, weather.cloud - 0.4) * 1.2;
+  const bank = Math.min(1, weather.cloud) * (dark ? 0.5 : 0.7);
+  const cloud = dark ? (storm ? "20,24,34" : "58,66,84") : storm ? "120,132,144" : wet ? "176,188,198" : "255,255,255";
+  const drift = Math.round(360 / (1 + weather.wind / 8));
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -113,49 +87,52 @@ export function WeatherSky({ weather, dark, w, h }: { weather: Weather | null; d
           className="absolute inset-0 transition-opacity duration-[3000ms]"
           style={{
             opacity: Math.min(1, grey) * (dark ? 0.7 : 0.75),
-            background:
-              weather.kind === "storm"
-                ? dark
-                  ? "linear-gradient(180deg, #10141E 0%, #0B0E16 60%, #07090F 100%)"
-                  : "linear-gradient(180deg, #6F7C88 0%, #8F9AA5 45%, #B6BEC6 100%)"
-                : dark
-                  ? "linear-gradient(180deg, #1B2130 0%, #121722 60%, #0B0F18 100%)"
-                  : "linear-gradient(180deg, #A9B5C0 0%, #C6CFD7 45%, #E2E6EA 100%)",
+            background: storm
+              ? dark
+                ? "linear-gradient(180deg, #10141E 0%, #0B0E16 60%, #07090F 100%)"
+                : "linear-gradient(180deg, #7C8894 0%, #9AA5AF 45%, #BEC6CD 100%)"
+              : dark
+                ? "linear-gradient(180deg, #1B2130 0%, #121722 60%, #0B0F18 100%)"
+                : "linear-gradient(180deg, #B3BEC8 0%, #CCD4DB 45%, #E4E8EB 100%)",
           }}
         />
       )}
-      {clouds.map((c, i) => (
+      {bank > 0.05 && (
         <div
-          key={i}
-          className="absolute left-0 top-0"
-          style={
-            {
-              "--x0": `-${260 * c.scale}px`,
-              "--x1": `${w + 40}px`,
-              "--y0": `${c.y}px`,
-              "--y1": `${c.y + 12}px`,
-              animation: `sky-travel ${c.dur}s linear ${c.delay}s infinite`,
-            } as CSSProperties
-          }
+          className="absolute inset-x-0 top-0 h-[55%]"
+          style={{
+            opacity: bank,
+            maskImage: "linear-gradient(180deg, #000 30%, transparent)",
+            WebkitMaskImage: "linear-gradient(180deg, #000 30%, transparent)",
+          }}
         >
-          <div className="relative h-[70px] w-[220px] origin-top-left" style={{ transform: `scale(${c.scale})` }}>
-            {PUFFS.map(([x, y, cw, ch], j) => (
+          {/* two copies side by side, sliding left forever, so it never jumps */}
+          <div className="absolute inset-y-0 left-0 flex w-[200%]" style={{ animation: `sky-drift ${drift}s linear infinite` }}>
+            {[0, 1].map((k) => (
               <div
-                key={j}
-                className="absolute rounded-full"
-                style={{ left: x, top: y, width: cw, height: ch, background: `radial-gradient(closest-side, ${puff} 45%, transparent)` }}
+                key={k}
+                className="h-full w-1/2"
+                style={{
+                  filter: "blur(24px)",
+                  background: [
+                    `radial-gradient(ellipse 38% 30% at 12% 28%, rgba(${cloud},0.9), rgba(${cloud},0))`,
+                    `radial-gradient(ellipse 30% 26% at 40% 18%, rgba(${cloud},0.75), rgba(${cloud},0))`,
+                    `radial-gradient(ellipse 42% 32% at 68% 32%, rgba(${cloud},0.85), rgba(${cloud},0))`,
+                    `radial-gradient(ellipse 30% 24% at 92% 20%, rgba(${cloud},0.7), rgba(${cloud},0))`,
+                  ].join(","),
+                }}
               />
             ))}
           </div>
         </div>
-      ))}
+      )}
       {weather.kind === "fog" && (
         <div
           className="absolute inset-0"
           style={{
             background: dark
-              ? "linear-gradient(180deg, rgba(120,130,150,0.05) 10%, rgba(120,130,150,0.32) 70%, rgba(120,130,150,0.45))"
-              : "linear-gradient(180deg, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0.65) 70%, rgba(255,255,255,0.8))",
+              ? "linear-gradient(180deg, rgba(120,130,150,0.04) 10%, rgba(120,130,150,0.22) 70%, rgba(120,130,150,0.3))"
+              : "linear-gradient(180deg, rgba(255,255,255,0.08) 10%, rgba(255,255,255,0.5) 70%, rgba(255,255,255,0.65))",
           }}
         />
       )}
