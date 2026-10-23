@@ -7,7 +7,12 @@ import {
   loadCore,
   previewSong,
   searchPeople,
+  spotifyNow,
+  spotifyPause,
+  spotifyPlay,
   type NewPost,
+  type SpotifyNow,
+  type SpotifyPlay,
 } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
@@ -22,6 +27,14 @@ export type GlobeApi = {
   searchPeople(q: string): Promise<(Profile & { following: boolean })[]>;
   follow(profileId: string): Promise<{ friend?: Friend; error?: string }>;
   loadCore(userId: string): Promise<Core | null>;
+  // Spotify Connect, for people who linked Spotify. The demo has none.
+  spotify?: SpotifyConnect;
+};
+
+export type SpotifyConnect = {
+  play(uri: string, positionMs?: number): Promise<SpotifyPlay>;
+  pause(): Promise<void>;
+  now(): Promise<SpotifyNow>;
 };
 
 export const serverApi: GlobeApi = {
@@ -31,6 +44,7 @@ export const serverApi: GlobeApi = {
   searchPeople,
   follow,
   loadCore,
+  spotify: { play: spotifyPlay, pause: spotifyPause, now: spotifyNow },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();
     const path = `${userId}/${crypto.randomUUID()}.jpg`;

@@ -33,12 +33,16 @@ type Props = {
   friends: Friend[];
   mySongs: Post[];
   redoUsed: boolean;
+  spotifyLinked?: boolean;
   api?: GlobeApi;
 };
 
 export function GlobeApp(props: Props) {
+  const spotify = (props.api ?? serverApi).spotify;
+  const linked = Boolean(props.spotifyLinked);
+  const connect = useMemo(() => (spotify ? { ...spotify, linked } : null), [spotify, linked]);
   return (
-    <PreviewProvider>
+    <PreviewProvider connect={connect}>
       <Globe {...props} />
     </PreviewProvider>
   );

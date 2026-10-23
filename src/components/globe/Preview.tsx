@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { embedFor } from "@/lib/songs";
 import type { Post } from "@/lib/types";
+import type { SpotifyConnect } from "./api";
 
 // One shared audio element for 30-second previews, so starting one song
 // stops the last. Spotify's player claims the same slot with its own stop.
@@ -12,10 +13,17 @@ type PreviewState = {
   play(key: string, url: string): void;
   claim(key: string, stop: () => void): void;
   stop(): void;
+  connect: (SpotifyConnect & { linked: boolean }) | null;
 };
 const Ctx = createContext<PreviewState | null>(null);
 
-export function PreviewProvider({ children }: { children: React.ReactNode }) {
+export function PreviewProvider({
+  children,
+  connect,
+}: {
+  children: React.ReactNode;
+  connect: (SpotifyConnect & { linked: boolean }) | null;
+}) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const other = useRef<(() => void) | null>(null);
   const [key, setKey] = useState<string | null>(null);
@@ -70,7 +78,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     [silence],
   );
 
-  return <Ctx.Provider value={{ key, at, play, claim, stop }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ key, at, play, claim, stop, connect }}>{children}</Ctx.Provider>;
 }
 
 export function usePreview() {
@@ -130,7 +138,9 @@ export const OpenIcon = () => (
   </svg>
 );
 
-// One play button. Spotify songs play through Spotify's player, hidden: anyone
+// One play button. Anyone who linked Spotify hears the song start on their
+// own Spotify app (Spotify Connect), whole, if they have Premium. Otherwise
+// Spotify songs play through Spotify's player, hidden: anyone
 // signed in to Spotify in this browser hears the whole song, everyone else
 // Spotify's 30 seconds. If a browser won't let our button start it (some
 // phones insist on a tap inside Spotify's own player), the player shows up
@@ -159,6 +169,10 @@ export function SongPlayer({
   const [sp, setSp] = useState({ playing: false, position: 0, duration: 0 });
   const [waiting, setWaiting] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
+  // Spotify Connect: where it's playing and how far along
+  const connect = pv.connect?.linked && spotifyUri ? pv.connect : null;
+  const [cx, setCx] = useState<{ device: string; playing: boolean; position: number; duration: number } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const controller = useCallback(() => {
     if (!spotifyUri || !host.current) return null;
@@ -207,11 +221,52 @@ export function SongPlayer({
     return () => clearTimeout(t);
   }, [waiting]);
 
+  // Connect playback ticks along here and checks in with Spotify now and then
+  const cxPlaying = Boolean(cx?.playing);
+  useEffect(() => {
+    if (!cxPlaying || !connect || !spotifyUri) return;
+    let n = 0;
+    const t = setInterval(() => {
+      n++;
+      setCx((c) => {
+        if (!c?.playing) return c;
+        const position = c.position + 1000;
+        return c.duration && position >= c.duration ? { ...c, playing: false, position: c.duration } : { ...c, position };
+      });
+      if (n % 15 === 0 || n === 1)
+        connect.now().then((now) => {
+          if (!now) return;
+          setCx((c) =>
+            c && now.uri === spotifyUri
+              ? { ...c, playing: now.playing, position: now.position, duration: now.duration || c.duration }
+              : c && { ...c, playing: false },
+          );
+        });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [cxPlaying, connect, spotifyUri]);
+
   const previewOn = pv.key === id && !spotifyUri;
-  const spotifyOn = pv.key === id && Boolean(spotifyUri) && (sp.playing || waiting);
+  const connectOn = pv.key === id && cxPlaying;
+  const spotifyOn = pv.key === id && Boolean(spotifyUri) && (sp.playing || waiting || connectOn);
   const canPlay = Boolean(embed || post.preview_url);
   const size = big ? 54 : 44;
   const playing = embedOpen || previewOn || spotifyOn;
+
+  // Spotify's own player, hidden, driven by our button
+  const playEmbed = () => {
+    const c = controller();
+    if (!c) return;
+    pv.claim(id, () => {
+      ctl.current?.then((x) => x.pause());
+    });
+    setWaiting(true);
+    c.then((x) => {
+      if (started.current) x.resume();
+      else x.play();
+      started.current = true;
+    });
+  };
 
   const toggle = () => {
     if (playing) {
@@ -220,18 +275,24 @@ export function SongPlayer({
       pv.stop();
       return;
     }
-    if (spotifyUri) {
-      const c = controller();
-      if (!c) return;
+    if (connect && spotifyUri) {
+      setNote(null);
       pv.claim(id, () => {
-        ctl.current?.then((x) => x.pause());
+        connect.pause();
+        setCx((c) => c && { ...c, playing: false });
       });
-      setWaiting(true);
-      c.then((x) => {
-        if (started.current) x.resume();
-        else x.play();
-        started.current = true;
+      // pick up where it was paused
+      const from = cx && cx.duration && cx.position < cx.duration - 2000 ? cx.position : 0;
+      setCx({ device: cx?.device ?? "", playing: true, position: from, duration: cx?.duration ?? 0 });
+      connect.play(spotifyUri, from).then((r) => {
+        if ("ok" in r) return setCx((c) => c && { ...c, device: r.device });
+        setCx(null);
+        if (r.error === "no-device") setNote("Open Spotify on your phone or computer, then press play again to hear the whole song there.");
+        if (r.error === "premium") setNote("Whole songs need Spotify Premium, so this is Spotify's preview.");
+        playEmbed();
       });
+    } else if (spotifyUri) {
+      playEmbed();
     } else if (post.preview_url) {
       pv.play(id, post.preview_url);
     } else if (embed) {
@@ -240,7 +301,12 @@ export function SongPlayer({
     }
   };
 
-  const progress = spotifyUri
+
+  const progress = cx
+    ? cx.duration > 0
+      ? { at: cx.position, of: cx.duration, preview: false }
+      : null
+    : spotifyUri
     ? sp.duration > 0 && (spotifyOn || sp.position > 0)
       ? { at: sp.position, of: sp.duration, preview: sp.duration <= 31_000 }
       : null
@@ -294,6 +360,13 @@ export function SongPlayer({
           aria-hidden={!showPlayer}
           className={showPlayer ? "rise-in overflow-hidden rounded-xl" : "pointer-events-none fixed left-0 top-0 -z-10 h-20 w-[300px] opacity-0"}
         />
+      )}
+      {cx && connectOn && cx.device && <p className="-mt-1 text-[11px] text-muted">Playing on {cx.device}</p>}
+      {note && <p className="-mt-1 text-[11px] text-muted">{note}</p>}
+      {big && spotifyUri && pv.connect && !pv.connect.linked && (
+        <a href="/spotify/connect" className="-mt-1 self-start text-[11px] font-semibold text-muted underline underline-offset-4">
+          Hear whole songs: connect Spotify
+        </a>
       )}
       {showPlayer && <p className="-mt-1 text-[11px] text-muted">This browser needs one tap on Spotify&apos;s play button to start.</p>}
       {embed && embedOpen && !spotifyUri && (
