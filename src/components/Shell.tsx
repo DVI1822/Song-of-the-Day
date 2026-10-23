@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-// The dark void with its turquoise aura, used by every page except the Globe
+// The white room with its faint glow, used by every page except the Globe
 // (which draws its own).
 export function Shell({
   children,
@@ -36,7 +36,7 @@ export function Shell({
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[28px] bg-card p-5 text-card-ink shadow-[0_16px_40px_-24px_rgba(0,0,0,0.55)] ${className}`}>
+    <div className={`rounded-[28px] border border-line bg-card p-5 text-card-ink shadow-[0_16px_40px_-24px_rgba(13,42,63,0.35)] ${className}`}>
       {children}
     </div>
   );
@@ -49,4 +49,4 @@ export const buttonClass =
   "inline-flex h-12 items-center justify-center gap-2 rounded-full bg-accent px-6 text-sm font-semibold text-white transition hover:bg-accent-deep disabled:opacity-50";
 
 export const ghostButtonClass =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-muted px-5 text-sm font-semibold text-ink transition hover:bg-white/5";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-muted px-5 text-sm font-semibold text-ink transition hover:bg-card-ink/5";

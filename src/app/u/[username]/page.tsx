@@ -83,7 +83,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
             {mine ? (
               <>
                 No song yet today.{" "}
-                <Link href="/post" className="font-semibold text-accent-deep">
+                <Link href="/" className="font-semibold text-accent-deep">
                   Share one
                 </Link>
               </>

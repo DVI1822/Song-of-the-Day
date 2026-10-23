@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/data";
+import { getCore, getSession } from "@/lib/data";
+import { supabaseUrl } from "@/lib/supabase/env";
+import type { Core, Friend, Post, Profile } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
 
 export type FormState = { error?: string; ok?: boolean } | undefined;
@@ -58,43 +60,58 @@ export async function previewSong(url: string): Promise<{ song?: ResolvedSong; e
   return { song };
 }
 
-export async function createPost(_: FormState, form: FormData): Promise<FormState> {
+export type NewPost = {
+  songUrl: string;
+  pageUrl: string | null;
+  title: string;
+  artist: string;
+  album: string;
+  artworkUrl: string | null;
+  previewUrl: string | null;
+  links: unknown;
+  caption: string;
+  photoUrl: string | null;
+};
+
+export async function createPost(input: NewPost): Promise<{ post?: Post; error?: string }> {
   const { supabase, userId, profile } = await getSession();
   if (!userId) redirect("/login");
   if (!profile) redirect("/welcome");
 
-  const songUrl = String(form.get("song_url") ?? "");
-  const title = String(form.get("title") ?? "").trim();
-  const artist = String(form.get("artist") ?? "").trim();
-  const caption = String(form.get("caption") ?? "").trim();
-  const artwork = String(form.get("artwork_url") ?? "");
-  const pageUrl = String(form.get("page_url") ?? "");
-  let links: unknown = {};
-  try {
-    links = JSON.parse(String(form.get("links") ?? "{}"));
-  } catch {}
-
-  if (!parseSongUrl(songUrl)) return { error: "That link doesn't look like a song." };
+  const title = input.title.trim();
+  const caption = input.caption.trim();
+  if (!parseSongUrl(input.songUrl)) return { error: "That link doesn't look like a song." };
   if (!title) return { error: "The song needs a title." };
-  if (caption.length > 100) return { error: "Keep the caption to 100 characters." };
+  if (caption.length > 100) return { error: "Keep the comment to 100 characters." };
 
-  const https = (v: string) => (v.startsWith("https://") ? v : null);
-  const { error } = await supabase.from("posts").insert({
-    song_url: songUrl,
-    page_url: https(pageUrl),
-    title: title.slice(0, 200),
-    artist: artist.slice(0, 200),
-    artwork_url: https(artwork),
-    platform_links: cleanLinks(links),
-    caption,
-  });
+  // Photos must be ones this person uploaded to their own folder.
+  const photoBase = `${supabaseUrl}/storage/v1/object/public/photos/${userId}/`;
+  const photo = input.photoUrl && input.photoUrl.startsWith(photoBase) ? input.photoUrl : null;
+
+  const https = (v: string | null) => (v && v.startsWith("https://") ? v : null);
+  const { data, error } = await supabase
+    .from("posts")
+    .insert({
+      song_url: input.songUrl,
+      page_url: https(input.pageUrl),
+      title: title.slice(0, 200),
+      artist: input.artist.trim().slice(0, 200),
+      album: input.album.trim().slice(0, 200) || null,
+      artwork_url: https(input.artworkUrl),
+      preview_url: https(input.previewUrl),
+      photo_url: photo,
+      platform_links: cleanLinks(input.links),
+      caption,
+    })
+    .select()
+    .single<Post>();
 
   if (error) {
     if (error.code === "23505") return { error: "You've already shared today's song." };
     return { error: error.message };
   }
   revalidatePath("/", "layout");
-  redirect("/");
+  return { post: data };
 }
 
 // Take back today's song so you can post another. One redo per day; the
@@ -111,11 +128,42 @@ export async function deleteTodayPost(postId: string): Promise<FormState> {
 // Following
 // ---------------------------------------------------------------------------
 
-export async function follow(profileId: string) {
+export async function searchPeople(q: string): Promise<(Profile & { following: boolean })[]> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return [];
+  // Strip characters that mean something to PostgREST filters.
+  const term = q.trim().replace(/^@/, "").replace(/[%_,()*\\]/g, "").slice(0, 40);
+  let query = supabase.from("profiles").select("*").neq("id", userId).limit(30);
+  query = term
+    ? query.or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
+    : query.order("created_at", { ascending: false });
+  const [{ data }, { data: follows }] = await Promise.all([
+    query,
+    supabase.from("follows").select("following_id").eq("follower_id", userId),
+  ]);
+  const followed = new Set((follows ?? []).map((f) => f.following_id as string));
+  return ((data ?? []) as Profile[]).map((p) => ({ ...p, following: followed.has(p.id) }));
+}
+
+// Follow someone and hand back their tile for the Globe.
+export async function follow(profileId: string): Promise<{ friend?: Friend; error?: string }> {
   const { supabase, userId } = await getSession();
   if (!userId) redirect("/login");
-  await supabase.from("follows").insert({ following_id: profileId });
+  const { error } = await supabase.from("follows").insert({ following_id: profileId });
+  if (error && error.code !== "23505") return { error: error.message };
+  const [{ data: profile }, { data: post }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", profileId).single<Profile>(),
+    supabase.from("today_posts").select("*").eq("user_id", profileId).maybeSingle<Post>(),
+  ]);
+  if (!profile) return { error: "Couldn't find that person." };
   revalidatePath("/", "layout");
+  return { friend: { ...profile, post: post ?? null, followed_at: new Date().toISOString() } };
+}
+
+export async function loadCore(userId: string): Promise<Core | null> {
+  const { userId: me } = await getSession();
+  if (!me) return null;
+  return getCore(userId);
 }
 
 export async function unfollow(profileId: string) {

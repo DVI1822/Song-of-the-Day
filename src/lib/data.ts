@@ -2,7 +2,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { isConfigured } from "./supabase/env";
 import { createClient } from "./supabase/server";
-import type { Friend, Post, Profile } from "./types";
+import { todayIn } from "./day";
+import type { Core, Friend, Post, Profile } from "./types";
 
 export async function getSession() {
   // Until Supabase is connected, the home page explains what to do.
@@ -29,14 +30,20 @@ export async function requireProfile() {
 
 export async function getGlobe(profile: Profile) {
   const supabase = await createClient();
-  const [{ data: follows }, { data: mine }] = await Promise.all([
+  const [{ data: follows }, { data: mySongs }, { data: redo }] = await Promise.all([
     supabase
       .from("follows")
       .select("created_at, profile:profiles!follows_following_id_fkey(*)")
       .eq("follower_id", profile.id)
       .order("created_at", { ascending: true })
-      .limit(100),
-    supabase.from("today_posts").select("*").eq("user_id", profile.id).maybeSingle<Post>(),
+      .limit(90),
+    supabase.from("posts").select("*").eq("user_id", profile.id).order("day", { ascending: false }).limit(400),
+    supabase
+      .from("post_redos")
+      .select("day")
+      .eq("user_id", profile.id)
+      .eq("day", todayIn(profile.timezone))
+      .maybeSingle(),
   ]);
 
   const people = (follows ?? [])
@@ -53,7 +60,31 @@ export async function getGlobe(profile: Profile) {
     followed_at,
     post: byUser.get(p.id) ?? null,
   }));
-  return { friends, myPost: mine ?? null };
+  const songs = (mySongs ?? []) as Post[];
+  const today = todayIn(profile.timezone);
+  return {
+    friends,
+    myPost: songs.find((p) => p.day === today) ?? null,
+    mySongs: songs,
+    redoUsed: Boolean(redo),
+  };
+}
+
+export async function getCore(userId: string): Promise<Core | null> {
+  const supabase = await createClient();
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle<Profile>();
+  if (!profile) return null;
+  const [{ data: posts }, followers, following] = await Promise.all([
+    supabase.from("posts").select("*").eq("user_id", profile.id).order("day", { ascending: false }).limit(400),
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", profile.id),
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", profile.id),
+  ]);
+  return {
+    profile,
+    posts: (posts ?? []) as Post[],
+    followers: followers.count ?? 0,
+    following: following.count ?? 0,
+  };
 }
 
 export async function getProfilePage(username: string, viewerId: string | null) {

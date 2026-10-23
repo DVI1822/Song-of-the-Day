@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
-/* Lake Michigan palette: turquoise water, deep blue, lighthouse red. */
+/* The white room: deep lake blue ink, lighthouse red. */
 @theme inline {
-  --color-void: #021114;
-  --color-ink: #e9fbf8;
-  --color-muted: #9cd3cc;
+  --color-void: #ffffff;
+  --color-ink: #0d2a3f;
+  --color-muted: #6a818c;
   --color-accent: #d7262b;
   --color-accent-deep: #b3161c;
   --color-ring: #ff4a4f;
   --color-card: #ffffff;
   --color-card-ink: #0d2a3f;
   --color-card-muted: #44606f;
-  --color-soft: #e3f3f1;
-  --color-line: #d0e6e2;
-  --color-nav: #08242a;
+  --color-soft: #f0f4f6;
+  --color-line: #dce4e8;
+  --color-nav: #f4f7f8;
   --color-glow: #d9fff8;
-  --color-tile-back: #0f4a52;
+  --color-tile-back: #eef2f4;
   --font-sans: var(--font-outfit), system-ui, sans-serif;
+  --font-bubble: var(--font-fredoka), var(--font-outfit), sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -30,14 +31,14 @@ body {
   font-family: var(--font-sans);
 }
 
-/* The soft turquoise glow behind everything. */
+/* A faint warm glow behind the plain pages. */
 .aura {
   pointer-events: none;
   border-radius: 9999px;
   background: radial-gradient(
     closest-side,
-    rgba(70, 210, 195, 0.3),
-    rgba(215, 38, 43, 0.11) 62%,
+    rgba(255, 236, 196, 0.45),
+    rgba(169, 220, 214, 0.18) 62%,
     rgba(0, 0, 0, 0)
   );
 }
@@ -79,6 +80,13 @@ body {
 
 .rise-in {
   animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
