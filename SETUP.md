@@ -167,6 +167,30 @@ Spotify keeps new apps in development mode: only people on that User
 Management list can sign in, up to 5 of them. Anyone else uses the email link.
 Their Spotify email still needs to be on the invite list in Supabase.
 
+## Part 4c: Whole songs with Spotify (optional)
+
+People who connect Spotify (in their Settings, or the "connect Spotify" link
+under a song) can press play and hear the whole song on their own Spotify app:
+phone, computer or speaker. It needs Spotify Premium. Everyone else keeps the
+preview.
+
+1. In Supabase's **SQL Editor**, run
+   `supabase/migrations/20261024000000_spotify_links.sql`.
+2. In your Spotify app at <https://developer.spotify.com/dashboard> (the same
+   one as Part 4b, or a new one with **Web API** ticked), open **Settings →
+   Edit** and add these Redirect URIs, then **Save**:
+   - `https://song-of-the-day-liart.vercel.app/spotify/callback`
+   - `https://song-of-the-day-git-claude-project-threa-3edd57-song-of-the-day.vercel.app/spotify/callback`
+     (the preview link, for trying changes before they go live)
+3. Copy the app's **Client ID** (not the secret; this doesn't need it).
+4. In Vercel, open the project's **Settings → Environment Variables**, add
+   `SPOTIFY_CLIENT_ID` with that value for all environments, and save. Then
+   open **Deployments**, and on the newest one click **⋯ → Redeploy** so it
+   picks up the new value.
+5. In the Spotify app's **User Management**, add yourself and each friend
+   (name plus their Spotify account's email). In development mode Spotify
+   lets up to 5 people connect.
+
 ## Part 5: Try it
 
 1. Open your site, click **Get started**, and enter the email you invited.

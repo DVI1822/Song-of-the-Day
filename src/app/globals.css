@@ -99,6 +99,7 @@ body {
 }
 
 /* Rare moments in the Globe's sky (see Ambient.tsx). */
+@keyframes sky-drift { to { transform: translateX(-50%); } }
 @keyframes sky-travel {
   0% { transform: translate(var(--x0), var(--y0)); opacity: 0; }
   6% { opacity: 1; }

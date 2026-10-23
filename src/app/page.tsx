@@ -11,12 +11,24 @@ export default async function Home() {
   await connection();
   if (!isConfigured) return <NotConfigured />;
 
-  const { userId, profile } = await getSession();
+  const { supabase, userId, profile } = await getSession();
   if (!userId) return <Landing />;
   if (!profile) redirect("/welcome");
 
-  const { friends, myPost, mySongs, redoUsed } = await getGlobe(profile);
-  return <GlobeApp me={profile} myPost={myPost} friends={friends} mySongs={mySongs} redoUsed={redoUsed} />;
+  const [{ friends, myPost, mySongs, redoUsed }, { data: spotify }] = await Promise.all([
+    getGlobe(profile),
+    supabase.from("spotify_links").select("user_id").eq("user_id", userId).maybeSingle(),
+  ]);
+  return (
+    <GlobeApp
+      me={profile}
+      myPost={myPost}
+      friends={friends}
+      mySongs={mySongs}
+      redoUsed={redoUsed}
+      spotifyLinked={Boolean(spotify)}
+    />
+  );
 }
 
 function Landing() {

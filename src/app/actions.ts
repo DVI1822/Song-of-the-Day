@@ -6,6 +6,7 @@ import { getCore, getSession } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
 import type { Core, Friend, Post, Profile } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
+import { accessToken, spotifyApi } from "@/lib/spotify";
 
 export type FormState = { error?: string; ok?: boolean } | undefined;
 
@@ -171,4 +172,67 @@ export async function unfollow(profileId: string) {
   if (!userId) redirect("/login");
   await supabase.from("follows").delete().eq("follower_id", userId).eq("following_id", profileId);
   revalidatePath("/", "layout");
+}
+
+// ---------------------------------------------------------------------------
+// Spotify Connect: play on the listener's own Spotify app
+// ---------------------------------------------------------------------------
+
+export type SpotifyPlay =
+  | { ok: true; device: string }
+  | { error: "not-linked" | "no-device" | "premium" | "failed" };
+
+export async function spotifyPlay(uri: string, positionMs = 0): Promise<SpotifyPlay> {
+  if (!/^spotify:(track|album):[A-Za-z0-9]+$/.test(uri)) return { error: "failed" };
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "not-linked" };
+  const token = await accessToken(supabase, userId);
+  if (!token) return { error: "not-linked" };
+
+  // the device that's playing now, else whichever Spotify app is open
+  const list = await spotifyApi(token, "/me/player/devices").then((r) => (r.ok ? r.json() : null));
+  type Device = { id: string | null; name: string; is_active: boolean; is_restricted: boolean };
+  const devices: Device[] = (list?.devices ?? []).filter((d: Device) => d.id && !d.is_restricted);
+  const device = devices.find((d) => d.is_active) ?? devices[0];
+  if (!device) return { error: "no-device" };
+
+  const at = Math.max(0, Math.floor(positionMs) || 0);
+  const body = uri.startsWith("spotify:album:") ? { context_uri: uri } : { uris: [uri], position_ms: at };
+  const res = await spotifyApi(token, `/me/player/play?device_id=${device.id}`, { method: "PUT", body: JSON.stringify(body) });
+  if (res.ok) return { ok: true, device: device.name };
+  if (res.status === 403) return { error: "premium" };
+  if (res.status === 404) return { error: "no-device" };
+  return { error: "failed" };
+}
+
+export async function spotifyPause(): Promise<void> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return;
+  const token = await accessToken(supabase, userId);
+  if (token) await spotifyApi(token, "/me/player/pause", { method: "PUT" });
+}
+
+export type SpotifyNow = { uri: string | null; playing: boolean; position: number; duration: number } | null;
+
+export async function spotifyNow(): Promise<SpotifyNow> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return null;
+  const token = await accessToken(supabase, userId);
+  if (!token) return null;
+  const res = await spotifyApi(token, "/me/player");
+  if (res.status !== 200) return null;
+  const p = await res.json();
+  return {
+    uri: p.context?.type === "album" ? p.context.uri : (p.item?.uri ?? null),
+    playing: Boolean(p.is_playing),
+    position: p.progress_ms ?? 0,
+    duration: p.item?.duration_ms ?? 0,
+  };
+}
+
+export async function unlinkSpotify() {
+  const { supabase, userId } = await getSession();
+  if (!userId) redirect("/login");
+  await supabase.from("spotify_links").delete().eq("user_id", userId);
+  revalidatePath("/settings");
 }

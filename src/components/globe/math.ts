@@ -21,6 +21,21 @@ export function camV(v: V3, c: Camera, noRoll = false): V3 {
   return [x1 * Math.cos(r) - y2 * Math.sin(r), x1 * Math.sin(r) + y2 * Math.cos(r), z2];
 }
 
+// camV run backwards: from what the camera sees back to the globe's own frame.
+export function camInv(v: V3, c: Camera): V3 {
+  const cr = Math.cos(c.roll),
+    sr = Math.sin(c.roll);
+  const x1 = v[0] * cr + v[1] * sr,
+    y2 = -v[0] * sr + v[1] * cr;
+  const cp = Math.cos(c.pitch),
+    sp = Math.sin(c.pitch);
+  const y1 = y2 * cp + v[2] * sp,
+    z1 = -y2 * sp + v[2] * cp;
+  const x0 = x1 * Math.cos(TILT) + y1 * Math.sin(TILT),
+    y = -x1 * Math.sin(TILT) + y1 * Math.cos(TILT);
+  return [x0 * Math.cos(c.yaw) - z1 * Math.sin(c.yaw), y, x0 * Math.sin(c.yaw) + z1 * Math.cos(c.yaw)];
+}
+
 export function latLon(p: V3) {
   return { lat: Math.asin(Math.max(-1, Math.min(1, p[1]))), lon: Math.atan2(p[0], p[2]) };
 }
