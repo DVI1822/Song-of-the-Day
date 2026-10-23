@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getCore, getSession } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
 import type { Core, Friend, Post, Profile } from "@/lib/types";
-import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
+import { cleanLinks, findYouTubeId, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
 
 export type FormState = { error?: string; ok?: boolean } | undefined;
 
@@ -58,6 +58,17 @@ export async function previewSong(url: string): Promise<{ song?: ResolvedSong; e
   const song = await resolveSong(url);
   if (!song) return { error: "Couldn't find that song. Check the link and try again." };
   return { song };
+}
+
+// For songs posted before full playback existed: find the YouTube video now.
+export async function findYouTube(title: string, artist: string): Promise<string | null> {
+  const { userId } = await getSession();
+  if (!userId) return null;
+  try {
+    return await findYouTubeId(title.slice(0, 200), artist.slice(0, 200));
+  } catch {
+    return null;
+  }
 }
 
 export type NewPost = {

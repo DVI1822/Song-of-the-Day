@@ -1,10 +1,10 @@
 "use client";
 
-import type { Ref } from "react";
+import { useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post } from "@/lib/types";
 import { Magma } from "./Magma";
-import { SongPlayer } from "./Preview";
+import { SongPlayer, VideoFrame } from "./Preview";
 import { Cover, CloseIcon, coverRadius } from "./ui";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
@@ -38,6 +38,7 @@ export function Feature({
   backdropRef: Ref<HTMLDivElement>;
   cardRef: Ref<HTMLDivElement>;
 }) {
+  const [video, setVideo] = useState<string | null>(null);
   const time = formatTime(post.created_at, timeZone);
   const radius = coverRadius(cover);
   const face = "absolute inset-0 overflow-hidden backface-hidden";
@@ -55,6 +56,14 @@ export function Feature({
             <CloseIcon size={20} />
           </button>
         </div>
+        {video && (
+          <div
+            className="absolute z-10 flex items-center overflow-hidden bg-black"
+            style={{ top: 42, width: cover, height: cover, borderRadius: radius }}
+          >
+            <VideoFrame src={video} className="aspect-video w-full" />
+          </div>
+        )}
         <button
           type="button"
           onClick={onFlip}
@@ -103,6 +112,7 @@ export function Feature({
             post={post}
             id={`feat-${post.id}`}
             big
+            onVideo={setVideo}
             extra={
               <button
                 type="button"
