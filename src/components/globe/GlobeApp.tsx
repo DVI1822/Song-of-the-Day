@@ -123,8 +123,6 @@ function newEls() {
     space: null as HTMLDivElement | null,
     stars: null as HTMLDivElement | null,
     starsB: null as HTMLDivElement | null,
-    sunGlow: null as HTMLDivElement | null,
-    sunDisc: null as HTMLDivElement | null,
     day: null as HTMLDivElement | null,
     sunShadow: null as HTMLDivElement | null,
     floor: null as HTMLDivElement | null,
@@ -675,7 +673,6 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             />
           </div>
         </div>
-        <div ref={(el) => void (R.current.sunGlow = el)} className="pointer-events-none absolute inset-0" />
         {size && <Ambient dark={darkOn} w={L.w} h={L.h} />}
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div
@@ -693,17 +690,6 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             height: 28 * L.s,
             background: "radial-gradient(closest-side, rgba(13,42,63,0.16), rgba(13,42,63,0))",
             filter: "blur(3px)",
-          }}
-        />
-        <div
-          ref={(el) => void (R.current.sunDisc = el)}
-          className="pointer-events-none absolute rounded-full"
-          style={{
-            width: 16 * L.s,
-            height: 16 * L.s,
-            marginLeft: -8 * L.s,
-            marginTop: -8 * L.s,
-            background: "radial-gradient(circle at 45% 42%, #FFFFFF 0%, #FFF8DC 45%, #FFE39A 75%, #FFC861 100%)",
           }}
         />
         <div
@@ -1063,29 +1049,6 @@ sim: TileSim,
     st.filter = `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day)).toFixed(1)}px)`;
   }
   if (r.floor) r.floor.style.opacity = roomOp.toFixed(3);
-  // The sun orbits the globe as if it were the centre of the universe, at
-  // its real place in the sky: east is screen-right, the noon sun sits
-  // between you and the globe. It's far off, so small and soft.
-  const orbit = Math.min(1.3 * L.R, Math.min(L.w, L.h) / 2 - 14);
-  const sz = Lc[2],
-    proj = 1 + 0.15 * sz;
-  const sx = L.cx + Lc[0] * orbit,
-    sy = L.cy + Lc[1] * orbit;
-  const warm = 1 - clamp01((sun.el * 180) / Math.PI / 25);
-  if (r.sunDisc) {
-    const st = r.sunDisc.style;
-    st.left = sx.toFixed(1) + "px";
-    st.top = sy.toFixed(1) + "px";
-    st.transform = `scale(${proj.toFixed(3)})`;
-    st.zIndex = sz > 0 ? "2" : "0";
-    st.opacity = ((1 - reveal) * (1 - lensP)).toFixed(3);
-    st.boxShadow = `0 0 ${(12 + 8 * (1 - warm)).toFixed(0)}px ${(3 + 3 * dk).toFixed(0)}px rgba(255,${Math.round(214 - 60 * warm)},${Math.round(140 - 80 * warm)},${(0.45 + 0.25 * dk).toFixed(2)})`;
-  }
-  if (r.sunGlow) {
-    const c = [255, Math.round(244 - 70 * warm), Math.round(214 - 110 * warm)].join(",");
-    r.sunGlow.style.opacity = ((1 - reveal) * Math.max(0.55 * day, 0.2 * dk)).toFixed(3);
-    r.sunGlow.style.background = `radial-gradient(circle at ${sx.toFixed(1)}px ${sy.toFixed(1)}px, rgba(${c},${(0.55 - 0.3 * dk).toFixed(2)}), rgba(${c},${(0.18 - 0.1 * dk).toFixed(2)}) ${Math.round(L.R * 0.45)}px, rgba(${c},0) ${Math.round(L.R * 1.3)}px)`;
-  }
   if (r.sphere) {
     const hx = 50 + 42 * Lc[0],
       hy = 50 + 42 * Lc[1],
