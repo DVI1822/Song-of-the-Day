@@ -1,7 +1,11 @@
 "use client";
 
-import { Globe } from "@/components/globe/Globe";
+import type { GlobeApi } from "@/components/globe/api";
+import { GlobeApp } from "@/components/globe/GlobeApp";
+import { addDays, todayIn } from "@/lib/day";
 import type { Friend, Post, Profile } from "@/lib/types";
+
+// The Globe with made-up friends. Works without signing in; nothing is saved.
 
 // Painted stand-in covers: [top, bottom, sun, sunX, sunY, sunSize, hill1, hill2]
 const PALETTES: [string, string, string, number, number, number, string, string][] = [
@@ -17,6 +21,9 @@ const PALETTES: [string, string, string, number, number, number, string, string]
   ["#CFE0DA", "#5E8A80", "#FFFFFF", 24, 26, 22, "#456B62", "#2E4C45"],
   ["#E4F5B8", "#5FA05A", "#FFFFFF", 66, 24, 22, "#3F7A3E", "#285428"],
   ["#4A4F7A", "#14162B", "#E9E4FF", 32, 22, 16, "#2A2D52", "#191B36"],
+  ["#C9E4F0", "#3F6F96", "#FFFFFF", 30, 24, 20, "#2D547A", "#1B3956"],
+  ["#FBE3C8", "#C9877A", "#FFF7EA", 62, 30, 28, "#9C5F5A", "#6E3F40"],
+  ["#E8DFF6", "#7A63B8", "#FFFFFF", 62, 26, 20, "#584391", "#3B2C66"],
 ];
 
 function cover(i: number) {
@@ -25,68 +32,137 @@ function cover(i: number) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-const SONGS = [
-  ["Low Tide Radio", "Sun Atlas", "windows down on the coast road, fog finally lifting off the water"],
-  ["Fernlight", "Hollow Pines", "first coffee on the porch and this one stopped me mid-sip"],
-  ["Glass Orchard", "Kaito & the Weather", "lunch walk, every cherry tree on the block going off at once"],
-  ["Afterglow Circuit", "Marlow Static", "sunset from the top of the parking garage, nobody else up there"],
-  ["Moss & Mercury", "Juniper Field", "empty highway home, every single light turned green for me"],
-  ["Dew Line", "Harbor & Field", "sunrise run, legs gone, this song carried me the last mile"],
-  ["Lowland Satellites", "Orbit Moss", "fog on the bridge, headphones in, the city still asleep"],
-  ["Saffron Weather", "Delta Vines", "rooftop garden, tomatoes finally red, sun on my neck"],
-  ["Static Bloom", "Paper Kites Club", "library window seat, rain on glass, could have stayed forever"],
-  ["Neon Fern", "Velvet Canopy", "golden hour on the bike home, took the long way twice"],
-  ["Quiet Engine", "North Arcade", "late shift done, parking lot stars, sat in the car to finish it"],
+const A = ["Silver", "Hollow", "Amber", "Velvet", "Northern", "Quiet", "Wild", "Cedar", "Lunar", "Salt", "Ember", "Willow", "Slow", "Open", "Coral"];
+const B = ["Rivers", "Static", "Hours", "Signal", "Garden", "Tides", "Season", "Echo", "Lanterns", "Valley", "Motel", "Fields", "Satellite", "Rain", "Arcade"];
+const C = ["Club", "Union", "Choir", "Parade", "Society", "Radio"];
+const CAPS = [
+  "windows down on the coast road, fog finally lifting",
+  "first coffee on the porch and this one stopped me mid-sip",
+  "lunch walk, every cherry tree on the block going off at once",
+  "top of the parking garage, nobody else up there",
+  "empty highway home, every single light turned green for me",
+  "sunrise run, this carried me the last mile",
+  "",
+  "library window seat, rain on glass, could have stayed forever",
+  "kitchen dance break, nobody saw, thank god",
+  "friends in the back seat screaming the chorus",
 ];
 const NAMES = [
   "Maya R.", "Jonah K.", "Priya S.", "Luis M.", "Sam T.", "Ava L.", "Theo B.", "Noor H.", "Kenji W.", "Rosa D.",
   "Eli P.", "Ivy C.", "Marco F.", "June A.", "Felix O.", "Hana Y.", "Omar Z.", "Lena V.", "Ravi N.", "Tess G.",
-  "Diego Q.", "Mila J.", "Arjun E.", "Zoe I.", "Kai U.", "Nina X.", "Ben W.", "Sora T.",
+  "Diego Q.", "Mila J.", "Arjun E.", "Zoe I.", "Kai U.", "Nina X.", "Ben W.", "Sora T.", "Iris M.", "Finn D.",
+  "Cleo R.", "Max H.", "Esme K.", "Nico P.", "Ruth A.", "Tariq S.", "Wren L.", "Oscar B.", "Ada F.", "Leo N.",
 ];
+const POOL = ["Hazel Q.", "Marcus V.", "Tilly O.", "Dev P.", "Sasha N.", "Rio C.", "Bea W.", "Quinn J.", "Ezra F.", "Luca G."];
+
+const rnd = (i: number, k: number) => {
+  const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+const pickOf = <T,>(list: T[], i: number, k: number) => list[Math.floor(rnd(i, k) * list.length)];
 
 const now = new Date();
-const at = (h: number, min: number) => {
-  const d = new Date(now);
-  d.setUTCHours(h, min, 0, 0);
-  return d.toISOString();
-};
+const TZ = typeof window === "undefined" ? "UTC" : Intl.DateTimeFormat().resolvedOptions().timeZone;
+const TODAY = todayIn(TZ, now);
 
-function post(i: number, user: string, title: string, artist: string, caption: string, created: string): Post {
+function profile(i: number, name: string): Profile {
   return {
-    id: `p${i}`,
-    user_id: user,
-    day: created.slice(0, 10),
-    song_url: "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",
-    page_url: null,
-    title,
-    artist,
-    artwork_url: cover(i),
-    platform_links: {},
-    caption,
-    created_at: created,
+    id: `u${i}`,
+    username: name.toLowerCase().replace(/[^a-z]/g, ""),
+    display_name: name,
+    timezone: TZ,
+    created_at: now.toISOString(),
   };
 }
 
-const profile = (i: number, name: string): Profile => ({
-  id: `u${i}`,
-  username: name.toLowerCase().replace(/[^a-z]/g, ""),
-  display_name: name,
-  timezone: "UTC",
-  created_at: now.toISOString(),
-});
+function song(i: number, user: string, day: string, hoursAgo: number): Post {
+  return {
+    id: `p${user}-${day}`,
+    user_id: user,
+    day,
+    song_url: "https://song.link/demo",
+    page_url: null,
+    title: `${pickOf(A, i, 4)} ${pickOf(B, i, 5)}`,
+    artist: `${pickOf(B, i, 6)} ${pickOf(C, i, 7)}`,
+    album: `${pickOf(A, i, 13)} ${pickOf(B, i, 14)}`,
+    artwork_url: cover(i * 7 + 3),
+    preview_url: null,
+    photo_url: null,
+    platform_links: {},
+    caption: CAPS[i % CAPS.length],
+    created_at: new Date(now.getTime() - hoursAgo * 3600e3).toISOString(),
+  };
+}
+
+function history(user: string, seed: number, days: number, from = 1) {
+  return Array.from({ length: days }, (_, d) => song(seed * 31 + d, user, addDays(TODAY, -(d + from)), 24 * (d + from) - 4));
+}
 
 const ME = profile(0, "You");
-const MY_POST = post(0, "u0", "Paper Moons", "Lune Harbor", "walking to the train with the whole street still blue and quiet", at(8, 10));
-const FRIENDS: Friend[] = NAMES.map((name, i) => {
-  const waiting = (i * 7) % 10 < 3;
-  const [title, artist, caption] = SONGS[i % SONGS.length];
-  return {
-    ...profile(i + 1, name),
-    followed_at: now.toISOString(),
-    post: waiting ? null : post(i + 1, `u${i + 1}`, title, artist, caption, at(6 + ((i * 5) % 14), (i * 17) % 60)),
-  };
-});
+const FRIENDS: Friend[] = NAMES.map((name, i) => ({
+  ...profile(i + 1, name),
+  followed_at: now.toISOString(),
+  post: rnd(i, 12) < 0.28 ? null : song(i + 1, `u${i + 1}`, TODAY, 1 + rnd(i, 1) * 10),
+}));
+const MY_SONGS = history("u0", 0, 40);
+
+const demoApi: GlobeApi = {
+  async previewSong() {
+    await new Promise((r) => setTimeout(r, 1100));
+    return {
+      song: {
+        songUrl: "https://song.link/demo",
+        pageUrl: null,
+        title: "Paper Moons",
+        artist: "Lune Harbor",
+        album: "Tideline",
+        artworkUrl: cover(0),
+        previewUrl: null,
+        links: {},
+      },
+    };
+  },
+  async uploadPhoto(_, photo) {
+    return { url: URL.createObjectURL(photo) };
+  },
+  async createPost(input) {
+    return {
+      post: {
+        ...song(0, "u0", TODAY, 0),
+        id: `mine-${Date.now()}`,
+        title: input.title,
+        artist: input.artist,
+        album: input.album,
+        artwork_url: input.artworkUrl,
+        caption: input.caption,
+        photo_url: input.photoUrl,
+        created_at: new Date().toISOString(),
+      },
+    };
+  },
+  async deleteTodayPost() {
+    return undefined;
+  },
+  async searchPeople(q) {
+    const term = q.trim().replace(/^@/, "").toLowerCase();
+    return POOL.map((name, j) => ({ ...profile(100 + j, name), following: false })).filter(
+      (p) => !term || p.username.includes(term) || p.display_name.toLowerCase().includes(term),
+    );
+  },
+  async follow(id) {
+    const j = Number(id.slice(1)) - 100;
+    const p = profile(100 + j, POOL[j]);
+    return { friend: { ...p, followed_at: new Date().toISOString(), post: song(200 + j, p.id, TODAY, 2) } };
+  },
+  async loadCore(id) {
+    const f = FRIENDS.find((x) => x.id === id);
+    const p = f ?? profile(Number(id.slice(1)), POOL[Number(id.slice(1)) - 100] ?? "Friend");
+    const seed = Number(id.slice(1));
+    const posts = [...(f?.post ? [f.post] : []), ...history(id, seed, 8 + Math.floor(rnd(seed, 3) * 50))];
+    return { profile: p, posts, followers: 12, following: 20 };
+  },
+};
 
 export function DemoGlobe() {
-  return <Globe me={ME} myPost={MY_POST} friends={FRIENDS} coreHref={() => "/login"} />;
+  return <GlobeApp me={ME} myPost={null} friends={FRIENDS} mySongs={MY_SONGS} redoUsed={false} api={demoApi} />;
 }

@@ -30,6 +30,13 @@ Your `main` branch now has the app in it. Vercel will build from `main`.
      password manager. You won't need it day to day. Don't share it with anyone,
      including me.
    - **Region:** pick the one closest to you (for Chicago, `East US` or `Central US`).
+   - **Security:** set the three boxes like this:
+     - **Enable Data API:** on. The app talks to the database through it.
+     - **Automatically expose new tables:** off, as Supabase recommends. The
+       database code grants exactly the access the app needs, nothing more.
+     - **Enable automatic RLS:** on. The database code turns on row level
+       security for every table anyway, and this is a safety net for any
+       table added later.
 3. Click **Create new project** and wait a minute or two while it sets up.
 
 ### Create the tables
@@ -41,6 +48,9 @@ Your `main` branch now has the app in it. Vercel will build from `main`.
    click the **copy** icon at the top right of the file, and paste it all into
    the SQL editor.
 4. Click **Run**. You should see "Success. No rows returned."
+5. Do the same with
+   [`supabase/migrations/20261023000000_album_preview_photo.sql`](supabase/migrations/20261023000000_album_preview_photo.sql)
+   in a new query. It adds albums, song previews and photos.
 
 You can check it worked under **Table Editor**: there should be `profiles`,
 `posts`, `follows`, `invites` and `app_settings` tables.
@@ -60,15 +70,42 @@ spaces don't matter.
 
 ### Copy your two keys
 
-1. Click the **Connect** button at the top of your project page (or go to
-   **Project Settings → API Keys**).
-2. Find and copy these two values somewhere handy:
-   - **Project URL**, which looks like `https://abcdefgh.supabase.co`
-   - **Publishable key**, which starts with `sb_publishable_`
-     (on older projects this is called the **anon public** key)
+Vercel needs two values from Supabase. Open a note on your computer or phone to
+paste them into while you go.
 
-These two are fine to paste into Vercel and fine to share with me. Never share
-the **secret** key or the **service_role** key: the app doesn't use them.
+**1. The Project URL**
+
+Look at your browser's address bar while you're in your Supabase project. It
+looks like this:
+
+```
+supabase.com/dashboard/project/abcdefghijklmnop
+```
+
+That last part (`abcdefghijklmnop`) is your project's ID. Your Project URL is
+`https://` + that ID + `.supabase.co`, for example:
+
+```
+https://abcdefghijklmnop.supabase.co
+```
+
+Write that down. (It's also shown under **Project Settings → Data API**, if
+you'd rather copy it.)
+
+**2. The Publishable key**
+
+1. Click the **gear icon** (Project Settings) at the bottom of the left sidebar.
+2. Click **API Keys**.
+3. Find the key labeled **Publishable key**. It starts with `sb_publishable_`.
+   Click the copy button next to it and paste it into your note.
+
+If that page only shows **anon** and **service_role** keys (older projects),
+copy the **anon** / **public** one instead. It works the same way.
+
+**Which keys are safe?** The URL and the publishable (or anon) key are meant
+to be public, so they're fine to paste into Vercel and fine to share with me.
+**Never** share the **secret** key or the **service_role** key. The app
+doesn't need them.
 
 ---
 
@@ -105,14 +142,39 @@ Sign-in works by emailing you a link, so Supabase needs to know your site's addr
 
 ---
 
+## Part 4b: Sign in with Spotify (optional)
+
+The sign-in page has a "Continue with Spotify" button above the email box. It
+works once Spotify and Supabase know about each other.
+
+1. In Supabase, open **Authentication → Sign In / Providers → Spotify** and
+   copy the **Callback URL** it shows. It looks like
+   `https://<your-project>.supabase.co/auth/v1/callback`. Leave the tab open.
+2. Go to <https://developer.spotify.com/dashboard>, sign in with your Spotify
+   account (it must be Premium), and click **Create app**.
+   - Name: Song of the Day. Description: anything.
+   - Redirect URI: paste the Supabase Callback URL from step 1 and click **Add**.
+   - Under "Which API/SDKs are you planning to use?", tick **Web API**.
+   - Agree to the terms and **Save**.
+3. In the new app, open **Settings**. Copy the **Client ID**, then click
+   **View client secret** and copy that too.
+4. Back in Supabase's Spotify provider, switch it on, paste the Client ID and
+   Client Secret, and **Save**.
+5. Back in the Spotify app, open **User Management** and add each friend's
+   name and the email address of their Spotify account.
+
+Spotify keeps new apps in development mode: only people on that User
+Management list can sign in, up to 5 of them. Anyone else uses the email link.
+Their Spotify email still needs to be on the invite list in Supabase.
+
 ## Part 5: Try it
 
 1. Open your site, click **Get started**, and enter the email you invited.
 2. Open the link in the email **on the same phone or browser** you asked from.
 3. Pick your name and username.
-4. Tap **+**, paste a Spotify link, write a caption, and share.
-5. Add a friend's email to **invites**, send them the link, and follow each
-   other from **People → Follow**. Their tile appears on your Globe.
+4. Tap **+**, paste a Spotify link, add a comment or photo if you like, and post.
+5. Add a friend's email to **invites**, send them the link, and add each
+   other from the **Find a friend** tab. Their tile appears on your Globe.
 
 You can also open `/demo` on your site to see a Globe full of made-up friends.
 

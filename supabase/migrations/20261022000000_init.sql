@@ -185,7 +185,8 @@ language sql stable security definer set search_path = '' as $$
     or exists (select 1 from public.profiles p where p.id = auth.uid());
 $$;
 
-grant execute on function public.is_invited(), public.can_view() to anon, authenticated;
+grant execute on function public.is_invited(), public.can_view(), public.current_day(uuid)
+  to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Row level security: content is readable by everyone once the site is

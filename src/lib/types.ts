@@ -17,6 +17,9 @@ export type Post = {
   title: string;
   artist: string;
   artwork_url: string | null;
+  album: string | null;
+  preview_url: string | null;
+  photo_url: string | null;
   platform_links: PlatformLinks;
   caption: string;
   created_at: string;
@@ -24,3 +27,11 @@ export type Post = {
 
 // Someone you follow, plus today's song if they've posted one.
 export type Friend = Profile & { post: Post | null; followed_at: string };
+
+// Everything shown when you fly into someone's core.
+export type Core = {
+  profile: Profile;
+  posts: Post[]; // newest first
+  followers: number;
+  following: number;
+};

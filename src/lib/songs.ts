@@ -18,7 +18,9 @@ export type ResolvedSong = {
   pageUrl: string | null;
   title: string;
   artist: string;
+  album: string;
   artworkUrl: string | null;
+  previewUrl: string | null;
   links: PlatformLinks;
 };
 
@@ -114,7 +116,9 @@ async function fromOdesli(url: string): Promise<ResolvedSong | null> {
     pageUrl: httpsOrNull(data.pageUrl),
     title: main.title,
     artist: main.artistName ?? "",
+    album: "",
     artworkUrl: biggerArtwork(httpsOrNull(art)),
+    previewUrl: null,
     links,
   };
 }
@@ -158,25 +162,119 @@ async function fromOEmbed(url: URL): Promise<ResolvedSong | null> {
     pageUrl: null,
     title: String(data.title).slice(0, 200),
     artist: platform === "spotify" ? "" : String(data.author_name ?? "").slice(0, 200),
+    album: "",
     artworkUrl: httpsOrNull(data.thumbnail_url),
+    previewUrl: null,
     links: { [platform]: url.toString() },
   };
+}
+
+// Spotify's own track page names the artist, even when song.link is down
+// (its oEmbed only gives the title).
+async function fromSpotifyPage(url: URL): Promise<{ title: string; artist: string; album: string; art: string | null } | null> {
+  const m = url.pathname.match(/\/track\/([A-Za-z0-9]+)/);
+  if (url.hostname !== "open.spotify.com" || !m) return null;
+  const res = await fetch(`https://open.spotify.com/track/${m[1]}`, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; SongOfTheDay/1.0)", "Accept-Language": "en" },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) return null;
+  const html = await res.text();
+  const meta = (prop: string) =>
+    decodeEntities(html.match(new RegExp(`<meta[^>]+(?:property|name)="${prop}"[^>]+content="([^"]*)"`))?.[1] ?? "");
+  const pageTitle = decodeEntities(html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "");
+
+  // "Song - song and lyrics by Artist | Spotify"
+  const t = pageTitle.match(/^(.*) - song(?: and lyrics)? by (.*) \| Spotify$/);
+  // "Artist · Album · Song · 2024"
+  const parts = meta("og:description").split(" · ");
+  const title = t?.[1] || meta("og:title");
+  const artist = t?.[2] || (parts.length >= 3 ? parts[0] : "");
+  const album = parts.length >= 4 ? parts[1] : "";
+  if (!title) return null;
+  return { title, artist, album, art: httpsOrNull(meta("og:image")) };
+}
+
+function decodeEntities(s: string) {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+// Apple's free iTunes catalog fills in the album and a 30-second preview.
+type ItunesTrack = {
+  trackName?: string;
+  artistName?: string;
+  collectionName?: string;
+  previewUrl?: string;
+  artworkUrl100?: string;
+};
+
+async function fromItunes(song: ResolvedSong): Promise<ItunesTrack | null> {
+  const norm = (x: string) => x.toLowerCase().replace(/\(.*?\)|\[.*?\]|-.*$/g, "").replace(/[^a-z0-9]/g, "");
+  const appleId = song.links.appleMusic ? new URL(song.links.appleMusic).searchParams.get("i") : null;
+  const api = appleId
+    ? `https://itunes.apple.com/lookup?id=${encodeURIComponent(appleId)}&entity=song`
+    : `https://itunes.apple.com/search?entity=song&limit=10&term=${encodeURIComponent(`${song.title} ${song.artist}`.trim())}`;
+  const res = await fetch(api, { signal: AbortSignal.timeout(6000) });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const results: ItunesTrack[] = data.results ?? [];
+  const want = norm(song.title);
+  const artist = norm(song.artist);
+  return (
+    results.find((r) => r.trackName && norm(r.trackName) === want && (!artist || norm(r.artistName ?? "") === artist)) ??
+    results.find((r) => r.trackName && norm(r.trackName) === want) ??
+    null
+  );
+}
+
+async function attempt<T>(fn: () => Promise<T | null>): Promise<T | null> {
+  try {
+    return await fn();
+  } catch {
+    return null;
+  }
 }
 
 export async function resolveSong(raw: string): Promise<ResolvedSong | null> {
   const url = parseSongUrl(raw);
   if (!url) return null;
-  try {
-    const hit = await fromOdesli(url.toString());
-    if (hit) return hit;
-  } catch {
-    // fall through to the backup
+
+  let song = (await attempt(() => fromOdesli(url.toString()))) ?? (await attempt(() => fromOEmbed(url)));
+
+  // Spotify links: fill the artist and album from Spotify's own page.
+  if (url.hostname === "open.spotify.com" && (!song || !song.artist)) {
+    const page = await attempt(() => fromSpotifyPage(url));
+    if (page) {
+      song = song ?? {
+        songUrl: url.toString(),
+        pageUrl: null,
+        title: page.title,
+        artist: "",
+        album: "",
+        artworkUrl: page.art,
+        previewUrl: null,
+        links: { spotify: url.toString() },
+      };
+      song.artist ||= page.artist;
+      song.album ||= page.album;
+      song.artworkUrl ||= page.art;
+    }
   }
-  try {
-    return await fromOEmbed(url);
-  } catch {
-    return null;
+  if (!song) return null;
+
+  const it = await attempt(() => fromItunes(song));
+  if (it) {
+    song.artist ||= it.artistName ?? "";
+    song.album ||= it.collectionName ?? "";
+    song.previewUrl = httpsOrNull(it.previewUrl);
+    song.artworkUrl ||= biggerArtwork(httpsOrNull(it.artworkUrl100?.replace("100x100bb", "600x600bb")));
   }
+  return song;
 }
 
 // Only keep links that are https and on a host we know.

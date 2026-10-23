@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
-/* Lake Michigan palette: turquoise water, deep blue, lighthouse red. */
+/* The white room: deep lake blue ink, lighthouse red. */
 @theme inline {
-  --color-void: #021114;
-  --color-ink: #e9fbf8;
-  --color-muted: #9cd3cc;
+  --color-void: #ffffff;
+  --color-ink: #0d2a3f;
+  --color-muted: #6a818c;
   --color-accent: #d7262b;
   --color-accent-deep: #b3161c;
   --color-ring: #ff4a4f;
   --color-card: #ffffff;
   --color-card-ink: #0d2a3f;
   --color-card-muted: #44606f;
-  --color-soft: #e3f3f1;
-  --color-line: #d0e6e2;
-  --color-nav: #08242a;
+  --color-soft: #f0f4f6;
+  --color-line: #dce4e8;
+  --color-nav: #f4f7f8;
   --color-glow: #d9fff8;
-  --color-tile-back: #0f4a52;
+  --color-tile-back: #eef2f4;
   --font-sans: var(--font-outfit), system-ui, sans-serif;
+  --font-bubble: var(--font-fredoka), var(--font-outfit), sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -30,14 +31,14 @@ body {
   font-family: var(--font-sans);
 }
 
-/* The soft turquoise glow behind everything. */
+/* A faint warm glow behind the plain pages. */
 .aura {
   pointer-events: none;
   border-radius: 9999px;
   background: radial-gradient(
     closest-side,
-    rgba(70, 210, 195, 0.3),
-    rgba(215, 38, 43, 0.11) 62%,
+    rgba(255, 236, 196, 0.45),
+    rgba(169, 220, 214, 0.18) 62%,
     rgba(0, 0, 0, 0)
   );
 }
@@ -81,6 +82,13 @@ body {
   animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -89,3 +97,48 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Rare moments in the Globe's sky (see Ambient.tsx). */
+@keyframes sky-travel {
+  0% { transform: translate(var(--x0), var(--y0)); opacity: 0; }
+  6% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { transform: translate(var(--x1), var(--y1)); opacity: 0; }
+}
+@keyframes sky-shoot {
+  0% { transform: translate(var(--x0), var(--y0)); opacity: 0; }
+  15% { opacity: 0.9; }
+  100% { transform: translate(var(--x1), var(--y1)); opacity: 0; }
+}
+@keyframes sky-glint {
+  0% { opacity: 0; }
+  25%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes sky-buzz {
+  0% { transform: translate(0, 0); opacity: 0; }
+  8% { opacity: 1; }
+  20% { transform: translate(24px, -10px); }
+  35% { transform: translate(10px, 14px); }
+  50% { transform: translate(40px, 6px); }
+  65% { transform: translate(28px, -16px); }
+  80% { transform: translate(56px, -4px); }
+  92% { opacity: 1; }
+  100% { transform: translate(90px, -30px); opacity: 0; }
+}
+.sky-twinkle { animation: sky-twinkle 1.4s ease-in-out infinite alternate; }
+@keyframes sky-twinkle { from { opacity: 0.35; } to { opacity: 1; } }
+.sky-bob { animation: sky-bob 2s ease-in-out infinite alternate; }
+@keyframes sky-bob { from { transform: translateY(-2px); } to { transform: translateY(2px); } }
+.sky-flap { transform-origin: 50% 60%; animation: sky-flap 0.38s ease-in-out infinite alternate; }
+@keyframes sky-flap { to { transform: scaleY(0.35); } }
+.sky-wing { animation: sky-wing 0.07s linear infinite alternate; }
+@keyframes sky-wing { to { opacity: 0.2; } }
+.sky-rain {
+  background: repeating-linear-gradient(100deg, rgba(110, 135, 155, 0.35) 0 1px, transparent 1px 8px);
+  background-size: 100% 24px;
+  mask-image: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0));
+  -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0));
+  animation: sky-rain 0.5s linear infinite;
+}
+@keyframes sky-rain { to { background-position: -4px 24px; } }
