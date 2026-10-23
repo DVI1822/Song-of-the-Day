@@ -95,12 +95,6 @@ function newMotion(posted: boolean) {
     profP: 0,
     dk: 0,
     darkOn: false,
-    override: null as null | boolean, // the pull chain beats the clock until reload
-    pull: null as null | { x: number; y: number },
-    pullY: 0,
-    pullV: 0,
-    sw: 0,
-    swV: 0,
     launch: null as null | number,
     myLanded: posted,
     myLock: null as null | number,
@@ -128,10 +122,6 @@ function newEls() {
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
     chrome: [] as (HTMLElement | null)[],
-    swing: null as HTMLDivElement | null,
-    beads: null as HTMLDivElement | null,
-    handle: null as HTMLButtonElement | null,
-    gem: null as HTMLDivElement | null,
     feat: null as HTMLDivElement | null,
     featBack: null as HTMLDivElement | null,
     featCard: null as HTMLDivElement | null,
@@ -353,21 +343,13 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         s.sunAt = now;
       }
       // the sky follows the real time of day: space at night, light blue by
-      // day. The pull chain overrides it.
-      const dGoal = s.override === null ? 1 - s.sun.day : s.override ? 1 : 0;
+      // day.
+      const dGoal = 1 - s.sun.day;
       s.dk = s.t === 0 || Math.abs(dGoal - s.dk) < 0.01 ? dGoal : s.dk + (dGoal - s.dk) * Math.min(1, dt * 5);
       if (s.dk > 0.5 !== s.darkOn) {
         s.darkOn = s.dk > 0.5;
         setDarkOn(s.darkOn);
       }
-      // the pull chain springs back and swings
-      if (!s.pull) {
-        s.pullV += (-260 * s.pullY - 16 * s.pullV) * dt;
-        s.pullY += s.pullV * dt;
-        if (Math.abs(s.pullY) < 0.05 && Math.abs(s.pullV) < 0.5) s.pullY = s.pullV = 0;
-      }
-      s.swV += (-18 * s.sw - 0.9 * s.swV) * dt;
-      s.sw += s.swV * dt;
       s.profP = s.coreOn ? Math.min(1, s.profP + dt * 2.5) : 0;
 
       if (s.featOn) {
@@ -492,30 +474,6 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     s.zoomTarget = null;
   };
 
-  const pullDown = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
-    m.current.pull = { y: e.clientY, x: e.clientX };
-  };
-  const pullMove = (e: React.PointerEvent) => {
-    const s = m.current;
-    if (!s.pull) return;
-    const d = Math.max(0, e.clientY - s.pull.y);
-    s.pullY = 70 * (1 - Math.exp(-d / 70));
-    s.pullV = 0;
-    s.sw = Math.max(-0.5, Math.min(0.5, (e.clientX - s.pull.x) * -0.006));
-    s.swV = 0;
-  };
-  const pullUp = () => {
-    const s = m.current;
-    if (!s.pull) return;
-    s.pull = null;
-    if (s.pullY > 26) s.override = !s.darkOn;
-    s.pullV = -s.pullY * 4;
-    s.swV += (Math.random() < 0.5 ? -1 : 1) * (0.6 + s.pullY * 0.02);
-  };
 
   // -------------------------------------------------------------------------
   // Posting, redo, following
@@ -710,44 +668,9 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         </div>
       </div>
 
-      {/* pull chain: lights off for space */}
-      <div ref={(el) => void (R.current.chrome[1] = el)} className="absolute right-[18px] top-0 z-[440] h-px w-6">
-        <div ref={(el) => void (R.current.swing = el)} className="absolute left-0 top-0 w-6 origin-[12px_0]">
-          <div ref={(el) => void (R.current.beads = el)} className="absolute left-[9px] top-0 w-1.5" />
-          <button
-            ref={(el) => void (R.current.handle = el)}
-            type="button"
-            onPointerDown={pullDown}
-            onPointerMove={pullMove}
-            onPointerUp={pullUp}
-            onPointerCancel={pullUp}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                m.current.override = !m.current.darkOn;
-              }
-            }}
-            aria-label={darkOn ? "Pull to turn the lights on" : "Pull to turn the lights off"}
-            className="absolute -left-2.5 h-[54px] w-11 cursor-grab touch-none"
-          >
-            <div
-              className="absolute left-[19px] top-0 h-[7px] w-1.5 rounded-[2px]"
-              style={{ background: "linear-gradient(90deg, #7D8A93, #E3E9ED 45%, #8C98A1)" }}
-            />
-            <div
-              ref={(el) => void (R.current.gem = el)}
-              className="absolute left-3.5 top-[9px] h-4 w-4 rotate-45 rounded-[3px_50%_50%_50%]"
-              style={{
-                background: "linear-gradient(135deg, rgba(255,255,255,0.97), rgba(186,220,240,0.75) 45%, rgba(118,158,190,0.9))",
-              }}
-            />
-          </button>
-        </div>
-      </div>
-
       {/* + until you've posted, then the countdown to midnight */}
       <div
-        ref={(el) => void (R.current.chrome[2] = el)}
+        ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
       >
         {!posted && !launching && (
@@ -767,7 +690,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       </div>
 
       {/* left tabs */}
-      <div ref={(el) => void (R.current.chrome[3] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
+      <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
         {(
           [
             ["friends", "My friends", 116],
@@ -867,6 +790,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           who={featWho}
           timeZone={featTz}
           cover={L.cover}
+          dark={darkOn}
           left={L.cx - L.cover / 2}
           top={L.cy - L.cover / 2 - 42}
           flipped={flipped}
@@ -1070,22 +994,14 @@ sim: TileSim,
       el.style.pointerEvents = off ? "none" : "";
     }
 
-  // pull chain
-  const len = 62 + s.pullY;
-  if (r.swing) r.swing.style.transform = `rotate(${(s.sw + 0.035 * Math.sin(s.mt * 1.1)).toFixed(4)}rad)`;
-  if (r.beads) {
-    r.beads.style.height = len.toFixed(1) + "px";
-    r.beads.style.background = `radial-gradient(circle at 3px 3px, ${dk > 0.5 ? "#C9D4DE" : "#8C98A1"} 1.5px, rgba(0,0,0,0) 2px) 0 0 / 6px 6px repeat-y`;
-  }
-  if (r.handle) r.handle.style.top = (len - 1).toFixed(1) + "px";
-  if (r.gem)
-    r.gem.style.boxShadow =
-      "0 3px 8px rgba(13,42,63,0.28), inset 0 0 0 1px rgba(255,255,255,0.65)" +
-      (dk > 0 ? `, 0 0 ${(14 * dk).toFixed(1)}px rgba(200,232,255,${(0.7 * dk).toFixed(2)})` : "");
-
   // the song card and the core fade with the camera
-  if (r.featBack)
-    r.featBack.style.background = `rgba(248,250,252,${((0.3 + 0.62 * dk) * s.fp).toFixed(3)})`;
+  // the world stays there behind a song, softly blurred
+  if (r.featBack) {
+    const blur = `blur(${(6 * s.fp).toFixed(1)}px)`;
+    r.featBack.style.background = `rgba(${dk > 0.5 ? "8,14,26" : "248,250,252"},${(0.18 * s.fp).toFixed(3)})`;
+    r.featBack.style.backdropFilter = blur;
+    r.featBack.style.setProperty("-webkit-backdrop-filter", blur);
+  }
   if (r.featCard) r.featCard.style.opacity = (1 - Math.pow(1 - s.fp, 3)).toFixed(3);
   if (r.prof) r.prof.style.opacity = s.profP.toFixed(3);
   if (r.profSheet) r.profSheet.style.transform = `translateY(${(Math.pow(1 - s.profP, 3) * 50).toFixed(1)}px)`;

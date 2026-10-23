@@ -80,7 +80,8 @@ function song(i: number, user: string, day: string, hoursAgo: number): Post {
     id: `p${user}-${day}`,
     user_id: user,
     day,
-    song_url: "https://song.link/demo",
+    // a real track so the play button can be tried in the demo
+    song_url: "https://open.spotify.com/track/003vvx7Niy0yvhvHt4a68B",
     page_url: null,
     title: `${pickOf(A, i, 4)} ${pickOf(B, i, 5)}`,
     artist: `${pickOf(B, i, 6)} ${pickOf(C, i, 7)}`,
