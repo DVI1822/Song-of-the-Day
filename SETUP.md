@@ -48,6 +48,9 @@ Your `main` branch now has the app in it. Vercel will build from `main`.
    click the **copy** icon at the top right of the file, and paste it all into
    the SQL editor.
 4. Click **Run**. You should see "Success. No rows returned."
+5. Do the same with
+   [`supabase/migrations/20261023000000_album_preview_photo.sql`](supabase/migrations/20261023000000_album_preview_photo.sql)
+   in a new query. It adds albums, song previews and photos.
 
 You can check it worked under **Table Editor**: there should be `profiles`,
 `posts`, `follows`, `invites` and `app_settings` tables.
@@ -144,9 +147,9 @@ Sign-in works by emailing you a link, so Supabase needs to know your site's addr
 1. Open your site, click **Get started**, and enter the email you invited.
 2. Open the link in the email **on the same phone or browser** you asked from.
 3. Pick your name and username.
-4. Tap **+**, paste a Spotify link, write a caption, and share.
-5. Add a friend's email to **invites**, send them the link, and follow each
-   other from **People → Follow**. Their tile appears on your Globe.
+4. Tap **+**, paste a Spotify link, add a comment or photo if you like, and post.
+5. Add a friend's email to **invites**, send them the link, and add each
+   other from the **Find a friend** tab. Their tile appears on your Globe.
 
 You can also open `/demo` on your site to see a Globe full of made-up friends.
 
