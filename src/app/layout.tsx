@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fredoka, Outfit } from "next/font/google";
 import { PreviewProvider } from "@/components/globe/Preview";
+import { SessionFromLink } from "@/components/SessionFromLink";
 import { MiniPlayer } from "@/components/globe/Shuffle";
 import "./globals.css";
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <PreviewProvider>
           {children}
           <MiniPlayer />
+          <SessionFromLink />
         </PreviewProvider>
       </body>
     </html>
