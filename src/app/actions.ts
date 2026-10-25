@@ -224,6 +224,11 @@ export async function spotifyNext(): Promise<void> {
   if (token) await spotifyApi(token, "/me/player/next", { method: "POST" });
 }
 
+// Carry on from where it was paused, on the same Spotify app.
+export async function spotifyResume(): Promise<SpotifyPlay> {
+  return startPlayback({});
+}
+
 export async function spotifyPause(): Promise<void> {
   const { supabase, userId } = await getSession();
   if (!userId) return;

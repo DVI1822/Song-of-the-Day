@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { Friend, Post, Profile } from "@/lib/types";
+import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -14,7 +14,7 @@ import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { Magma, MagmaFilters } from "./Magma";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
-import { PreviewProvider, usePreview } from "./Preview";
+import { usePreview } from "./Preview";
 import { BackIcon, coverRadius, glass } from "./ui";
 import {
   PERSPECTIVE,
@@ -37,6 +37,7 @@ type Props = {
   friends: Friend[];
   mySongs: Post[];
   redoUsed: boolean;
+  addedMe?: AddedMe[];
   spotifyLinked?: boolean;
   api?: GlobeApi;
 };
@@ -45,11 +46,10 @@ export function GlobeApp(props: Props) {
   const spotify = (props.api ?? serverApi).spotify;
   const linked = Boolean(props.spotifyLinked);
   const connect = useMemo(() => (spotify ? { ...spotify, linked } : null), [spotify, linked]);
-  return (
-    <PreviewProvider connect={connect}>
-      <Globe {...props} />
-    </PreviewProvider>
-  );
+  // the player lives in the root layout and stays with you after you leave
+  const { setConnect } = usePreview();
+  useEffect(() => setConnect(connect), [connect, setConnect]);
+  return <Globe {...props} />;
 }
 
 const ME = 99; // your own tile's slot; friends take 0..89
@@ -63,6 +63,31 @@ type TileEls = {
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+// When you last looked at who added you, so the My friends tab can show a
+// badge for anyone new. Kept on this device only.
+const SEEN_KEY = "sotd-added-seen";
+const seenListeners = new Set<() => void>();
+const seenStore = {
+  subscribe(f: () => void) {
+    seenListeners.add(f);
+    return () => void seenListeners.delete(f);
+  },
+  get() {
+    try {
+      return localStorage.getItem(SEEN_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  },
+  server: () => "~", // sorts after every date: no badge until we're in the browser
+  set(at: string) {
+    try {
+      localStorage.setItem(SEEN_KEY, at);
+    } catch {}
+    seenListeners.forEach((f) => f());
+  },
+};
 
 // Magnify the view to k, keeping content point (cx, cy) under screen point
 // (sx, sy), and never letting the picture's edge come into view.
@@ -167,9 +192,21 @@ function newEls() {
   };
 }
 
-function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: initialSongs, redoUsed: initialRedo, api = serverApi }: Props) {
-  const stopPreview = usePreview().stop;
+function Globe({
+  me,
+  myPost: initialPost,
+  friends: initialFriends,
+  mySongs: initialSongs,
+  redoUsed: initialRedo,
+  addedMe: initialAddedMe = [],
+  api = serverApi,
+}: Props) {
+  // Songs keep playing as you move around; only pausing or starting another stops them.
+  const shuffleNow = usePreview().shuffle?.now ?? null;
   const [friends, setFriends] = useState(initialFriends);
+  const [addedMe, setAddedMe] = useState(initialAddedMe);
+  const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
+  const newAdds = addedMe.filter((p) => p.added_at > seen).length;
   const [myPost, setMyPost] = useState(initialPost);
   const [mySongs, setMySongs] = useState(initialSongs);
   const [redoUsed, setRedoUsed] = useState(initialRedo);
@@ -267,9 +304,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       setFocus(null);
       setFlipped(false);
       closePanel();
-      stopPreview();
     },
-    [closePanel, stopPreview],
+    [closePanel],
   );
 
   // Fly through the near side of the globe into someone's core.
@@ -287,9 +323,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       setCoreFor({ k });
       setFocus(null);
       closePanel();
-      stopPreview();
     },
-    [closePanel, stopPreview],
+    [closePanel],
   );
 
   const closeCore = useCallback(() => {
@@ -304,8 +339,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     m.current.featOpen = false;
     m.current.zoomTarget = 1;
     setFlipped(false);
-    stopPreview();
-  }, [stopPreview]);
+  }, []);
 
   const openCompose = useCallback(() => {
     if (m.current.launch !== null) return;
@@ -642,11 +676,20 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     closePanel();
   };
 
+  const onAddBack = async (p: AddedMe) => {
+    if (friends.length >= 90) return "Your globe is full.";
+    const r = await api.follow(p.id);
+    if (!r.friend) return r.error ?? "Couldn't add them back. Try again.";
+    setAddedMe((list) => list.filter((x) => x.id !== p.id));
+    onFollowed(r.friend);
+    return null;
+  };
+
   const openTab = (name: PanelName) => {
     if (panel === name && panelOn) return closePanel();
+    if (name === "friends" && addedMe.length) seenStore.set(addedMe[0].added_at); // newest first
     setPanel(name);
     setPanelOn(true);
-    stopPreview();
   };
 
   // -------------------------------------------------------------------------
@@ -681,24 +724,18 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const featTz = feat === ME ? me.timezone : feat !== null ? friends[feat]?.timezone ?? "UTC" : "UTC";
   const posted = landed && !!myPost;
   const shuffleSongs = useMemo(
-    () => [
-      ...friends.flatMap((f, k) => (f.post ? [{ k, post: f.post }] : [])),
-      ...(myPost && landed ? [{ k: ME, post: myPost }] : []),
-    ],
+    () => [...friends.flatMap((f) => (f.post ? [f.post] : [])), ...(myPost && landed ? [myPost] : [])],
     [friends, myPost, landed],
   );
   // the Globe turns to whichever song shuffle is playing
-  const onShuffleSong = useCallback(
-    (k: number | null) => {
-      const s = m.current;
-      if (k === null) return setFocus(null);
-      if (s.featOn || s.coreOn || s.lens !== null) return;
-      s.vel = 0;
-      s.target = aim(sim.current.pos(k), s.yaw);
-      setFocus(k);
-    },
-    [],
-  );
+  const shuffleK = !shuffleNow ? null : shuffleNow.id === myPost?.id ? ME : friends.findIndex((f) => f.post?.id === shuffleNow.id);
+  useEffect(() => {
+    const s = m.current;
+    if (shuffleK === null || shuffleK < 0 || s.featOn || s.coreOn || s.lens !== null) return;
+    s.vel = 0;
+    s.target = aim(sim.current.pos(shuffleK), s.yaw);
+    setFocus(shuffleK);
+  }, [shuffleK]);
   const ink = darkOn ? "#EEF3F8" : "#0D2A3F";
   const muted = darkOn ? "#93A6B8" : "#6A818C";
   const tabTop = Math.max(100, L.cy - 240);
@@ -835,7 +872,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
       >
         <div className="absolute inset-x-0 bottom-full flex justify-center pb-1">
-          <Shuffle songs={shuffleSongs} dark={darkOn} onNow={onShuffleSong} />
+          <Shuffle songs={shuffleSongs} />
         </div>
         {!posted && !launching && (
           <button
@@ -868,10 +905,18 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             onClick={() => openTab(name)}
             aria-label={label}
             aria-expanded={panel === name && panelOn}
-            className="box-border flex w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0 transition-shadow"
+            className="relative box-border flex w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0 transition-shadow"
             style={{ height, ...glass(darkOn), ...activeTab(name) }}
           >
             <TabIcon name={name} />
+            {name === "friends" && newAdds > 0 && (
+              <span
+                aria-label={`${newAdds} new`}
+                className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
+              >
+                {newAdds}
+              </span>
+            )}
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
               {label}
             </span>
@@ -917,6 +962,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           {panel === "friends" && (
             <FriendsPanel
               friends={friends}
+              addedMe={addedMe}
+              onAddBack={onAddBack}
               onOpen={fly}
               onSpin={(k) => {
                 m.current.moved = false;

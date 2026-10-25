@@ -28,6 +28,9 @@ export type Post = {
 // Someone you follow, plus today's song if they've posted one.
 export type Friend = Profile & { post: Post | null; followed_at: string };
 
+// Someone who added you that you haven't added back.
+export type AddedMe = Profile & { added_at: string };
+
 // Everything shown when you fly into someone's core.
 export type Core = {
   profile: Profile;

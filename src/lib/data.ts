@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isConfigured } from "./supabase/env";
 import { createClient } from "./supabase/server";
 import { todayIn } from "./day";
-import type { Core, Friend, Post, Profile } from "./types";
+import type { AddedMe, Core, Friend, Post, Profile } from "./types";
 
 export async function getSession() {
   // Until Supabase is connected, the home page explains what to do.
@@ -30,7 +30,7 @@ export async function requireProfile() {
 
 export async function getGlobe(profile: Profile) {
   const supabase = await createClient();
-  const [{ data: follows }, { data: mySongs }, { data: redo }] = await Promise.all([
+  const [{ data: follows }, { data: mySongs }, { data: redo }, { data: followers }, { data: following }] = await Promise.all([
     supabase
       .from("follows")
       .select("created_at, profile:profiles!follows_following_id_fkey(*)")
@@ -44,7 +44,19 @@ export async function getGlobe(profile: Profile) {
       .eq("user_id", profile.id)
       .eq("day", todayIn(profile.timezone))
       .maybeSingle(),
+    // who added you, newest first, and everyone you've added (for "add back")
+    supabase
+      .from("follows")
+      .select("created_at, profile:profiles!follows_follower_id_fkey(*)")
+      .eq("following_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase.from("follows").select("following_id").eq("follower_id", profile.id),
   ]);
+  const mine = new Set((following ?? []).map((f) => f.following_id as string));
+  const addedMe: AddedMe[] = (followers ?? [])
+    .map((f) => ({ ...(f.profile as unknown as Profile), added_at: f.created_at as string }))
+    .filter((p) => p.id && !mine.has(p.id));
 
   const people = (follows ?? [])
     .map((f) => ({ followed_at: f.created_at as string, profile: f.profile as unknown as Profile }))
@@ -67,6 +79,7 @@ export async function getGlobe(profile: Profile) {
     myPost: songs.find((p) => p.day === today) ?? null,
     mySongs: songs,
     redoUsed: Boolean(redo),
+    addedMe,
   };
 }
 

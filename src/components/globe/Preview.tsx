@@ -5,30 +5,68 @@ import { embedFor } from "@/lib/songs";
 import type { Post } from "@/lib/types";
 import type { SpotifyConnect } from "./api";
 
-// One shared audio element for 30-second previews, so starting one song
-// stops the last. Spotify's player claims the same slot with its own stop.
+// What's playing, for the whole site. It lives in the root layout, so a song
+// keeps going after you close its card or move to another page, until you
+// pause it or start another. One shared audio element plays 30-second
+// previews; Spotify (Connect, or its hidden player) claims the same slot with
+// its own stop, so starting one song always stops the last.
+export type ShuffleState = { list: Post[]; whole: boolean; now: Post; paused: boolean };
+export type Track = { post: Post; paused: boolean; kind: "clip" | "connect" | "embed" };
+type Controls = { pause(): void; resume(): void };
+type EmbedState = { uri: string; playing: boolean; position: number; duration: number };
+type Connect = (SpotifyConnect & { linked: boolean }) | null;
 type PreviewState = {
   key: string | null;
   at: number;
-  play(key: string, url: string, onEnd?: () => void): void;
-  claim(key: string, stop: () => void): void;
+  play(key: string, url: string, onEnd?: () => void, post?: Post): void;
+  claim(key: string, stop: () => void, track?: { post: Post; kind: Track["kind"]; controls: Controls }): void;
   stop(): void;
-  connect: (SpotifyConnect & { linked: boolean }) | null;
+  // the single song that's playing (or paused), for the mini player
+  track: Track | null;
+  toggle(): void;
+  connect: Connect;
+  setConnect(c: Connect): void;
+  // Spotify's hidden player, kept here so it outlives the card that started it
+  embed: EmbedState | null;
+  embedShown: boolean;
+  spotifyController(uri: string): Promise<SpotifyController>;
+  showEmbed(on: boolean): void;
+  // Shuffle all
+  shuffle: ShuffleState | null;
+  startShuffle(posts: Post[]): Promise<string | null>;
+  shuffleNext(): void;
+  shuffleToggle(): void;
+  // the Globe shows its own player bar, so the mini player steps aside
+  docked: boolean;
+  setDocked(on: boolean): void;
 };
 const Ctx = createContext<PreviewState | null>(null);
+export const SHUFFLE = "shuffle";
 
-export function PreviewProvider({
-  children,
-  connect,
-}: {
-  children: React.ReactNode;
-  connect: (SpotifyConnect & { linked: boolean }) | null;
-}) {
+function shuffled<T>(list: T[]) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const other = useRef<(() => void) | null>(null);
   const ended = useRef<(() => void) | null>(null);
+  const controls = useRef<Controls | null>(null);
+  const host = useRef<HTMLDivElement>(null);
+  const embedCtl = useRef<{ uri: string; ctl: Promise<SpotifyController> } | null>(null);
   const [key, setKey] = useState<string | null>(null);
   const [at, setAt] = useState(0);
+  const [track, setTrack] = useState<Track | null>(null);
+  const [connect, setConnect] = useState<Connect>(null);
+  const [embed, setEmbed] = useState<EmbedState | null>(null);
+  const [embedShown, setEmbedShown] = useState(false);
+  const [shuffle, setShuffle] = useState<ShuffleState | null>(null);
+  const [docked, setDocked] = useState(false);
 
   useEffect(() => {
     const a = new Audio();
@@ -40,6 +78,7 @@ export function PreviewProvider({
       if (next) return next();
       setKey(null);
       setAt(0);
+      setTrack(null);
     });
     a.addEventListener("error", () => setKey(null));
     audio.current = a;
@@ -51,40 +90,200 @@ export function PreviewProvider({
     audio.current?.pause();
     other.current?.();
     other.current = null;
+    controls.current = null;
+    setEmbedShown(false);
   }, []);
 
   const stop = useCallback(() => {
     silence();
     setKey(null);
     setAt(0);
+    setShuffle(null);
+    setTrack(null);
   }, [silence]);
 
-  const claim = useCallback(
-    (k: string, stopIt: () => void) => {
+  const claim = useCallback<PreviewState["claim"]>(
+    (k, stopIt, t) => {
       silence();
       other.current = stopIt;
+      controls.current = t?.controls ?? null;
       setAt(0);
       setKey(k);
+      if (k !== SHUFFLE) setShuffle(null);
+      setTrack(t ? { post: t.post, kind: t.kind, paused: false } : null);
     },
     [silence],
   );
 
-  const play = useCallback(
-    (k: string, url: string, onEnd?: () => void) => {
+  const play = useCallback<PreviewState["play"]>(
+    (k, url, onEnd, post) => {
       const a = audio.current;
       if (!a) return;
       silence();
       ended.current = onEnd ?? null;
+      controls.current = { pause: () => a.pause(), resume: () => void a.play() };
       a.src = url;
       a.currentTime = 0;
       setAt(0);
       setKey(k);
+      if (k !== SHUFFLE) setShuffle(null);
+      setTrack(post ? { post, kind: "clip", paused: false } : null);
       a.play().catch(() => setKey(null));
     },
     [silence],
   );
 
-  return <Ctx.Provider value={{ key, at, play, claim, stop, connect }}>{children}</Ctx.Provider>;
+  const toggle = useCallback(() => {
+    if (!track || !controls.current) return;
+    if (track.paused) controls.current.resume();
+    else controls.current.pause();
+    setTrack({ ...track, paused: !track.paused });
+  }, [track]);
+
+  // One hidden Spotify player for the site; asking for another song swaps it.
+  const spotifyController = useCallback((uri: string) => {
+    if (embedCtl.current?.uri === uri) return embedCtl.current.ctl;
+    embedCtl.current?.ctl.then((c) => c.destroy());
+    const el = document.createElement("div");
+    host.current?.replaceChildren(el);
+    setEmbed(null);
+    const ctl = loadSpotify().then(
+      (api) =>
+        new Promise<SpotifyController>((resolve) =>
+          api.createController(el, { uri, width: "100%", height: 80 }, (c) => {
+            c.addListener("playback_update", (e) => {
+              const { isPaused, position, duration } = e.data;
+              setEmbed({ uri, playing: !isPaused, position, duration });
+              setTrack((t) => (t?.kind === "embed" && spotifyUriOf(t.post) === uri ? { ...t, paused: isPaused } : t));
+              if (!isPaused) setEmbedShown(false);
+            });
+            resolve(c);
+          }),
+        ),
+    );
+    embedCtl.current = { uri, ctl };
+    return ctl;
+  }, []);
+
+  // A whole song on Spotify Connect can be paused or end on the phone: check in.
+  const connectPost = track?.kind === "connect" ? track.post : null;
+  useEffect(() => {
+    if (!connectPost || !connect) return;
+    const uri = spotifyUriOf(connectPost);
+    const t = setInterval(() => {
+      connect.now().then((n) => {
+        const paused = !(n && n.uri === uri && n.playing);
+        setTrack((tr) => (tr?.post === connectPost && tr.paused !== paused ? { ...tr, paused } : tr));
+      });
+    }, 5000);
+    return () => clearInterval(t);
+  }, [connectPost, connect]);
+
+  // Shuffle with previews: one clip after another until the list runs out.
+  const clip = useCallback(
+    (list: Post[], from: number) => {
+      const go = (i: number) => {
+        if (i >= list.length) return stop();
+        play(SHUFFLE, list[i].preview_url!, () => go(i + 1));
+        setShuffle({ list, whole: false, now: list[i], paused: false });
+      };
+      go(from);
+    },
+    [play, stop],
+  );
+
+  const startShuffle = useCallback(
+    async (posts: Post[]) => {
+      const order = shuffled(posts);
+      const c = connect?.linked ? connect : null;
+      const whole = order.filter((p) => spotifyUriOf(p)?.startsWith("spotify:track:"));
+      if (c && whole.length) {
+        const r = await c.playAll(whole.map((p) => spotifyUriOf(p)!));
+        if ("ok" in r) {
+          claim(SHUFFLE, () => void c.pause());
+          setShuffle({ list: whole, whole: true, now: whole[0], paused: false });
+          return null;
+        }
+        if (r.error === "no-device") return "Open Spotify on your phone or computer, then shuffle again to hear whole songs.";
+      }
+      const list = order.filter((p) => p.preview_url);
+      if (!list.length) return c ? null : "Connect Spotify in Settings to shuffle whole songs.";
+      clip(list, 0);
+      return null;
+    },
+    [connect, claim, clip],
+  );
+
+  const shuffleNext = useCallback(() => {
+    if (!shuffle) return;
+    const i = shuffle.list.findIndex((p) => p.id === shuffle.now.id);
+    if (!shuffle.whole) return clip(shuffle.list, i + 1);
+    void connect?.next();
+    const now = shuffle.list[i + 1];
+    if (now) setShuffle({ ...shuffle, now, paused: false });
+  }, [shuffle, connect, clip]);
+
+  const shuffleToggle = useCallback(() => {
+    if (!shuffle) return;
+    const paused = !shuffle.paused;
+    if (shuffle.whole) void (paused ? connect?.pause() : connect?.resume());
+    else if (paused) audio.current?.pause();
+    else void audio.current?.play();
+    setShuffle({ ...shuffle, paused });
+  }, [shuffle, connect]);
+
+  // Whole songs play on Spotify, which moves on by itself: now and then ask
+  // it which song it's on, and whether it's paused.
+  const whole = shuffle?.whole ? shuffle.list : null;
+  useEffect(() => {
+    if (!whole || !connect) return;
+    const check = () =>
+      connect.now().then((n) => {
+        const now = n?.uri ? whole.find((p) => spotifyUriOf(p) === n.uri) : undefined;
+        if (now) setShuffle((s) => (s?.list === whole ? { ...s, now, paused: !n!.playing } : s));
+      });
+    check();
+    const t = setInterval(check, 4000);
+    return () => clearInterval(t);
+  }, [whole, connect]);
+
+  return (
+    <Ctx.Provider
+      value={{
+        key,
+        at,
+        play,
+        claim,
+        stop,
+        track,
+        toggle,
+        connect,
+        setConnect,
+        embed,
+        embedShown,
+        spotifyController,
+        showEmbed: setEmbedShown,
+        shuffle,
+        startShuffle,
+        shuffleNext,
+        shuffleToggle,
+        docked,
+        setDocked,
+      }}
+    >
+      {children}
+      {/* Spotify's player, out of sight unless a browser insists on a tap */}
+      <div
+        ref={host}
+        aria-hidden={!embedShown}
+        className={
+          embedShown
+            ? "rise-in fixed inset-x-4 bottom-[calc(80px+env(safe-area-inset-bottom))] z-[950] mx-auto max-w-[420px] overflow-hidden rounded-xl"
+            : "pointer-events-none fixed left-0 top-0 -z-10 h-20 w-[300px] opacity-0"
+        }
+      />
+    </Ctx.Provider>
+  );
 }
 
 export function usePreview() {
@@ -151,91 +350,59 @@ export const OpenIcon = () => (
   </svg>
 );
 
+
 // One play button. Anyone who linked Spotify hears the song start on their
 // own Spotify app (Spotify Connect), whole, if they have Premium. Otherwise
 // Spotify songs play through Spotify's player, hidden: anyone
 // signed in to Spotify in this browser hears the whole song, everyone else
 // Spotify's 30 seconds. If a browser won't let our button start it (some
 // phones insist on a tap inside Spotify's own player), the player shows up
-// below so it can be tapped. Songs from elsewhere use our 30-second preview,
-// then that platform's player.
+// so it can be tapped. Songs from elsewhere use our 30-second preview,
+// then that platform's player. The song keeps playing after this card closes.
 export function SongPlayer({
   post,
-  id,
   big = false,
   extra,
 }: {
   post: Post;
-  id: string;
   big?: boolean;
   extra?: React.ReactNode;
 }) {
   const pv = usePreview();
+  const key = `song-${post.id}`;
+  const mine = pv.key === key;
   const [embedOpen, setEmbedOpen] = useState(false);
   const embed = embedFor(post.platform_links ?? {}, post.song_url);
-  const uri = embed?.platform === "spotify" ? embed.src.match(/\/embed\/(track|album)\/([A-Za-z0-9]+)/) : null;
-  const spotifyUri = uri ? `spotify:${uri[1]}:${uri[2]}` : null;
-
-  const host = useRef<HTMLDivElement>(null);
-  const ctl = useRef<Promise<SpotifyController> | null>(null);
-  const started = useRef(false);
-  const [sp, setSp] = useState({ playing: false, position: 0, duration: 0 });
+  const spotifyUri = spotifyUriOf(post);
+  const sp = pv.embed && pv.embed.uri === spotifyUri ? pv.embed : null;
   const [waiting, setWaiting] = useState(false);
-  const [showPlayer, setShowPlayer] = useState(false);
   // Spotify Connect: where it's playing and how far along
   const connect = pv.connect?.linked && spotifyUri ? pv.connect : null;
   const [cx, setCx] = useState<{ device: string; playing: boolean; position: number; duration: number } | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const { spotifyController, showEmbed } = pv;
 
-  const controller = useCallback(() => {
-    if (!spotifyUri || !host.current) return null;
-    const el = document.createElement("div");
-    host.current.appendChild(el);
-    ctl.current ??= loadSpotify().then(
-      (api) =>
-        new Promise<SpotifyController>((resolve) =>
-          api.createController(el, { uri: spotifyUri, width: "100%", height: 80 }, (c) => {
-            c.addListener("playback_update", (e) => {
-              const { isPaused, position, duration } = e.data;
-              setSp({ playing: !isPaused, position, duration });
-              if (!isPaused) {
-                setWaiting(false);
-                setShowPlayer(false);
-              }
-            });
-            resolve(c);
-          }),
-        ),
-    );
-    return ctl.current;
-  }, [spotifyUri]);
-
-  // the big card gets Spotify ready as soon as it opens, so play is instant
+  // the big card gets Spotify ready as soon as it opens, so play is instant,
+  // unless Spotify's player is busy with another song
+  const embedBusy = pv.track?.kind === "embed";
   useEffect(() => {
-    if (big) controller();
-  }, [big, controller]);
-  useEffect(
-    () => () => {
-      ctl.current?.then((c) => c.destroy());
-      ctl.current = null;
-    },
-    [],
-  );
-  // another song started
+    if (big && spotifyUri && !connect && !embedBusy) spotifyController(spotifyUri);
+  }, [big, spotifyUri, connect, embedBusy, spotifyController]);
+  // it started: stop waiting (set during render, React's way to follow a prop)
+  if (waiting && sp?.playing) setWaiting(false);
+  // still not playing after a few seconds: show Spotify's player for a tap
+  const stuck = waiting && !sp?.playing;
   useEffect(() => {
-    if (pv.key !== id) ctl.current?.then((c) => c.pause());
-  }, [pv.key, id]);
-  useEffect(() => {
-    if (!waiting) return;
+    if (!stuck) return;
     const t = setTimeout(() => {
       setWaiting(false);
-      setShowPlayer(true);
+      showEmbed(true);
     }, 3500);
     return () => clearTimeout(t);
-  }, [waiting]);
+  }, [stuck, showEmbed]);
 
   // Connect playback ticks along here and checks in with Spotify now and then
-  const cxPlaying = Boolean(cx?.playing);
+  const cxPlaying = Boolean(cx?.playing) && mine;
   useEffect(() => {
     if (!cxPlaying || !connect || !spotifyUri) return;
     let n = 0;
@@ -259,41 +426,35 @@ export function SongPlayer({
     return () => clearInterval(t);
   }, [cxPlaying, connect, spotifyUri]);
 
-  const previewOn = pv.key === id && !spotifyUri;
-  const connectOn = pv.key === id && cxPlaying;
-  const spotifyOn = pv.key === id && Boolean(spotifyUri) && (sp.playing || waiting || connectOn);
+  const paused = mine && pv.track?.paused;
   const canPlay = Boolean(embed || post.preview_url);
   const size = big ? 54 : 44;
-  const playing = embedOpen || previewOn || spotifyOn;
+  const playing = embedOpen || (mine && !paused);
 
   // Spotify's own player, hidden, driven by our button
   const playEmbed = () => {
-    const c = controller();
-    if (!c) return;
-    pv.claim(id, () => {
-      ctl.current?.then((x) => x.pause());
-    });
+    if (!spotifyUri) return;
+    const c = spotifyController(spotifyUri);
+    const pause = () => void c.then((x) => x.pause());
+    pv.claim(key, pause, { post, kind: "embed", controls: { pause, resume: () => void c.then((x) => x.resume()) } });
     setWaiting(true);
-    c.then((x) => {
-      if (started.current) x.resume();
-      else x.play();
-      started.current = true;
-    });
+    c.then((x) => x.play());
   };
 
   const toggle = () => {
-    if (playing) {
-      setEmbedOpen(false);
-      setWaiting(false);
-      pv.stop();
-      return;
+    if (embedOpen) return setEmbedOpen(false);
+    // pause, or carry on, without losing your place
+    if (mine && pv.track) {
+      if (cx) setCx({ ...cx, playing: Boolean(paused) });
+      return pv.toggle();
     }
     if (connect && spotifyUri) {
       setNote(null);
-      pv.claim(id, () => {
+      const pause = () => {
         connect.pause();
         setCx((c) => c && { ...c, playing: false });
-      });
+      };
+      pv.claim(key, pause, { post, kind: "connect", controls: { pause, resume: () => void connect.resume() } });
       // pick up where it was paused
       const from = cx && cx.duration && cx.position < cx.duration - 2000 ? cx.position : 0;
       setCx({ device: cx?.device ?? "", playing: true, position: from, duration: cx?.duration ?? 0 });
@@ -307,23 +468,22 @@ export function SongPlayer({
     } else if (spotifyUri) {
       playEmbed();
     } else if (post.preview_url) {
-      pv.play(id, post.preview_url);
+      pv.play(key, post.preview_url, undefined, post);
     } else if (embed) {
       pv.stop();
       setEmbedOpen(true);
     }
   };
 
-
   const progress = cx
     ? cx.duration > 0
       ? { at: cx.position, of: cx.duration, preview: false }
       : null
     : spotifyUri
-    ? sp.duration > 0 && (spotifyOn || sp.position > 0)
+    ? sp && sp.duration > 0 && (mine || sp.position > 0)
       ? { at: sp.position, of: sp.duration, preview: sp.duration <= 31_000 }
       : null
-    : previewOn
+    : mine
       ? { at: pv.at * 1000, of: 30_000, preview: true }
       : null;
 
@@ -367,21 +527,16 @@ export function SongPlayer({
           </div>
         </div>
       )}
-      {spotifyUri && (
-        <div
-          ref={host}
-          aria-hidden={!showPlayer}
-          className={showPlayer ? "rise-in overflow-hidden rounded-xl" : "pointer-events-none fixed left-0 top-0 -z-10 h-20 w-[300px] opacity-0"}
-        />
-      )}
-      {cx && connectOn && cx.device && <p className="-mt-1 text-[11px] text-muted">Playing on {cx.device}</p>}
+      {cx && cxPlaying && cx.device && <p className="-mt-1 text-[11px] text-muted">Playing on {cx.device}</p>}
       {note && <p className="-mt-1 text-[11px] text-muted">{note}</p>}
       {big && spotifyUri && pv.connect && !pv.connect.linked && (
         <a href="/spotify/connect" className="-mt-1 self-start text-[11px] font-semibold text-muted underline underline-offset-4">
           Hear whole songs: connect Spotify
         </a>
       )}
-      {showPlayer && <p className="-mt-1 text-[11px] text-muted">This browser needs one tap on Spotify&apos;s play button to start.</p>}
+      {mine && pv.embedShown && (
+        <p className="-mt-1 text-[11px] text-muted">This browser needs one tap on Spotify&apos;s play button, just below.</p>
+      )}
       {embed && embedOpen && !spotifyUri && (
         <iframe
           title="Player"

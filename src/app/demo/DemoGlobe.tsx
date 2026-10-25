@@ -3,7 +3,7 @@
 import type { GlobeApi } from "@/components/globe/api";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { addDays, todayIn } from "@/lib/day";
-import type { Friend, Post, Profile } from "@/lib/types";
+import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
 
 // The Globe with made-up friends. Works without signing in; nothing is saved.
 
@@ -164,6 +164,14 @@ const demoApi: GlobeApi = {
   },
 };
 
+// Two people from the pool who added you, so "Added you" has something in it.
+const ADDED_ME: AddedMe[] = [0, 1].map((j) => ({
+  ...profile(100 + j, POOL[j]),
+  added_at: new Date(Date.now() - (j + 1) * 3_600_000).toISOString(),
+}));
+
 export function DemoGlobe() {
-  return <GlobeApp me={ME} myPost={null} friends={FRIENDS} mySongs={MY_SONGS} redoUsed={false} api={demoApi} />;
+  return (
+    <GlobeApp me={ME} myPost={null} friends={FRIENDS} mySongs={MY_SONGS} redoUsed={false} addedMe={ADDED_ME} api={demoApi} />
+  );
 }
