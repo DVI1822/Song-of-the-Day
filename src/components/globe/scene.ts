@@ -1,5 +1,5 @@
 import type { Weather } from "@/lib/weather";
-import { PERSPECTIVE, type V3 } from "./math";
+import { PERSPECTIVE, camInv, camV, type Camera, type V3 } from "./math";
 import { CELLS, TEX, atlas } from "./textures";
 
 // The weather and the season, in the Globe's own 3D space, drawn on the GPU.
@@ -14,8 +14,14 @@ import { CELLS, TEX, atlas } from "./textures";
 // What's in it: soft clouds that slowly change shape, fine motion-blurred
 // rain that splashes on the songs, snow, low mist, lightning; and, by season,
 // leaves blowing past now and then in autumn, petals in spring, seeds on
-// summer days and fireflies on summer nights, with a few flowers
-// or fallen leaves on the ground under the globe.
+// summer days and fireflies on summer nights, with a few flowers on the
+// ground under the globe in spring and summer. All of it sparse.
+//
+// The globe is a real thing in that air. The wind parts round it and the
+// spinning sphere drags a thin skin of air along, so light things (snow,
+// petals, seeds) swirl past it, and heavier ones (leaves) hit it, lie flat
+// against it, ride the spin for a moment and slide off. A snowflake that
+// lands on it melts away in a few seconds, and a raindrop runs down it.
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
@@ -39,6 +45,7 @@ export type SceneFrame = {
   day: number; // how much sunlight
   L: V3; // toward the sun, camera space
   yaw: number;
+  cam: Camera; // the globe's turn, to carry what's resting on it
   season: Season;
   hour: number;
   temp: number | null;
@@ -383,9 +390,30 @@ class Sky {
 // --------------------------------------------------------------------------
 
 type Drop = { x: number; y: number; z: number; vy: number; len: number };
-type Flake = { x: number; y: number; z: number; vy: number; r: number; ph: number };
+type Flake = { x: number; y: number; z: number; vx: number; vy: number; vz: number; fall: number; r: number; ph: number };
+type Settled = { w: V3; r: number; age: number; life: number }; // snow resting on the globe, in its own frame
+type Bead = { w: V3; v: V3; age: number }; // a raindrop running down the globe
 type Spark = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number };
-type Mote = { p: V3; v: V3; e1: V3; e2: V3; w: V3; s: number; tex: number; kind: "leaf" | "petal" | "seed"; dir: number; ph: number; age: number };
+type Mote = {
+  p: V3;
+  v: V3;
+  U: V3; // the gust carrying it
+  e1: V3;
+  e2: V3;
+  w: V3;
+  w0: V3; // its own tumble, back once it's free of the globe
+  s: number;
+  tex: number;
+  kind: "leaf" | "petal" | "seed";
+  dir: number;
+  ph: number;
+  age: number;
+  touch: number; // how lately it touched the globe
+  rest: V3 | null; // caught on the globe (its own frame), riding the spin
+  restLeft: number;
+  caught: boolean;
+  gone: number; // fading where it came to rest on the ground
+};
 type Fly = { p: V3; v: V3; ph: number; period: number };
 type Mist = { x: number; y: number; z: number; w: number; h: number; a: number; seed: number; age: number };
 type Ground = { p: V3; u: V3; v: V3; tex: number; s: number; sway: number; ph: number; age: number };
@@ -396,6 +424,7 @@ const tint = (dk: number, day: V3, night: V3): V3 => [day[0] + (night[0] - day[0
 function cross(a: V3, b: V3): V3 {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
+const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 function normalize(a: V3): V3 {
   const l = Math.hypot(a[0], a[1], a[2]) || 1;
   return [a[0] / l, a[1] / l, a[2] / l];
@@ -408,6 +437,33 @@ function turn(v: V3, k: V3, a: number): V3 {
   const d = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
   return [v[0] * c + kv[0] * s + k[0] * d * (1 - c), v[1] * c + kv[1] * s + k[1] * d * (1 - c), v[2] * c + kv[2] * s + k[2] * d * (1 - c)];
 }
+// Bring a flat thing's frame round so it lies against the surface with normal n.
+function lay(m: { e1: V3; e2: V3 }, n: V3, k: number) {
+  const c = normalize(cross(m.e1, m.e2));
+  const t: V3 = dot(c, n) < 0 ? [-n[0], -n[1], -n[2]] : n;
+  const ax = cross(c, t);
+  const sn = Math.hypot(ax[0], ax[1], ax[2]);
+  if (sn < 1e-4) return;
+  const a = Math.asin(Math.min(1, sn)) * k;
+  const u: V3 = [ax[0] / sn, ax[1] / sn, ax[2] / sn];
+  m.e1 = turn(m.e1, u, a);
+  m.e2 = turn(m.e2, u, a);
+}
+
+// The air at p when the wind is U: it parts round a sphere of radius a
+// (potential flow, so it slides along the surface and never into it), and
+// the spinning globe (omega, rad/s) drags the air close to it along.
+function airAt(p: V3, U: V3, a: number, omega: V3): V3 {
+  const r = Math.hypot(p[0], p[1], p[2]);
+  if (r > 3.2 * a || r < 1) return [U[0], U[1], U[2]];
+  const n: V3 = [p[0] / r, p[1] / r, p[2] / r];
+  const k = (a * a * a) / (2 * r * r * r);
+  const un = 3 * dot(U, n);
+  const d = Math.pow(a / Math.max(r, a), 4) * 0.8;
+  const sp = cross(omega, p);
+  return [U[0] + k * (U[0] - un * n[0]) + d * sp[0], U[1] + k * (U[1] - un * n[1]) + d * sp[1], U[2] + k * (U[2] - un * n[2]) + d * sp[2]];
+}
+
 function randomFrame(): [V3, V3] {
   const a = normalize([rand(-1, 1), rand(-1, 1), rand(-1, 1)]);
   const b = normalize(cross(a, Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
@@ -420,6 +476,10 @@ export class Scene {
   private sky: Sky;
   private drops: Drop[] = [];
   private flakes: Flake[] = [];
+  private settled: Settled[] = [];
+  private beads: Bead[] = [];
+  private prevCam: Camera | null = null;
+  private omega: V3 = [0, 0, 0];
   private sparks: Spark[] = [];
   private motes: Mote[] = [];
   private flies: Fly[] = [];
@@ -464,6 +524,19 @@ export class Scene {
     const wind = wx?.wind ?? 0;
     const temp = f.temp;
     const ez = (k: number) => 1 - Math.exp(-k * dt);
+
+    // how fast the globe is turning, as a spin vector in camera space
+    const cam = f.cam;
+    if (this.prevCam && dt > 0) {
+      const A = camV([0, 1, 0], cam);
+      const q0 = camV([1, 0, 0], this.prevCam),
+        q1 = camV([1, 0, 0], cam);
+      const aq = cross(A, q1);
+      const l2 = dot(aq, aq);
+      const w = l2 > 0.01 ? Math.max(-1.5, Math.min(1.5, ((q1[0] - q0[0]) * aq[0] + (q1[1] - q0[1]) * aq[1] + (q1[2] - q0[2]) * aq[2]) / (l2 * dt))) : 0;
+      this.omega = [A[0] * w, A[1] * w, A[2] * w];
+    }
+    this.prevCam = { ...cam };
 
     // ---------------------------------------------------- the look on the songs
     const L = this.look;
@@ -582,17 +655,15 @@ export class Scene {
           ? [[TEX.sprout, 6], [TEX.daisy, 4], [TEX.crocus, 4]]
           : f.season === "summer"
             ? [[TEX.daisy, 4]]
-            : f.season === "autumn"
-              ? [[-1, 9]]
-              : [];
+            : [];
       for (const [tex, n] of plan) for (let i = 0; i < n; i++) this.ground.push(this.groundItem(tex, f));
     }
-    for (let i = this.ground.length - 1; i >= 0; i--) {
+    for (let i = 0; i < this.ground.length; i++) {
       const g = this.ground[i];
       g.age = g.age >= 0 ? g.age + dt : g.age - dt;
       const fade = g.age >= 0 ? clamp01(g.age / 4) : clamp01(1 + (g.age + 1) / 4);
       if (g.age < 0 && fade <= 0) {
-        this.ground.splice(i, 1);
+        this.ground.splice(i--, 1);
         continue;
       }
       let v = g.v;
@@ -611,8 +682,8 @@ export class Scene {
       : drizzle
         ? 0.04 + wind / 60
         : Math.min(0.25, wind / 40);
-    const wantDrops = wet ? Math.round((storm ? 1100 : drizzle ? 650 : 380 + 620 * intensity) * area * this.calm) : 0;
-    while (this.drops.length < wantDrops) this.drops.push(this.dropSpot(kind, halfW, topY, true));
+    const wantDrops = wet ? Math.round((storm ? 420 : drizzle ? 220 : 140 + 220 * intensity) * area * this.calm) : 0;
+    while (this.drops.length < wantDrops) this.drops.push(this.dropSpot(kind, halfW, topY, true, R));
     if (this.drops.length > wantDrops) this.drops.length = Math.max(wantDrops, this.drops.length - Math.ceil(dt * 400));
     // by day rain shows as faint grey against the bright sky, by night it catches the light
     const rc = tint(dk, storm ? [0.84, 0.87, 0.92] : [0.42, 0.48, 0.55], [0.78, 0.84, 0.95]);
@@ -627,6 +698,7 @@ export class Scene {
         const hit = -Math.sqrt(R2 - d.x * d.x - d.z * d.z);
         if (py < hit && d.y >= hit) {
           if (d.z > -R * 0.2 && Math.random() < 0.4) this.splash(d.x, hit, d.z, R);
+          if (Math.random() < (drizzle ? 0.02 : 0.05) && this.beads.length < 18 * this.calm) this.beads.push({ w: camInv([d.x, hit, d.z], cam), v: [0, 0, 0], age: 0 });
           done = true;
         }
       }
@@ -635,7 +707,7 @@ export class Scene {
         done = true;
       }
       if (!done && d.y - d.len > botY(d.z)) done = true;
-      if (done) Object.assign(d, this.dropSpot(kind, halfW, topY, false));
+      if (done) Object.assign(d, this.dropSpot(kind, halfW, topY, false, R));
       const near = Math.max(0, d.z) / 170;
       const k2 = kAt(d.z);
       const behind = d.z < 0 && d.x * d.x + d.y * d.y < R2 ? 0.5 : 1;
@@ -656,22 +728,48 @@ export class Scene {
     }
 
     // ---------------------------------------------------------------- snow
-    const wantFlakes = snow ? Math.round((320 + 420 * intensity) * area * this.calm) : 0;
-    while (this.flakes.length < wantFlakes) this.flakes.push(this.flakeSpot(halfW, topY, true));
+    // Flakes ride the air, so most part round the globe. The ones that meet
+    // it near the top rest there a moment and melt.
+    const wantFlakes = snow ? Math.round((110 + 150 * intensity) * area * this.calm) : 0;
+    while (this.flakes.length < wantFlakes) this.flakes.push(this.flakeSpot(halfW, topY, true, R));
     if (this.flakes.length > wantFlakes) this.flakes.length = Math.max(wantFlakes, this.flakes.length - Math.ceil(dt * 200));
     const sc = tint(dk, [1, 1, 1], [0.86, 0.9, 0.98]);
+    const om = this.omega;
+    const keepSettled = Math.round(40 * this.calm);
+    const kf = ez(2);
     for (const s of this.flakes) {
-      const py = s.y;
+      // the breeze parts round the globe; the flake sinks through it all the same
+      const U: V3 = [Math.sin(this.t * 0.9 + s.ph) * 18 + wind * 5, 0, Math.cos(this.t * 0.7 + s.ph * 1.3) * 8];
+      const air = airAt([s.x, s.y, s.z], U, R * 1.05, om);
+      s.vx += (air[0] - s.vx) * kf;
+      s.vy += (air[1] + s.fall - s.vy) * kf;
+      s.vz += (air[2] - s.vz) * kf;
+      s.x += s.vx * dt;
       s.y += s.vy * dt;
-      s.x += (Math.sin(this.t * 0.9 + s.ph) * 18 + wind * 5) * dt;
-      s.z += Math.cos(this.t * 0.7 + s.ph * 1.3) * 8 * dt;
+      s.z += s.vz * dt;
       let done = false;
-      if (s.x * s.x + s.z * s.z < R2) {
-        const hit = -Math.sqrt(R2 - s.x * s.x - s.z * s.z);
-        if (py < hit && s.y >= hit) done = true;
+      const d = Math.hypot(s.x, s.y, s.z);
+      if (d < R + s.r) {
+        const n: V3 = [s.x / d, s.y / d, s.z / d];
+        if (n[1] < -0.25 && this.settled.length < keepSettled) {
+          // on the upper half (y is down): it rests, turning with the globe, and melts
+          this.settled.push({ w: camInv([n[0] * (R + 0.5), n[1] * (R + 0.5), n[2] * (R + 0.5)], cam), r: s.r * rand(0.8, 1.1), age: 0, life: rand(2.5, 6) });
+          done = true;
+        } else {
+          // lower down it can't hold on, and slips past
+          s.x = n[0] * (R + s.r);
+          s.y = n[1] * (R + s.r);
+          s.z = n[2] * (R + s.r);
+          const vn = s.vx * n[0] + s.vy * n[1] + s.vz * n[2];
+          if (vn < 0) {
+            s.vx -= vn * n[0];
+            s.vy -= vn * n[1];
+            s.vz -= vn * n[2];
+          }
+        }
       }
       if (!done && (s.y > f.floorY + 10 || s.y > botY(s.z))) done = true;
-      if (done) Object.assign(s, this.flakeSpot(halfW, topY, false));
+      if (done) Object.assign(s, this.flakeSpot(halfW, topY, false, R));
       const near = Math.max(0, s.z) / 150;
       const r = s.r * (1 + near * 1.2);
       const behind = s.z < 0 && s.x * s.x + s.y * s.y < R2 ? 0.45 : 1;
@@ -679,6 +777,49 @@ export class Scene {
       // a faint grey edge, so flakes still show against a bright sky
       if (dk < 0.5) to(s.z).push([s.x, s.y, s.z], [r * 1.5, r * 1.5, 0], [0, 0, 0], 0.4, 0.45, 0.52, a * 0.5 * (1 - dk * 2), 1, 0, 0, 0);
       to(s.z).push([s.x, s.y, s.z], [r, r, 0], [0, 0, 0], sc[0], sc[1], sc[2], a, 1, 0, 0, 0);
+    }
+
+    // snow resting on the globe: it turns with it a moment, and melts
+    const warm = temp !== null && temp > 2;
+    for (let i = this.settled.length - 1; i >= 0; i--) {
+      const st = this.settled[i];
+      st.age += dt * (warm ? 3 : snow ? 1 : 1.6);
+      if (st.age > st.life) {
+        this.settled.splice(i, 1);
+        continue;
+      }
+      const q = camV(st.w, cam);
+      const fade = clamp01(st.age / 0.3) * clamp01((st.life - st.age) / 2);
+      // seen through the glass on the far side, only faintly
+      const a = 0.85 * fade * (q[2] < 0 ? 0.3 : 1) * show;
+      if (dk < 0.5) to(q[2]).push(q, [st.r * 1.4, st.r * 1.4, 0], [0, 0, 0], 0.5, 0.55, 0.62, a * 0.35 * (1 - dk * 2), 1, 0, 0, 0);
+      to(q[2]).push(q, [st.r, st.r, 0], [0, 0, 0], sc[0], sc[1], sc[2], a, 1, 0, 0, 0);
+    }
+
+    // rain running down the globe: a drop clings a moment, then runs, and drips off underneath
+    for (let i = this.beads.length - 1; i >= 0; i--) {
+      const b = this.beads[i];
+      b.age += dt;
+      const q = camV(b.w, cam);
+      const r = Math.hypot(q[0], q[1], q[2]);
+      const n: V3 = [q[0] / r, q[1] / r, q[2] / r];
+      const run = 70 * clamp01((b.age - 0.6) / 1.5);
+      for (let j = 0; j < 3; j++) {
+        const g = (j === 1 ? run : 0) - run * n[1] * n[j];
+        b.v[j] += (g - b.v[j]) * ez(2);
+        q[j] += b.v[j] * dt;
+      }
+      const r2 = Math.hypot(q[0], q[1], q[2]);
+      for (let j = 0; j < 3; j++) q[j] *= R / r2;
+      if (n[1] > 0.8 || b.age > 16) {
+        if (q[2] > 0) this.splash(q[0], q[1], q[2], 0);
+        this.beads.splice(i, 1);
+        continue;
+      }
+      b.w = camInv(q, cam);
+      const a = clamp01(b.age / 0.3) * (q[2] < 0 ? 0.35 : 1) * show;
+      to(q[2]).push(q, [1.7, 2.1, 0], [0, 0, 0], rc[0], rc[1], rc[2], 0.45 * a, 1, 0, 0, 0);
+      to(q[2]).push([q[0] - 0.4, q[1] - 0.5, q[2]], [0.7, 0.7, 0], [0, 0, 0], 1, 1, 1, 0.55 * a * (0.4 + 0.6 * f.day), 1, 0, 0, 0);
     }
 
     // ------------------------------------------------- splashes off the songs
@@ -718,53 +859,87 @@ export class Scene {
     for (let i = this.motes.length - 1; i >= 0; i--) {
       const m = this.motes[i];
       m.age += dt;
+      m.touch = Math.max(0, m.touch - dt);
       const p = m.p,
         v = m.v;
-      if (m.kind === "seed") {
-        v[1] += (Math.sin(this.t * 0.8 + m.ph) * 14 - v[1]) * ez(1);
-      } else {
-        // flutter: the air pushes it about, and it slowly sinks
-        const sink = m.kind === "leaf" ? 26 : 12;
-        v[1] += (sink + Math.sin(this.t * 2.2 + m.ph) * 55 - v[1]) * ez(2);
-        v[2] += Math.cos(this.t * 1.4 + m.ph) * 30 * dt;
+      if (m.gone > 0) {
+        m.gone += dt;
+        if (m.gone > 1.2) {
+          this.motes.splice(i, 1);
+          continue;
+        }
+        drawn.push(m);
+        continue;
       }
-      p[0] += v[0] * dt;
-      p[1] += v[1] * dt;
-      p[2] += v[2] * dt;
-      p[2] = Math.max(FAR * 0.6, Math.min(NEAR - 20, p[2]));
-      // round the globe, never through it
-      const d = Math.hypot(p[0], p[1], p[2]),
-        keep = R + 26;
-      if (d < keep) {
-        const n: V3 = [p[0] / d, p[1] / d, p[2] / d];
-        p[0] = n[0] * keep;
-        p[1] = n[1] * keep;
-        p[2] = n[2] * keep;
-        const vr = v[0] * n[0] + v[1] * n[1] + v[2] * n[2];
-        if (vr < 0) {
-          v[0] -= vr * n[0];
-          v[1] -= vr * n[1];
-          v[2] -= vr * n[2];
+      if (m.rest) {
+        // caught on the globe: it rides the spin a moment, then the wind takes it again
+        const q = camV(m.rest, cam);
+        const n = normalize(q);
+        m.restLeft -= dt;
+        if (m.restLeft <= 0 || n[1] > -0.12) {
+          m.rest = null;
+          const sv = cross(om, q);
+          for (let j = 0; j < 3; j++) v[j] = sv[j] + m.U[j] * 0.35 + n[j] * 25;
+        }
+        p[0] = q[0];
+        p[1] = q[1];
+        p[2] = q[2];
+      } else {
+        const air = airAt(p, m.U, R * 1.08, om);
+        if (m.kind === "seed") air[1] += Math.sin(this.t * 0.8 + m.ph) * 14;
+        else {
+          // flutter: the air pushes it about, and it slowly sinks
+          air[1] += (m.kind === "leaf" ? 26 : 12) + Math.sin(this.t * 2.2 + m.ph) * 55;
+          air[2] += Math.cos(this.t * 1.4 + m.ph) * 30;
+        }
+        const k = ez(m.kind === "leaf" ? 1.5 : m.kind === "petal" ? 2.4 : 3.2);
+        for (let j = 0; j < 3; j++) v[j] += (air[j] - v[j]) * k;
+        p[0] += v[0] * dt;
+        p[1] += v[1] * dt;
+        p[2] += v[2] * dt;
+        p[2] = Math.max(FAR * 0.6, Math.min(NEAR - 20, p[2]));
+        // it meets the globe: a little bounce, then it rubs along the turning surface
+        const d = Math.hypot(p[0], p[1], p[2]),
+          keep = R + (m.kind === "seed" ? 14 : m.s * 0.45);
+        if (d < keep) {
+          const n: V3 = [p[0] / d, p[1] / d, p[2] / d];
+          for (let j = 0; j < 3; j++) p[j] = n[j] * keep;
+          const sv = cross(om, p);
+          const rel: V3 = [v[0] - sv[0], v[1] - sv[1], v[2] - sv[2]];
+          const vn = dot(rel, n);
+          const bounce = m.kind === "leaf" ? 0.25 : m.kind === "petal" ? 0.12 : 0.05;
+          const rub = 1 - Math.min(1, dt * (m.kind === "leaf" ? 2.2 : 1.2));
+          for (let j = 0; j < 3; j++) {
+            const nj = vn * n[j];
+            v[j] = sv[j] + (rel[j] - nj) * rub + (vn < 0 ? -bounce * nj : nj);
+          }
+          m.touch = 0.5;
+          // landing on the upper side, slowly enough, a leaf or petal can catch there for a moment
+          if (!m.caught && m.kind !== "seed" && n[1] < -0.3 && Math.hypot(rel[0], rel[1], rel[2]) < 150 && Math.random() < 0.6) {
+            m.caught = true;
+            m.rest = camInv(p, cam);
+            m.restLeft = rand(1.5, 5);
+          }
         }
       }
+      // against the globe it lies flat and stops tumbling; free of it, the tumble comes back
+      if (m.touch > 0 || m.rest) {
+        lay(m, normalize(p), ez(m.rest ? 6 : 4));
+        for (let j = 0; j < 3; j++) m.w[j] *= 1 - Math.min(1, dt * 4);
+      } else for (let j = 0; j < 3; j++) m.w[j] += (m.w0[j] - m.w[j]) * ez(0.8);
       const spin = Math.hypot(m.w[0], m.w[1], m.w[2]);
-      if (spin > 0) {
+      if (spin > 0.01) {
         const ax: V3 = [m.w[0] / spin, m.w[1] / spin, m.w[2] / spin];
         m.e1 = turn(m.e1, ax, spin * dt);
         m.e2 = turn(m.e2, ax, spin * dt);
       }
-      // an autumn leaf that comes down near the globe stays on the ground
+      // down on the ground it lies still a moment and fades: no heaps
       if (p[1] >= f.floorY - 2) {
-        if (m.kind === "leaf" && Math.abs(p[0]) < 1.6 * R && Math.abs(p[2]) < 1.2 * R && this.ground.filter((g) => !g.sway).length < 14) {
-          const g = this.groundItem(m.tex, f, true);
-          g.p = [p[0], f.floorY - 0.5, p[2]];
-          g.age = 4;
-          this.ground.push(g);
-        }
-        this.motes.splice(i, 1);
-        continue;
+        p[1] = f.floorY - 2;
+        lay(m, [0, -1, 0], 1);
+        m.gone = 1e-3;
       }
-      if ((m.dir > 0 ? p[0] > halfW(p[2]) + 60 : p[0] < -halfW(p[2]) - 60) || m.age > 60) {
+      if ((m.dir > 0 ? p[0] > halfW(p[2]) + 60 : p[0] < -halfW(p[2]) - 60) || m.age > 90) {
         this.motes.splice(i, 1);
         continue;
       }
@@ -772,7 +947,7 @@ export class Scene {
     }
     drawn.sort((a, b) => a.p[2] - b.p[2]);
     for (const m of drawn) {
-      const fade = clamp01(m.age / 0.6);
+      const fade = clamp01(m.age / 0.6) * (1 - clamp01(m.gone / 1.2));
       const nightDim = 1 - 0.35 * dk;
       to(m.p[2]).push(
         m.p,
@@ -847,12 +1022,15 @@ export class Scene {
 
   // --------------------------------------------------------------------------
 
-  private dropSpot(kind: string, halfW: (z: number) => number, topY: (z: number) => number, scatter: boolean): Drop {
-    const z = rand(FAR, NEAR);
+  // Rain and snow are sparse, so a share of it comes down right over the
+  // globe, where you can see it meet it.
+  private dropSpot(kind: string, halfW: (z: number) => number, topY: (z: number) => number, scatter: boolean, R: number): Drop {
+    const over = Math.random() < 0.2;
+    const z = over ? rand(-0.9, 0.9) * R : rand(FAR, NEAR);
     const vy = kind === "storm" ? rand(1500, 1900) : kind === "drizzle" ? rand(480, 620) : rand(1050, 1300);
     return {
       z,
-      x: rand(-1.25, 1) * halfW(z),
+      x: over ? rand(-1.1, 1.1) * R : rand(-1.25, 1) * halfW(z),
       y: topY(z) - (scatter ? rand(-1.8, 0.1) * Math.abs(topY(z)) : rand(0, 150)),
       vy,
       // motion blur: how far it falls while the eye takes it in
@@ -860,9 +1038,11 @@ export class Scene {
     };
   }
 
-  private flakeSpot(halfW: (z: number) => number, topY: (z: number) => number, scatter: boolean): Flake {
-    const z = rand(FAR, NEAR);
-    return { z, x: rand(-1.1, 1.1) * halfW(z), y: topY(z) - (scatter ? rand(-1.8, 0.1) * Math.abs(topY(z)) : rand(0, 120)), vy: rand(38, 80), r: rand(1.6, 3.4), ph: rand(0, 6.3) };
+  private flakeSpot(halfW: (z: number) => number, topY: (z: number) => number, scatter: boolean, R: number): Flake {
+    const over = Math.random() < 0.3;
+    const z = over ? rand(-1, 1) * R : rand(FAR, NEAR);
+    const fall = rand(38, 80);
+    return { z, x: over ? rand(-1.2, 1.2) * R : rand(-1.1, 1.1) * halfW(z), y: topY(z) - (scatter ? rand(-1.8, 0.1) * Math.abs(topY(z)) : rand(0, 120)), vx: 0, vy: fall, vz: 0, fall, r: rand(1.6, 3.4), ph: rand(0, 6.3) };
   }
 
   private splash(x: number, y: number, z: number, R: number) {
@@ -875,19 +1055,31 @@ export class Scene {
   }
 
   private newMote(kind: Mote["kind"], dir: number, halfW: (z: number) => number, topY: (z: number) => number, f: SceneFrame): Mote {
-    // mostly out past the globe, in the background, now and then nearer
-    const z = Math.random() < 0.75 ? rand(-700, -60) : rand(-60, 220);
-    const y = rand(topY(z) * 0.75, f.floorY - 70);
+    // about half blow straight at the globe; the rest pass out past it, in
+    // the background, now and then nearer
+    const R = f.R;
+    const aim = Math.random() < (kind === "seed" ? 0.35 : 0.55);
+    const z = aim ? rand(-0.55, 0.45) * R : Math.random() < 0.75 ? rand(-700, -60) : rand(-60, 220);
+    const y = aim ? rand(-1, 0.15) * R : rand(topY(z) * 0.75, f.floorY - 70);
     const [e1, e2] = kind === "seed" ? ([[1, 0, 0], [0, -1, 0]] as [V3, V3]) : randomFrame();
     const speed = kind === "leaf" ? rand(120, 220) : kind === "petal" ? rand(70, 140) : rand(28, 60);
     const spin = kind === "leaf" ? rand(1.6, 4.2) : kind === "petal" ? rand(1.2, 3) : 0;
     const axis = normalize([rand(-1, 1), rand(-1, 1), rand(-1, 1)]);
+    const U: V3 = [dir * speed, 0, rand(-15, 15)];
+    const w: V3 = [axis[0] * spin, axis[1] * spin, axis[2] * spin];
     return {
       p: [-dir * (halfW(z) + 40), y, z],
-      v: [dir * speed, 0, rand(-15, 15)],
+      v: [U[0], U[1], U[2]],
+      U,
       e1,
       e2,
-      w: [axis[0] * spin, axis[1] * spin, axis[2] * spin],
+      w,
+      w0: [w[0], w[1], w[2]],
+      touch: 0,
+      rest: null,
+      restLeft: 0,
+      caught: false,
+      gone: 0,
       s: kind === "leaf" ? rand(10, 14) : kind === "petal" ? rand(4.5, 6.5) : rand(9, 12),
       tex: kind === "leaf" ? LEAVES[Math.floor(Math.random() * LEAVES.length)] : kind === "petal" ? (Math.random() < 0.7 ? TEX.petal : TEX.petalWhite) : TEX.seed,
       kind,
@@ -897,21 +1089,14 @@ export class Scene {
     };
   }
 
-  // Something on the ground under the globe: an upright tuft or flower, or a
-  // leaf lying flat (tex -1 picks a leaf).
-  private groundItem(tex: number, f: SceneFrame, flat = false): Ground {
-    // a small patch round the spot the globe stands on, thinning outward
+  // A flower or tuft on the ground under the globe: a small patch round the
+  // spot the globe stands on, thinning outward.
+  private groundItem(tex: number, f: SceneFrame): Ground {
     const R = f.R;
     const a = rand(0, Math.PI * 2),
       r = Math.sqrt(Math.random()) * 1.15;
     const x = Math.cos(a) * r * R,
       z = Math.sin(a) * r * R * 0.42;
-    if (tex < 0 || flat) {
-      const t = tex < 0 ? LEAVES[Math.floor(Math.random() * LEAVES.length)] : tex;
-      const s = rand(8, 11.5),
-        b = rand(0, Math.PI * 2);
-      return { p: [x, f.floorY - 0.5, z], u: [Math.cos(b) * s, 0, Math.sin(b) * s], v: [-Math.sin(b) * s, 0, Math.cos(b) * s], tex: t, s, sway: 0, ph: 0, age: 0 };
-    }
     const s = rand(7, 10);
     const b = rand(-0.6, 0.6);
     return { p: [x, f.floorY, z], u: [Math.cos(b) * s, 0, Math.sin(b) * s], v: [0, -s, 0], tex, s, sway: rand(0.6, 1.2), ph: rand(0, 20), age: 0 };
