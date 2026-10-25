@@ -569,6 +569,7 @@ function Globe({
           day: s.sun.day,
           L: s.sun.L,
           yaw: s.yaw,
+          cam: s.cam,
           season: w.season,
           hour: d.getHours() + d.getMinutes() / 60,
           temp: tempOverride() ?? w.weather?.temp ?? null,
