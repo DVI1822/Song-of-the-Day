@@ -129,7 +129,7 @@ function newMotion(posted: boolean) {
     born: new Map<number, number>(),
     drag: null as null | { x: number; y: number; lx: number; yaw: number; pitch: number },
     pointers: new Map<number, { x: number; y: number }>(),
-    pinch: null as null | { d: number; k: number; x: number; y: number; cx: number; cy: number },
+    pinch: null as null | { d: number; k: number; cx: number; cy: number },
     // a pinch magnifies the view as it is, like zooming into a photo:
     // screen = content * k + (x, y). Nothing in the scene moves for it.
     mag: { k: 1, x: 0, y: 0, home: false },
@@ -351,16 +351,47 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   // Phones: a pinch zooms the Globe, never the page (iOS ignores the
   // viewport's no-zoom, so its gestures are stopped here).
   useEffect(() => {
+    // Touch events, not pointer events: iOS Safari is only reliable with these.
     const stop = (e: Event) => e.preventDefault();
-    const twoFingers = (e: TouchEvent) => {
-      if (e.touches.length > 1) e.preventDefault();
+    const two = (t: TouchList) => {
+      const [a, b] = [t[0], t[1]];
+      return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+    };
+    const start = (e: TouchEvent) => {
+      const s = m.current;
+      if (e.touches.length !== 2) return;
+      const f = two(e.touches),
+        g = s.mag;
+      // the point between the fingers, in the unmagnified view
+      s.pinch = { d: f.d, k: g.k, cx: (f.x - g.x) / g.k, cy: (f.y - g.y) / g.k };
+      g.home = false;
+      s.drag = null;
+      s.moved = true;
+    };
+    const move = (e: TouchEvent) => {
+      if (e.touches.length < 2) return;
+      e.preventDefault();
+      const s = m.current,
+        p = s.pinch;
+      if (!p || s.coreOn || s.featOn) return;
+      const f = two(e.touches);
+      magnify(s, (p.k * f.d) / p.d, p.cx, p.cy, f.x, f.y);
+    };
+    const end = (e: TouchEvent) => {
+      if (e.touches.length < 2) m.current.pinch = null;
     };
     const opts = { passive: false } as const;
     for (const g of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(g, stop, opts);
-    document.addEventListener("touchmove", twoFingers, opts);
+    document.addEventListener("touchstart", start, opts);
+    document.addEventListener("touchmove", move, opts);
+    document.addEventListener("touchend", end);
+    document.addEventListener("touchcancel", end);
     return () => {
       for (const g of ["gesturestart", "gesturechange", "gestureend"]) document.removeEventListener(g, stop);
-      document.removeEventListener("touchmove", twoFingers);
+      document.removeEventListener("touchstart", start);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", end);
+      document.removeEventListener("touchcancel", end);
     };
   }, []);
 
@@ -525,12 +556,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const onDown = (e: React.PointerEvent) => {
     const s = m.current;
     s.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (s.pointers.size === 2) {
-      const [a, b] = [...s.pointers.values()];
-      const g = s.mag;
-      // the point between the fingers, in the unmagnified view
-      s.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, k: g.k, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, cx: ((a.x + b.x) / 2 - g.x) / g.k, cy: ((a.y + b.y) / 2 - g.y) / g.k };
-      g.home = false;
+    if (s.pinch || s.pointers.size > 1) {
       s.drag = null;
       return;
     }
@@ -550,15 +576,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     const s = m.current;
     if (!s.pointers.has(e.pointerId)) return;
     s.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (s.pinch && s.pointers.size === 2) {
-      const [a, b] = [...s.pointers.values()];
-      if (!s.coreOn && !s.featOn) {
-        const p = s.pinch;
-        magnify(s, (p.k * Math.hypot(a.x - b.x, a.y - b.y)) / p.d, p.cx, p.cy, (a.x + b.x) / 2, (a.y + b.y) / 2);
-      }
-      s.moved = true;
-      return;
-    }
+    if (s.pinch) return;
     const d = s.drag;
     if (!d) return;
     const dx = e.clientX - d.x,
@@ -572,7 +590,6 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const onUp = (e: React.PointerEvent) => {
     const s = m.current;
     s.pointers.delete(e.pointerId);
-    if (s.pointers.size < 2) s.pinch = null;
     if (!s.pointers.size) s.drag = null;
   };
   const onWheel = (e: React.WheelEvent) => {
