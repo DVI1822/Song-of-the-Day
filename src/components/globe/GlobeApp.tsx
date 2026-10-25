@@ -1008,6 +1008,8 @@ function Globe({
           onFlip={() => setFlipped((f) => !f)}
           onClose={closeFeat}
           onCore={() => openCore(feat === ME ? null : feat)}
+          api={api}
+          onBlocked={() => window.location.reload()}
           rootRef={(el) => void (R.current.feat = el)}
           backdropRef={(el) => void (R.current.featBack = el)}
           cardRef={(el) => void (R.current.featCard = el)}
@@ -1039,6 +1041,8 @@ function Globe({
           sheetTop={Math.round(L.cy + Math.max(56, L.R * 0.5))}
           onClose={closeCore}
           onOpenToday={() => fly(coreFor?.k ?? ME)}
+          api={api}
+          onBlocked={() => window.location.reload()}
           rootRef={(el) => void (R.current.prof = el)}
           sheetRef={(el) => void (R.current.profSheet = el)}
         />

@@ -48,6 +48,81 @@ export async function signOut() {
 }
 
 // ---------------------------------------------------------------------------
+// Safety: reports, blocks, deleting your account, copyright takedowns
+// ---------------------------------------------------------------------------
+
+export type ReportReason = "spam" | "offensive" | "harassment" | "copyright" | "other";
+const REASONS: ReportReason[] = ["spam", "offensive", "harassment", "copyright", "other"];
+
+export async function reportUser(input: {
+  reportedId: string;
+  postId?: string | null;
+  reason: ReportReason;
+  note?: string;
+}): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "Sign in to report." };
+  if (!REASONS.includes(input.reason)) return { error: "Pick a reason." };
+  const { error } = await supabase.from("reports").insert({
+    reported_id: input.reportedId,
+    post_id: input.postId ?? null,
+    reason: input.reason,
+    note: (input.note ?? "").trim().slice(0, 500),
+  });
+  return error ? { error: "Couldn't send that. Try again." } : {};
+}
+
+export async function blockUser(profileId: string): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "Sign in to block." };
+  const { error } = await supabase.rpc("block_user", { target: profileId });
+  if (error) return { error: "Couldn't block them. Try again." };
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function unblockUser(profileId: string) {
+  const { supabase, userId } = await getSession();
+  if (!userId) redirect("/login");
+  await supabase.from("blocks").delete().eq("blocker_id", userId).eq("blocked_id", profileId);
+  revalidatePath("/", "layout");
+}
+
+// Everything goes: photos first (storage doesn't cascade), then the account,
+// which takes the profile, songs, follows and Spotify link with it.
+export async function deleteAccount(_: FormState, form: FormData): Promise<FormState> {
+  const { supabase, userId, profile } = await getSession();
+  if (!userId) redirect("/login");
+  const typed = String(form.get("confirm") ?? "").trim().replace(/^@/, "").toLowerCase();
+  if (profile && typed !== profile.username) return { error: `Type ${profile.username} to confirm.` };
+
+  const { data: photos } = await supabase.storage.from("photos").list(userId, { limit: 1000 });
+  if (photos?.length) await supabase.storage.from("photos").remove(photos.map((f) => `${userId}/${f.name}`));
+  const { error } = await supabase.rpc("delete_me");
+  if (error) return { error: "Couldn't delete your account. Try again in a minute." };
+  await supabase.auth.signOut();
+  redirect("/?bye=1");
+}
+
+export async function fileTakedown(_: FormState, form: FormData): Promise<FormState> {
+  const { supabase } = await getSession();
+  const field = (k: string) => String(form.get(k) ?? "").trim();
+  const row = {
+    name: field("name"),
+    email: field("email"),
+    work: field("work"),
+    song_link: field("song_link"),
+    good_faith: form.get("good_faith") === "on",
+    signature: field("signature"),
+  };
+  if (!row.name || !row.email.includes("@") || !row.work || !row.song_link || !row.signature)
+    return { error: "Please fill in every field." };
+  if (!row.good_faith) return { error: "Please confirm the statement above your signature." };
+  const { error } = await supabase.from("takedowns").insert(row);
+  return error ? { error: "Couldn't send it. Try again." } : { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Posting
 // ---------------------------------------------------------------------------
 

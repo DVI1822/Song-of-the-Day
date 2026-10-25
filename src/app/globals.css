@@ -145,3 +145,15 @@ body {
   animation: sky-rain 0.5s linear infinite;
 }
 @keyframes sky-rain { to { background-position: -4px 24px; } }
+
+/* Deleting your account: your core melts away. */
+.core-fade {
+  animation: core-fade 2.4s ease-in forwards;
+}
+@keyframes core-fade {
+  to {
+    opacity: 0;
+    transform: scale(0.2) translateY(12px);
+    filter: blur(6px);
+  }
+}

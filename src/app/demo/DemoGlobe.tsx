@@ -155,6 +155,14 @@ const demoApi: GlobeApi = {
     const p = profile(100 + j, POOL[j]);
     return { friend: { ...p, followed_at: new Date().toISOString(), post: song(200 + j, p.id, TODAY, 2) } };
   },
+  async report() {
+    await new Promise((r) => setTimeout(r, 500));
+    return {};
+  },
+  async block() {
+    await new Promise((r) => setTimeout(r, 500));
+    return {};
+  },
   async loadCore(id) {
     const f = FRIENDS.find((x) => x.id === id);
     const p = f ?? profile(Number(id.slice(1)), POOL[Number(id.slice(1)) - 100] ?? "Friend");
