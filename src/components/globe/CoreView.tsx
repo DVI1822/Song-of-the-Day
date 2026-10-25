@@ -155,7 +155,7 @@ export function CoreView({
                 {open === p.id && (
                   <div className="rise-in flex flex-col gap-2.5 pb-3">
                     {p.caption && <div className="text-sm leading-relaxed">“{p.caption}”</div>}
-                    <SongPlayer post={p} id={`core-${p.id}`} />
+                    <SongPlayer post={p} />
                   </div>
                 )}
               </div>

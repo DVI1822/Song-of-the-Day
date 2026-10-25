@@ -108,7 +108,6 @@ export function Feature({
         <div className="relative">
           <SongPlayer
             post={post}
-            id={`feat-${post.id}`}
             big
             extra={
               <button

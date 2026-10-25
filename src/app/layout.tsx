@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fredoka, Outfit } from "next/font/google";
+import { PreviewProvider } from "@/components/globe/Preview";
+import { MiniPlayer } from "@/components/globe/Shuffle";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -33,7 +35,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${outfit.variable} ${fredoka.variable} h-full antialiased`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {/* what's playing carries on from page to page */}
+        <PreviewProvider>
+          {children}
+          <MiniPlayer />
+        </PreviewProvider>
+      </body>
     </html>
   );
 }

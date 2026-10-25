@@ -14,7 +14,7 @@ import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { Magma, MagmaFilters } from "./Magma";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
-import { PreviewProvider, usePreview } from "./Preview";
+import { usePreview } from "./Preview";
 import { BackIcon, coverRadius, glass } from "./ui";
 import {
   PERSPECTIVE,
@@ -46,11 +46,10 @@ export function GlobeApp(props: Props) {
   const spotify = (props.api ?? serverApi).spotify;
   const linked = Boolean(props.spotifyLinked);
   const connect = useMemo(() => (spotify ? { ...spotify, linked } : null), [spotify, linked]);
-  return (
-    <PreviewProvider connect={connect}>
-      <Globe {...props} />
-    </PreviewProvider>
-  );
+  // the player lives in the root layout and stays with you after you leave
+  const { setConnect } = usePreview();
+  useEffect(() => setConnect(connect), [connect, setConnect]);
+  return <Globe {...props} />;
 }
 
 const ME = 99; // your own tile's slot; friends take 0..89
@@ -202,7 +201,8 @@ function Globe({
   addedMe: initialAddedMe = [],
   api = serverApi,
 }: Props) {
-  const stopPreview = usePreview().stop;
+  // Songs keep playing as you move around; only pausing or starting another stops them.
+  const shuffleNow = usePreview().shuffle?.now ?? null;
   const [friends, setFriends] = useState(initialFriends);
   const [addedMe, setAddedMe] = useState(initialAddedMe);
   const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
@@ -304,9 +304,8 @@ function Globe({
       setFocus(null);
       setFlipped(false);
       closePanel();
-      stopPreview();
     },
-    [closePanel, stopPreview],
+    [closePanel],
   );
 
   // Fly through the near side of the globe into someone's core.
@@ -324,9 +323,8 @@ function Globe({
       setCoreFor({ k });
       setFocus(null);
       closePanel();
-      stopPreview();
     },
-    [closePanel, stopPreview],
+    [closePanel],
   );
 
   const closeCore = useCallback(() => {
@@ -341,8 +339,7 @@ function Globe({
     m.current.featOpen = false;
     m.current.zoomTarget = 1;
     setFlipped(false);
-    stopPreview();
-  }, [stopPreview]);
+  }, []);
 
   const openCompose = useCallback(() => {
     if (m.current.launch !== null) return;
@@ -693,7 +690,6 @@ function Globe({
     if (name === "friends" && addedMe.length) seenStore.set(addedMe[0].added_at); // newest first
     setPanel(name);
     setPanelOn(true);
-    stopPreview();
   };
 
   // -------------------------------------------------------------------------
@@ -728,24 +724,18 @@ function Globe({
   const featTz = feat === ME ? me.timezone : feat !== null ? friends[feat]?.timezone ?? "UTC" : "UTC";
   const posted = landed && !!myPost;
   const shuffleSongs = useMemo(
-    () => [
-      ...friends.flatMap((f, k) => (f.post ? [{ k, post: f.post }] : [])),
-      ...(myPost && landed ? [{ k: ME, post: myPost }] : []),
-    ],
+    () => [...friends.flatMap((f) => (f.post ? [f.post] : [])), ...(myPost && landed ? [myPost] : [])],
     [friends, myPost, landed],
   );
   // the Globe turns to whichever song shuffle is playing
-  const onShuffleSong = useCallback(
-    (k: number | null) => {
-      const s = m.current;
-      if (k === null) return setFocus(null);
-      if (s.featOn || s.coreOn || s.lens !== null) return;
-      s.vel = 0;
-      s.target = aim(sim.current.pos(k), s.yaw);
-      setFocus(k);
-    },
-    [],
-  );
+  const shuffleK = !shuffleNow ? null : shuffleNow.id === myPost?.id ? ME : friends.findIndex((f) => f.post?.id === shuffleNow.id);
+  useEffect(() => {
+    const s = m.current;
+    if (shuffleK === null || shuffleK < 0 || s.featOn || s.coreOn || s.lens !== null) return;
+    s.vel = 0;
+    s.target = aim(sim.current.pos(shuffleK), s.yaw);
+    setFocus(shuffleK);
+  }, [shuffleK]);
   const ink = darkOn ? "#EEF3F8" : "#0D2A3F";
   const muted = darkOn ? "#93A6B8" : "#6A818C";
   const tabTop = Math.max(100, L.cy - 240);
@@ -882,7 +872,7 @@ function Globe({
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
       >
         <div className="absolute inset-x-0 bottom-full flex justify-center pb-1">
-          <Shuffle songs={shuffleSongs} dark={darkOn} onNow={onShuffleSong} />
+          <Shuffle songs={shuffleSongs} />
         </div>
         {!posted && !launching && (
           <button

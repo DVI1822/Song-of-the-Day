@@ -319,7 +319,7 @@ export function SongsPanel({
                   <img src={p.photo_url} alt="" className="h-[150px] w-full rounded-2xl object-cover" loading="lazy" />
                 )}
                 {p.caption && <div className="text-sm leading-relaxed">“{p.caption}”</div>}
-                <SongPlayer post={p} id={`song-${p.id}`} />
+                <SongPlayer post={p} />
                 {isToday && canRedo && (
                   <button
                     type="button"
