@@ -5,8 +5,9 @@ import { todayIn } from "@/lib/day";
 import type { Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
-import { WeatherSky, override as weatherOverride, useWeather } from "./Weather";
-import { WeatherSim } from "./weather3d";
+import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
+import { Scene, seasonAt, type Look, type Season } from "./scene";
+import { surfaceTexture } from "./textures";
 import { Compose } from "./Compose";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -53,7 +54,12 @@ export function GlobeApp(props: Props) {
 const ME = 99; // your own tile's slot; friends take 0..89
 type PanelName = "friends" | "find" | "songs";
 type TileInfo = { k: number; wait: boolean; art: string; label: string };
-type TileEls = { box: HTMLDivElement | null; facets: (HTMLDivElement | null)[]; shades: (HTMLDivElement | null)[] };
+type TileEls = {
+  box: HTMLDivElement | null;
+  facets: (HTMLDivElement | null)[];
+  shades: (HTMLDivElement | null)[];
+  coats: (HTMLDivElement | null)[]; // snow or frost on the cover
+};
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 // Per-frame easing written for 60fps, made frame-rate independent.
@@ -89,6 +95,7 @@ function newMotion(posted: boolean) {
     mt: 0,
     last: 0,
     wxShow: 0,
+    look: { overcast: 0, wet: 0, snow: 0, frost: 0 } as Look,
     cam: { yaw: 0, pitch: 0, roll: 0 } as Camera,
     target: null as null | { yaw: number; pitch: number },
     zoomTarget: null as null | number,
@@ -127,10 +134,10 @@ function newEls() {
     starsB: null as HTMLDivElement | null,
     day: null as HTMLDivElement | null,
     sunShadow: null as HTMLDivElement | null,
-    wxFall: null as HTMLDivElement | null,
-    wxSkin: null as HTMLDivElement | null,
+    wxSky: null as HTMLCanvasElement | null,
+    wxBack: null as HTMLCanvasElement | null,
+    wxFront: null as HTMLCanvasElement | null,
     wxFlash: null as HTMLDivElement | null,
-    wxFloor: null as HTMLCanvasElement | null,
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
     chrome: [] as (HTMLElement | null)[],
@@ -183,7 +190,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     m.current.geo = { lat, lon };
     m.current.sunAt = 0;
   });
-  const wx = useRef({ weather, dark: false, sim: null as WeatherSim | null });
+  const wx = useRef({ weather, dark: false, scene: null as Scene | null, failed: false, season: "autumn" as Season, seasonAt: -Infinity });
   useLayoutEffect(() => {
     wx.current.weather = weather;
     wx.current.dark = darkOn;
@@ -420,23 +427,42 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       draw(s, R.current, els.current, sim.current, live.current);
       const w = wx.current,
         el = R.current;
-      if (!w.sim && el.wxFall && el.wxSkin) w.sim = new WeatherSim(el.wxFall, el.wxSkin, el.wxFlash, el.wxFloor, weatherOverride() !== null);
-      if (w.sim) {
+      if (!w.scene && !w.failed && el.wxSky && el.wxBack && el.wxFront)
+        try {
+          w.scene = new Scene(el.wxSky, el.wxBack, el.wxFront, el.wxFlash, weatherOverride() !== null || seasonOverride() !== null);
+        } catch {
+          w.failed = true; // no WebGL here: the globe just goes without
+        }
+      if (w.scene) {
         const { L: Lw } = live.current;
         const hide = s.lens !== null || s.coreOn || s.featOn;
         s.wxShow += ((hide ? 0 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.wxShow) * ease(0.1, dt);
-        w.sim.step(dt, w.weather, {
-          cam: s.cam,
+        if (now - w.seasonAt > 60_000) {
+          w.season = seasonOverride() ?? seasonAt(new Date(), s.geo.lat);
+          w.seasonAt = now;
+        }
+        const d = new Date();
+        const show = s.wxShow < 0.02 ? 0 : s.wxShow;
+        w.scene.step(dt, w.weather, {
           zoom: s.zoom,
-          show: s.wxShow < 0.02 ? 0 : s.wxShow,
+          show,
           w: Lw.w,
           h: Lw.h,
           cx: Lw.cx,
           cy: Lw.cy,
           R: Rb + 2,
           floorY: 216 * Lw.s,
-          dark: w.dark,
+          dk: s.dk,
+          day: s.sun.day,
+          L: s.sun.L,
+          yaw: s.yaw,
+          season: w.season,
+          hour: d.getHours() + d.getMinutes() / 60,
+          temp: tempOverride() ?? w.weather?.temp ?? null,
         });
+        if (el.wxBack) el.wxBack.style.opacity = show.toFixed(3);
+        if (el.wxFront) el.wxFront.style.opacity = show.toFixed(3);
+        s.look = w.scene.look;
       }
       raf = requestAnimationFrame(tick);
     };
@@ -444,8 +470,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     const w = wx.current;
     return () => {
       cancelAnimationFrame(raf);
-      w.sim?.destroy();
-      w.sim = null;
+      w.scene = null;
     };
   }, []);
 
@@ -670,7 +695,9 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         <WeatherSky weather={weather} dark={darkOn} />
         {/* the little sky moments only on clear-ish days */}
         {size && (!weather || weather.kind === "clear" || weather.kind === "partly") && <Ambient dark={darkOn} w={L.w} h={L.h} />}
-        <canvas ref={(el) => void (R.current.wxFloor = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* clouds, then the weather and seasons further away than the globe's middle */}
+        <canvas ref={(el) => void (R.current.wxSky = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div
           ref={(el) => void (R.current.sphere = el)}
@@ -695,9 +722,6 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           style={{ left: L.cx, top: L.cy }}
         >
           <TileLayer tiles={tiles} half={half} Rb={Rb} focus={focus} els={els} onPick={pick} />
-          {/* weather: falling things face the camera, water on the songs turns with them */}
-          <div ref={(el) => void (R.current.wxFall = el)} className="preserve-3d pointer-events-none absolute left-0 top-0 h-0 w-0" />
-          <div ref={(el) => void (R.current.wxSkin = el)} className="preserve-3d pointer-events-none absolute left-0 top-0 h-0 w-0" />
           <button
             ref={(el) => void (R.current.core = el)}
             type="button"
@@ -708,6 +732,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             <Magma full className="h-full w-full" />
           </button>
         </div>
+        {/* the weather and seasons nearer than the globe's middle */}
+        <canvas ref={(el) => void (R.current.wxFront = el)} className="pointer-events-none absolute inset-0 z-[2] h-full w-full" />
       </div>
 
       {/* lightning lights up everything */}
@@ -919,6 +945,11 @@ sim: TileSim,
   // tiles
   const Lc = sun.L,
     day = sun.day;
+  const lk = s.look;
+  const direct = 1 - 0.7 * lk.overcast;
+  const grey = 0.1 * lk.overcast * day;
+  const hv = [Lc[0], Lc[1], Lc[2] + 1],
+    hl = Math.hypot(hv[0], hv[1], hv[2]) || 1;
   const visibleZ = (s.zoom * Rb) / PERSPECTIVE - 0.05;
   for (const k of keys) {
     const te = tileEls.get(k);
@@ -944,6 +975,15 @@ sim: TileSim,
 
     const ex = camV([clo, 0, -slo], cam),
       ey = camV([sla * slo, cla, sla * clo], cam);
+    // snow lies along each cover's upper edge, deeper the more the cover faces up
+    let snowMask = "";
+    if (lk.snow > 0.01) {
+      const nu = -ez[1];
+      const fill = nu > -0.35 ? clamp01(lk.snow * (0.16 + 0.9 * Math.max(0, nu)) + Math.max(0, nu - 0.6) * 2.5 * lk.snow) : 0;
+      const ang = (Math.atan2(-ex[1], ey[1]) * 180) / Math.PI;
+      const at = (1 - fill) * 100;
+      snowMask = fill > 0.01 ? `linear-gradient(${ang.toFixed(1)}deg, transparent ${(at - 4).toFixed(1)}%, #000 ${(at + 4).toFixed(1)}%)` : "";
+    }
     const fadeOp =
       nearFade * (1 - reveal * 0.6) * (s.lens !== null ? (k !== s.lens ? 1 - 0.88 * lensP : 1 - s.fp) : 1);
     const morph = lockE < 1 || wait;
@@ -983,13 +1023,39 @@ sim: TileSim,
           (j) => ex[j] * Math.sin(fa) - ey[j] * Math.sin(fb) + ez[j] * Math.cos(fa) * Math.cos(fb),
         );
         const lit = nn[0] * Lc[0] + nn[1] * Lc[1] + nn[2] * Lc[2];
+        // cloud cover takes the edge off the sun: softer light, softer shadows
         const shade =
           lit > 0
-            ? `rgba(255,247,226,${(0.32 * lit * day).toFixed(3)})`
-            : `rgba(13,42,63,${(Math.min(0.62, 0.75 * -lit + 0.12) * day).toFixed(3)})`;
-        const amb = `rgba(13,42,63,${(0.1 * (1 - day)).toFixed(3)})`;
+            ? `rgba(255,247,226,${(0.32 * lit * day * direct).toFixed(3)})`
+            : `rgba(13,42,63,${(Math.min(0.62, 0.75 * -lit + 0.12) * day * (0.4 + 0.6 * direct)).toFixed(3)})`;
+        const amb = `rgba(13,42,63,${(0.1 * (1 - day) + 0.05 * lk.wet).toFixed(3)})`;
+        let layers = `linear-gradient(${shade},${shade}), `;
+        if (grey > 0.005) layers += `linear-gradient(rgba(120,130,140,${grey.toFixed(3)}),rgba(120,130,140,${grey.toFixed(3)})), `;
+        if (lk.wet > 0.01) {
+          // wet covers catch the light: a glint where the sun reflects, and the sky's sheen
+          const nh = (nn[0] * hv[0] + nn[1] * hv[1] + nn[2] * hv[2]) / hl;
+          const ry = 2 * nn[2] * nn[1];
+          const glint = lk.wet * (0.4 * Math.pow(Math.max(0, nh), 60) * day * direct + 0.1 * Math.pow(clamp01(-ry), 2) * (0.3 + 0.7 * day));
+          if (glint > 0.004) layers += `linear-gradient(rgba(255,255,255,${glint.toFixed(3)}),rgba(255,255,255,${glint.toFixed(3)})), `;
+        }
         const sh = te.shades[i];
-        if (sh) sh.style.background = `linear-gradient(${shade},${shade}), ${amb}`;
+        if (sh) sh.style.background = layers + amb;
+        // snow settles on the covers that face up; frost rims them all, and the sun melts it
+        const coat = te.coats[i];
+        if (coat) {
+          const kind = lk.snow > 0.01 ? "snow" : lk.frost > 0.01 ? "frost" : "";
+          if (coat.dataset.k !== kind) {
+            coat.dataset.k = kind;
+            coat.style.backgroundImage = kind ? `url(${surfaceTexture(kind)})` : "none";
+            if (kind !== "snow") coat.style.maskImage = coat.style.webkitMaskImage = "none";
+          }
+          let op = 0;
+          if (kind === "snow") {
+            op = snowMask ? 0.96 : 0;
+            if (snowMask && coat.style.maskImage !== snowMask) coat.style.maskImage = coat.style.webkitMaskImage = snowMask;
+          } else if (kind === "frost") op = lk.frost * (0.95 - 0.5 * Math.max(0, lit) * day);
+          coat.style.opacity = op.toFixed(3);
+        }
         f.style.opacity = (fadeOp * lockE).toFixed(3);
       }
     }
@@ -1008,7 +1074,7 @@ sim: TileSim,
       h = 60 * L.s * (1 + 0.5 * cot * Math.abs(lz));
     const cx = L.cx - lx * len,
       cy = L.cy + 216 * L.s - lz * len * 0.3;
-    const a = 0.12 * (1 - day) + (day * 0.72) / (1 + 0.3 * cot);
+    const a = (0.12 * (1 - day) + (day * 0.72) / (1 + 0.3 * cot)) * (0.35 + 0.65 * direct);
     const st = r.sunShadow.style;
     st.left = (cx - w / 2).toFixed(1) + "px";
     st.top = (cy - h / 2).toFixed(1) + "px";
@@ -1016,7 +1082,7 @@ sim: TileSim,
     st.height = h.toFixed(1) + "px";
     st.opacity = roomOp.toFixed(3);
     st.background = `radial-gradient(closest-side, rgba(13,42,63,${a.toFixed(3)}), rgba(13,42,63,${(a * 0.7).toFixed(3)}) 50%, rgba(13,42,63,0))`;
-    st.filter = `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day)).toFixed(1)}px)`;
+    st.filter = `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day) + 7 * lk.overcast).toFixed(1)}px)`;
   }
   if (r.floor) r.floor.style.opacity = roomOp.toFixed(3);
   if (r.sphere) {
@@ -1024,7 +1090,7 @@ sim: TileSim,
       hy = 50 + 42 * Lc[1],
       lit = 18 + (30 * (1 + Lc[2])) / 2;
     r.sphere.style.opacity = ((1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3)).toFixed(3);
-    r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(255,250,236,${((0.35 + 0.2 * dk) * day + 0.05 * dk).toFixed(3)}) 0%, rgba(255,250,236,0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
+    r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(255,250,236,${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk).toFixed(3)}) 0%, rgba(255,250,236,0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
     r.sphere.style.boxShadow = dk > 0 ? `0 0 ${(40 * dk).toFixed(0)}px rgba(180,210,255,${(0.08 * dk).toFixed(3)})` : "";
   }
   if (r.space) r.space.style.opacity = dk.toFixed(3);
@@ -1105,7 +1171,7 @@ const TileLayer = memo(function TileLayer({
     fs = W / 3,
     r0 = Math.round(0.26 * W);
   return tiles.map(({ k, wait, art, label }) => {
-    if (!els.current.has(k)) els.current.set(k, { box: null, facets: [], shades: [] });
+    if (!els.current.has(k)) els.current.set(k, { box: null, facets: [], shades: [], coats: [] });
     const te = els.current.get(k)!;
     const facets = [];
     for (let i = 0; i < 9; i++) {
@@ -1145,6 +1211,22 @@ const TileLayer = memo(function TileLayer({
                 }),
           }}
         >
+          {!wait && (
+            <div
+              ref={(el) => void (te.coats[i] = el)}
+              className="absolute inset-0 opacity-0"
+              style={{
+                backgroundSize: `${W}px ${W}px`,
+                backgroundPosition: `${-l0}px ${-t0}px`,
+                maskSize: `${W}px ${W}px`,
+                maskPosition: `${-l0}px ${-t0}px`,
+                maskRepeat: "no-repeat",
+                WebkitMaskSize: `${W}px ${W}px`,
+                WebkitMaskPosition: `${-l0}px ${-t0}px`,
+                WebkitMaskRepeat: "no-repeat",
+              }}
+            />
+          )}
           {!wait && <div ref={(el) => void (te.shades[i] = el)} className="absolute inset-0" />}
         </div>,
       );

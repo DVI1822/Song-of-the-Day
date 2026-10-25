@@ -7,10 +7,11 @@ export type Weather = {
   cloud: number; // 0..1 of the sky covered
   intensity: number; // 0..1 how hard it's coming down
   wind: number; // m/s, leans the rain
+  temp?: number; // °C, for frost and cold-morning mist
 };
 export type WeatherReply = { weather?: Weather; lat?: number; lon?: number; place?: string };
 
-export function weatherFrom(code: number, cloudCover: number, precipitation: number, wind: number): Weather {
+export function weatherFrom(code: number, cloudCover: number, precipitation: number, wind: number, temp?: number): Weather {
   const cloud = Math.max(0, Math.min(1, cloudCover / 100));
   const hard = (mm: number) => Math.max(0.2, Math.min(1, mm / 4));
   let kind: WeatherKind = "clear";
@@ -29,7 +30,7 @@ export function weatherFrom(code: number, cloudCover: number, precipitation: num
     : kind === "snow" ? Math.max(code === 75 || code === 86 ? 0.8 : code === 73 ? 0.5 : 0.3, hard(precipitation * 3))
     : 0;
   const wet = kind === "rain" || kind === "drizzle" || kind === "storm" || kind === "snow";
-  return { kind, cloud: wet || kind === "fog" ? Math.max(cloud, 0.75) : kind === "cloudy" ? Math.max(cloud, 0.85) : cloud, intensity, wind };
+  return { kind, cloud: wet || kind === "fog" ? Math.max(cloud, 0.75) : kind === "cloudy" ? Math.max(cloud, 0.85) : cloud, intensity, wind, temp };
 }
 
 // ?weather=rain (or drizzle, snow, storm, cloudy, partly, fog, clear) shows
@@ -41,6 +42,6 @@ export const PRESETS: Record<WeatherKind, Weather> = {
   fog: { kind: "fog", cloud: 0.8, intensity: 0, wind: 1 },
   drizzle: { kind: "drizzle", cloud: 0.85, intensity: 0.15, wind: 2 },
   rain: { kind: "rain", cloud: 0.95, intensity: 0.55, wind: 4 },
-  snow: { kind: "snow", cloud: 0.9, intensity: 0.5, wind: 2 },
+  snow: { kind: "snow", cloud: 0.9, intensity: 0.5, wind: 2, temp: -2 },
   storm: { kind: "storm", cloud: 1, intensity: 0.9, wind: 9 },
 };
