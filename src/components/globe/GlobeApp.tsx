@@ -63,6 +63,18 @@ type TileEls = {
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+// Magnify the view to k, keeping content point (cx, cy) under screen point
+// (sx, sy), and never letting the picture's edge come into view.
+function magnify(s: Motion, k: number, cx: number, cy: number, sx: number, sy: number) {
+  const g = s.mag;
+  g.k = Math.max(1, Math.min(4, k));
+  if (g.k < 1.01) g.k = 1;
+  const w = window.innerWidth,
+    h = window.innerHeight;
+  g.x = Math.min(0, Math.max(w * (1 - g.k), sx - cx * g.k));
+  g.y = Math.min(0, Math.max(h * (1 - g.k), sy - cy * g.k));
+}
 // Per-frame easing written for 60fps, made frame-rate independent.
 const ease = (k: number, dt: number) => 1 - Math.pow(1 - k, dt * 60);
 
@@ -117,7 +129,10 @@ function newMotion(posted: boolean) {
     born: new Map<number, number>(),
     drag: null as null | { x: number; y: number; lx: number; yaw: number; pitch: number },
     pointers: new Map<number, { x: number; y: number }>(),
-    pinch: null as null | { d: number; zoom: number },
+    pinch: null as null | { d: number; k: number; x: number; y: number; cx: number; cy: number },
+    // a pinch magnifies the view as it is, like zooming into a photo:
+    // screen = content * k + (x, y). Nothing in the scene moves for it.
+    mag: { k: 1, x: 0, y: 0, home: false },
     moved: false,
     sun: null as null | Sun,
     sunAt: 0,
@@ -128,6 +143,7 @@ function newMotion(posted: boolean) {
 function newEls() {
   return {
     stage: null as HTMLDivElement | null,
+    lensEl: null as HTMLDivElement | null,
     world: null as HTMLDivElement | null,
     core: null as HTMLButtonElement | null,
     space: null as HTMLDivElement | null,
@@ -241,6 +257,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       s.vel = 0;
       s.target = aim(sim.current.pos(k), s.yaw, true);
       s.zoomTarget = live.current.zFeat;
+      s.mag.home = true;
       s.featFly = k;
       s.lens = k;
       s.coreOn = false;
@@ -261,6 +278,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       const s = m.current;
       s.vel = 0;
       s.zoomTarget = 6.8;
+      s.mag.home = true;
       s.pendingCore = true;
       s.lens = null;
       s.featFly = null;
@@ -440,6 +458,15 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         }
       }
       if (s.lens !== null && !s.featOn && s.featFly === null && s.zoomTarget === null && s.zoom < 1.03) s.lens = null;
+      const g = s.mag;
+      if (g.home) {
+        const f = ease(0.15, dt);
+        g.k += (1 - g.k) * f;
+        g.x -= g.x * f;
+        g.y -= g.y * f;
+        if (g.k < 1.002) Object.assign(g, { k: 1, x: 0, y: 0, home: false });
+      }
+      if (R.current.lensEl) R.current.lensEl.style.transform = g.k === 1 ? "" : `translate(${g.x.toFixed(2)}px,${g.y.toFixed(2)}px) scale(${g.k.toFixed(4)})`;
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
       draw(s, R.current, els.current, sim.current, live.current);
       const w = wx.current,
@@ -500,7 +527,10 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     s.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (s.pointers.size === 2) {
       const [a, b] = [...s.pointers.values()];
-      s.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: s.zoom };
+      const g = s.mag;
+      // the point between the fingers, in the unmagnified view
+      s.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, k: g.k, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, cx: ((a.x + b.x) / 2 - g.x) / g.k, cy: ((a.y + b.y) / 2 - g.y) / g.k };
+      g.home = false;
       s.drag = null;
       return;
     }
@@ -523,8 +553,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     if (s.pinch && s.pointers.size === 2) {
       const [a, b] = [...s.pointers.values()];
       if (!s.coreOn && !s.featOn) {
-        s.zoom = Math.max(0.6, Math.min(3, (s.pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / s.pinch.d));
-        s.zoomTarget = null;
+        const p = s.pinch;
+        magnify(s, (p.k * Math.hypot(a.x - b.x, a.y - b.y)) / p.d, p.cx, p.cy, (a.x + b.x) / 2, (a.y + b.y) / 2);
       }
       s.moved = true;
       return;
@@ -548,8 +578,9 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const onWheel = (e: React.WheelEvent) => {
     const s = m.current;
     if (s.coreOn || s.featOn || s.lens !== null) return;
-    s.zoom = Math.max(0.6, Math.min(3, s.zoom - e.deltaY * 0.002));
-    s.zoomTarget = null;
+    const g = s.mag;
+    g.home = false;
+    magnify(s, g.k * Math.exp(-e.deltaY * 0.002), (e.clientX - g.x) / g.k, (e.clientY - g.y) / g.k, e.clientX, e.clientY);
   };
 
 
@@ -696,8 +727,13 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         onPointerLeave={onUp}
         onWheel={onWheel}
         className="absolute inset-0 cursor-grab touch-none overflow-hidden"
-        style={{ perspective: PERSPECTIVE, perspectiveOrigin: `${L.cx}px ${L.cy}px` }}
       >
+        {/* the lens: a pinch magnifies everything in here as one picture */}
+        <div
+          ref={(el) => void (R.current.lensEl = el)}
+          className="absolute inset-0 origin-top-left"
+          style={{ perspective: PERSPECTIVE, perspectiveOrigin: `${L.cx}px ${L.cy}px` }}
+        >
         <div
           ref={(el) => void (R.current.day = el)}
           className="pointer-events-none absolute inset-0"
@@ -770,6 +806,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
         </div>
         {/* the weather and seasons nearer than the globe's middle */}
         <canvas ref={(el) => void (R.current.wxFront = el)} className="pointer-events-none absolute inset-0 z-[2] h-full w-full" />
+        </div>
       </div>
 
       {/* lightning lights up everything */}
