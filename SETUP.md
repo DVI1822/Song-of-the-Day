@@ -144,8 +144,11 @@ Sign-in works by emailing you a link, so Supabase needs to know your site's addr
 
 ## Part 4b: Sign in with Spotify (optional)
 
-The sign-in page has a "Continue with Spotify" button above the email box. It
-works once Spotify and Supabase know about each other.
+Not in use right now: the sign-in page is email only, because a Spotify app
+in development mode lets in just 5 allowlisted accounts. To bring the
+"Continue with Spotify" button back after Spotify grants extended access,
+restore it in `src/app/login/LoginForm.tsx` (see git history) and follow
+these steps.
 
 1. In Supabase, open **Authentication → Sign In / Providers → Spotify** and
    copy the **Callback URL** it shows. It looks like

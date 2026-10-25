@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
-import type { Friend, Post, Profile } from "@/lib/types";
+import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
 import { Cover, SearchIcon, coverRadius } from "./ui";
@@ -12,16 +12,20 @@ const Kicker = ({ children }: { children: React.ReactNode }) => (
 );
 
 // ---------------------------------------------------------------------------
-// My friends: who's posted today, and who hasn't yet.
+// My friends: who added you, who's posted today, and who hasn't yet.
 // ---------------------------------------------------------------------------
 
 export function FriendsPanel({
   friends,
+  addedMe,
+  onAddBack,
   onOpen,
   onSpin,
   onFind,
 }: {
   friends: Friend[];
+  addedMe: AddedMe[];
+  onAddBack(p: AddedMe): Promise<string | null>;
   onOpen(k: number): void;
   onSpin(k: number): void;
   onFind(): void;
@@ -31,9 +35,12 @@ export function FriendsPanel({
   const posted = all.filter((x) => x.f.post).sort(byName);
   const waiting = all.filter((x) => !x.f.post).sort(byName);
 
+  const added = addedMe.length > 0 && <AddedYou people={addedMe} onAddBack={onAddBack} />;
+
   if (!friends.length)
     return (
-      <div className="flex flex-1 flex-col items-start gap-3 px-[18px] pt-2">
+      <div className="flex flex-1 flex-col items-start gap-3 overflow-y-auto px-[18px] pt-2">
+        {added && <div className="-mx-2 self-stretch">{added}</div>}
         <div className="text-sm text-muted">No one on your globe yet.</div>
         <button type="button" onClick={onFind} className="h-10 rounded-full bg-accent px-4 text-[13px] font-semibold text-white">
           Find a friend
@@ -43,6 +50,7 @@ export function FriendsPanel({
 
   return (
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
+      {added}
       <Kicker>Posted today · {posted.length}</Kicker>
       {posted.map(({ f, k }) => (
         <button
@@ -83,6 +91,51 @@ export function FriendsPanel({
           <div className="min-w-0 flex-1 truncate text-sm text-muted">{f.display_name}</div>
         </button>
       ))}
+    </div>
+  );
+}
+
+// People who added you and you haven't added back, each with an "Add back".
+function AddedYou({ people, onAddBack }: { people: AddedMe[]; onAddBack(p: AddedMe): Promise<string | null> }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const add = async (p: AddedMe) => {
+    setBusy(p.id);
+    setError(null);
+    const e = await onAddBack(p);
+    setBusy(null);
+    if (e) setError(e);
+  };
+  return (
+    <div className="pb-2.5">
+      <Kicker>Added you · {people.length}</Kicker>
+      {people.map((p) => (
+        <div key={p.id} className="flex h-[54px] items-center gap-3 px-2">
+          <div
+            className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[11px] font-semibold"
+            style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
+          >
+            {initials(p.display_name)}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-px">
+            <div className="truncate text-sm font-semibold">{p.display_name}</div>
+            <div className="truncate text-[11px] text-muted">added you · {formatDay(p.added_at.slice(0, 10))}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => add(p)}
+            disabled={busy === p.id}
+            aria-label={`Add ${p.display_name} back`}
+            className="flex h-[34px] flex-none items-center gap-1.5 rounded-[17px] bg-accent px-3.5 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add back
+          </button>
+        </div>
+      ))}
+      {error && <p className="px-2 pt-1 text-xs text-accent-deep">{error}</p>}
     </div>
   );
 }

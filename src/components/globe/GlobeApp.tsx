@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { Friend, Post, Profile } from "@/lib/types";
+import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -37,6 +37,7 @@ type Props = {
   friends: Friend[];
   mySongs: Post[];
   redoUsed: boolean;
+  addedMe?: AddedMe[];
   spotifyLinked?: boolean;
   api?: GlobeApi;
 };
@@ -63,6 +64,31 @@ type TileEls = {
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+// When you last looked at who added you, so the My friends tab can show a
+// badge for anyone new. Kept on this device only.
+const SEEN_KEY = "sotd-added-seen";
+const seenListeners = new Set<() => void>();
+const seenStore = {
+  subscribe(f: () => void) {
+    seenListeners.add(f);
+    return () => void seenListeners.delete(f);
+  },
+  get() {
+    try {
+      return localStorage.getItem(SEEN_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  },
+  server: () => "~", // sorts after every date: no badge until we're in the browser
+  set(at: string) {
+    try {
+      localStorage.setItem(SEEN_KEY, at);
+    } catch {}
+    seenListeners.forEach((f) => f());
+  },
+};
 
 // Magnify the view to k, keeping content point (cx, cy) under screen point
 // (sx, sy), and never letting the picture's edge come into view.
@@ -167,9 +193,20 @@ function newEls() {
   };
 }
 
-function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: initialSongs, redoUsed: initialRedo, api = serverApi }: Props) {
+function Globe({
+  me,
+  myPost: initialPost,
+  friends: initialFriends,
+  mySongs: initialSongs,
+  redoUsed: initialRedo,
+  addedMe: initialAddedMe = [],
+  api = serverApi,
+}: Props) {
   const stopPreview = usePreview().stop;
   const [friends, setFriends] = useState(initialFriends);
+  const [addedMe, setAddedMe] = useState(initialAddedMe);
+  const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
+  const newAdds = addedMe.filter((p) => p.added_at > seen).length;
   const [myPost, setMyPost] = useState(initialPost);
   const [mySongs, setMySongs] = useState(initialSongs);
   const [redoUsed, setRedoUsed] = useState(initialRedo);
@@ -642,8 +679,18 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     closePanel();
   };
 
+  const onAddBack = async (p: AddedMe) => {
+    if (friends.length >= 90) return "Your globe is full.";
+    const r = await api.follow(p.id);
+    if (!r.friend) return r.error ?? "Couldn't add them back. Try again.";
+    setAddedMe((list) => list.filter((x) => x.id !== p.id));
+    onFollowed(r.friend);
+    return null;
+  };
+
   const openTab = (name: PanelName) => {
     if (panel === name && panelOn) return closePanel();
+    if (name === "friends" && addedMe.length) seenStore.set(addedMe[0].added_at); // newest first
     setPanel(name);
     setPanelOn(true);
     stopPreview();
@@ -868,10 +915,18 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
             onClick={() => openTab(name)}
             aria-label={label}
             aria-expanded={panel === name && panelOn}
-            className="box-border flex w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0 transition-shadow"
+            className="relative box-border flex w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0 transition-shadow"
             style={{ height, ...glass(darkOn), ...activeTab(name) }}
           >
             <TabIcon name={name} />
+            {name === "friends" && newAdds > 0 && (
+              <span
+                aria-label={`${newAdds} new`}
+                className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
+              >
+                {newAdds}
+              </span>
+            )}
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
               {label}
             </span>
@@ -917,6 +972,8 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           {panel === "friends" && (
             <FriendsPanel
               friends={friends}
+              addedMe={addedMe}
+              onAddBack={onAddBack}
               onOpen={fly}
               onSpin={(k) => {
                 m.current.moved = false;
