@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/client";
 // Email only. Spotify sign-in is off while the Spotify app is in development
 // mode, which lets in just 5 allowlisted accounts; Spotify is linked from
 // Settings instead.
+// The typed code needs {{ .Token }} in Supabase's Magic Link email, which
+// Supabase only lets you edit with your own email sender (SMTP). Turn it on
+// with NEXT_PUBLIC_EMAIL_CODE=on once the email shows the code.
+const withCode = process.env.NEXT_PUBLIC_EMAIL_CODE === "on";
+
 export function LoginForm({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
@@ -53,35 +58,37 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       <Card className="rise-in">
         <h2 className="display text-xl">Check your email</h2>
         <p className="mt-2 text-sm text-card-muted">
-          We sent a sign-in link to <strong className="text-card-ink">{email}</strong>. Open it on this device, or type
-          the code from the email here.
+          We sent a sign-in link to <strong className="text-card-ink">{email}</strong>. Open it on this device
+          {withCode ? ", or type the code from the email here." : " and you're in."}
         </p>
-        <form onSubmit={verify} className="mt-5 flex flex-col gap-3">
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            placeholder="••••••"
-            aria-label="Code from the email"
-            className="h-16 w-full rounded-2xl border border-line bg-white text-center font-bubble text-[30px] tracking-[0.35em] text-card-ink outline-none placeholder:text-card-muted/40 focus:border-accent"
-          />
-          {error && <p className="text-sm text-accent-deep">{error}</p>}
-          <button className={buttonClass} disabled={code.length < 6 || checking}>
-            {checking ? "Checking…" : "Sign in with code"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setState("idle");
-              setCode("");
-              setError(undefined);
-            }}
-            className="text-xs font-semibold text-card-muted"
-          >
-            Use a different email
-          </button>
-        </form>
+        {withCode && (
+          <form onSubmit={verify} className="mt-5 flex flex-col gap-3">
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="••••••"
+              aria-label="Code from the email"
+              className="h-16 w-full rounded-2xl border border-line bg-white text-center font-bubble text-[30px] tracking-[0.35em] text-card-ink outline-none placeholder:text-card-muted/40 focus:border-accent"
+            />
+            {error && <p className="text-sm text-accent-deep">{error}</p>}
+            <button className={buttonClass} disabled={code.length < 6 || checking}>
+              {checking ? "Checking…" : "Sign in with code"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setState("idle");
+                setCode("");
+                setError(undefined);
+              }}
+              className="text-xs font-semibold text-card-muted"
+            >
+              Use a different email
+            </button>
+          </form>
+        )}
       </Card>
     );
   }
