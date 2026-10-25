@@ -29,6 +29,9 @@ body {
   background: var(--color-void);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* no double-tap zoom or rubber-banding: the Globe handles its own gestures */
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
 
 /* A faint warm glow behind the plain pages. */

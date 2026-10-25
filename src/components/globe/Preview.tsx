@@ -10,7 +10,7 @@ import type { SpotifyConnect } from "./api";
 type PreviewState = {
   key: string | null;
   at: number;
-  play(key: string, url: string): void;
+  play(key: string, url: string, onEnd?: () => void): void;
   claim(key: string, stop: () => void): void;
   stop(): void;
   connect: (SpotifyConnect & { linked: boolean }) | null;
@@ -26,6 +26,7 @@ export function PreviewProvider({
 }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const other = useRef<(() => void) | null>(null);
+  const ended = useRef<(() => void) | null>(null);
   const [key, setKey] = useState<string | null>(null);
   const [at, setAt] = useState(0);
 
@@ -34,6 +35,9 @@ export function PreviewProvider({
     a.preload = "none";
     a.addEventListener("timeupdate", () => setAt(a.currentTime));
     a.addEventListener("ended", () => {
+      const next = ended.current;
+      ended.current = null;
+      if (next) return next();
       setKey(null);
       setAt(0);
     });
@@ -43,6 +47,7 @@ export function PreviewProvider({
   }, []);
 
   const silence = useCallback(() => {
+    ended.current = null;
     audio.current?.pause();
     other.current?.();
     other.current = null;
@@ -65,10 +70,11 @@ export function PreviewProvider({
   );
 
   const play = useCallback(
-    (k: string, url: string) => {
+    (k: string, url: string, onEnd?: () => void) => {
       const a = audio.current;
       if (!a) return;
       silence();
+      ended.current = onEnd ?? null;
       a.src = url;
       a.currentTime = 0;
       setAt(0);
@@ -115,6 +121,13 @@ const clock = (ms: number) => {
   const t = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
+
+// The spotify:track:… for a post, if it's a Spotify song.
+export function spotifyUriOf(post: Pick<Post, "platform_links" | "song_url">) {
+  const embed = embedFor(post.platform_links ?? {}, post.song_url);
+  const m = embed?.platform === "spotify" ? embed.src.match(/\/embed\/(track|album)\/([A-Za-z0-9]+)/) : null;
+  return m ? `spotify:${m[1]}:${m[2]}` : null;
+}
 
 export function spotifyHref(post: Pick<Post, "platform_links" | "title" | "artist">) {
   return (

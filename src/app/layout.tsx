@@ -24,6 +24,9 @@ export const viewport: Viewport = {
   themeColor: "#FFFFFF",
   width: "device-width",
   initialScale: 1,
+  // pinching zooms the Globe, never the page
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 
