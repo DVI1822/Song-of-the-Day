@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { LegalLinks } from "@/components/Legal";
 import { Shell } from "@/components/Shell";
 import { getSession } from "@/lib/data";
 import { LoginForm } from "./LoginForm";
@@ -16,6 +17,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </div>
         <LoginForm initialError={error ? "That sign-in didn't work. Try again." : undefined} />
       </div>
+      <LegalLinks />
     </Shell>
   );
 }

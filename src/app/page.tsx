@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { Magma, MagmaFilters } from "@/components/globe/Magma";
+import { LegalLinks } from "@/components/Legal";
 import { Shell, buttonClass } from "@/components/Shell";
 import { getGlobe, getSession } from "@/lib/data";
 import { isConfigured } from "@/lib/supabase/env";
@@ -48,6 +49,7 @@ function Landing() {
           Peek at a demo Globe
         </Link>
       </div>
+      <LegalLinks />
     </Shell>
   );
 }
