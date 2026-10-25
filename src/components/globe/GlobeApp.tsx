@@ -226,8 +226,12 @@ function Globe({
 
   const L = layoutFor(size?.w ?? 390, size?.h ?? 844);
   const keys = useMemo(() => [...friends.map((_, i) => i), ME], [friends]);
-  const half =
-    Math.max(38 * L.s, Math.min(64 * L.s, Math.round(L.R * Math.sqrt((4 * Math.PI) / Math.max(keys.length, 12)) * 0.6))) / 2;
+  // Tiles share the globe: a few songs get big tiles (up to 112px on a phone)
+  // so it never feels empty, shrinking as more arrive, down to 64px, and only
+  // past ~30 songs smaller still.
+  const roomy = Math.min(112 * L.s, 64 * L.s * Math.sqrt(16 / keys.length));
+  const packed = Math.max(38 * L.s, Math.min(64 * L.s, L.R * Math.sqrt((4 * Math.PI) / Math.max(keys.length, 12)) * 0.6));
+  const half = Math.round(Math.max(roomy, packed)) / 2;
   const Rb = L.R + 6;
   const zFeat = (() => {
     const zf = L.cover / (2 * half);
