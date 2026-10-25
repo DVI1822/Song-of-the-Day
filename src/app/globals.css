@@ -164,8 +164,3 @@ body {
     transform: rotateY(360deg);
   }
 }
-@keyframes orbit-flat {
-  to {
-    transform: rotate(360deg);
-  }
-}

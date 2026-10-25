@@ -53,7 +53,7 @@ export function InviteCard({
   const [error, setError] = useState<string | null>(null);
 
   const link = inviteUrl(origin, username);
-  const message = `Come share a song a day with me. You'll land right on my globe: ${link}`;
+  const message = `Share your Song of the Day with the world: ${link}`;
 
   const share = async () => {
     if (navigator.share) {
@@ -111,7 +111,6 @@ export function InviteCard({
         style={{ background: "linear-gradient(135deg, #FFF3E6 0%, #FFE1D6 45%, #DDF2EE 100%)" }}
       >
         <div className="flex items-center gap-3">
-          <Orbit />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">Bring your people</div>
             <div className="truncate text-[11px] text-muted">
@@ -201,23 +200,6 @@ const Avatar = ({ name }: { name: string }) => (
     style={{ background: "linear-gradient(135deg, #DDE3F5, #A9DCD6)", color: "#245866" }}
   >
     {initials(name)}
-  </div>
-);
-
-// A tiny globe: a core with one empty spot circling it.
-const Orbit = () => (
-  <div className="relative h-10 w-10 flex-none">
-    <div
-      className="absolute inset-[9px] rounded-full"
-      style={{ background: "radial-gradient(circle at 34% 28%, #FFFFFF 0%, #A9DCD6 30%, #2F6F7E 75%, #173C47 100%)" }}
-    />
-    <div
-      className="absolute inset-0 rounded-full border border-card-ink/15"
-      style={{ transform: "rotate(-23deg) scaleY(0.42)" }}
-    />
-    <div className="absolute inset-0" style={{ animation: "orbit-flat 6s linear infinite" }}>
-      <div className="absolute -top-0.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-[3px] border border-dashed border-accent bg-white" />
-    </div>
   </div>
 );
 
