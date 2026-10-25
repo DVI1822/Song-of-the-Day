@@ -6,6 +6,7 @@ import {
   deleteTodayPost,
   follow,
   loadCore,
+  matchContacts,
   previewSong,
   reportUser,
   searchPeople,
@@ -15,6 +16,7 @@ import {
   spotifyPlay,
   spotifyPlayAll,
   spotifyResume,
+  type ContactMatch,
   type NewPost,
   type ReportReason,
   type SpotifyNow,
@@ -32,6 +34,7 @@ export type GlobeApi = {
   deleteTodayPost(postId: string): Promise<{ error?: string } | undefined>;
   searchPeople(q: string): Promise<(Profile & { following: boolean })[]>;
   follow(profileId: string): Promise<{ friend?: Friend; error?: string }>;
+  matchContacts(emails: string[]): Promise<ContactMatch[]>;
   loadCore(userId: string): Promise<Core | null>;
   report(input: { reportedId: string; postId?: string | null; reason: ReportReason; note?: string }): Promise<{ error?: string }>;
   block(profileId: string): Promise<{ error?: string }>;
@@ -54,6 +57,7 @@ export const serverApi: GlobeApi = {
   deleteTodayPost,
   searchPeople,
   follow,
+  matchContacts,
   loadCore,
   report: reportUser,
   block: blockUser,

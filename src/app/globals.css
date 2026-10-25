@@ -157,3 +157,15 @@ body {
     filter: blur(6px);
   }
 }
+
+/* The invite page's little globe: songs circling a core, ~45s a turn. */
+@keyframes orbit {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+@keyframes orbit-flat {
+  to {
+    transform: rotate(360deg);
+  }
+}
