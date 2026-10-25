@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  blockUser,
   createPost,
   deleteTodayPost,
   follow,
   loadCore,
   previewSong,
+  reportUser,
   searchPeople,
   spotifyNext,
   spotifyNow,
@@ -14,6 +16,7 @@ import {
   spotifyPlayAll,
   spotifyResume,
   type NewPost,
+  type ReportReason,
   type SpotifyNow,
   type SpotifyPlay,
 } from "@/app/actions";
@@ -30,6 +33,8 @@ export type GlobeApi = {
   searchPeople(q: string): Promise<(Profile & { following: boolean })[]>;
   follow(profileId: string): Promise<{ friend?: Friend; error?: string }>;
   loadCore(userId: string): Promise<Core | null>;
+  report(input: { reportedId: string; postId?: string | null; reason: ReportReason; note?: string }): Promise<{ error?: string }>;
+  block(profileId: string): Promise<{ error?: string }>;
   // Spotify Connect, for people who linked Spotify. The demo has none.
   spotify?: SpotifyConnect;
 };
@@ -50,6 +55,8 @@ export const serverApi: GlobeApi = {
   searchPeople,
   follow,
   loadCore,
+  report: reportUser,
+  block: blockUser,
   spotify: { play: spotifyPlay, playAll: spotifyPlayAll, next: spotifyNext, pause: spotifyPause, resume: spotifyResume, now: spotifyNow },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();

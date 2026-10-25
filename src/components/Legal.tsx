@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Shell } from "@/components/Shell";
 
-// The privacy policy and terms pages share this plain reading layout.
+// The privacy, terms and copyright pages share this plain reading layout.
 export function LegalPage({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
   return (
     <Shell back={{ href: "/", label: "Song of the Day" }}>
@@ -22,6 +22,9 @@ export function LegalLinks({ className = "" }: { className?: string }) {
       </Link>
       <Link href="/terms" className="underline-offset-4 hover:underline">
         Terms
+      </Link>
+      <Link href="/copyright" className="underline-offset-4 hover:underline">
+        Copyright
       </Link>
     </p>
   );

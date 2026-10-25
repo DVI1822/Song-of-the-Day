@@ -1,8 +1,9 @@
-import { signOut, unlinkSpotify } from "@/app/actions";
+import { signOut, unblockUser, unlinkSpotify } from "@/app/actions";
 import { ProfileForm } from "@/app/welcome/ProfileForm";
 import { LegalLinks } from "@/components/Legal";
 import { Card, Shell, buttonClass, ghostButtonClass } from "@/components/Shell";
 import { requireProfile } from "@/lib/data";
+import { DeleteAccount } from "./DeleteAccount";
 
 const SPOTIFY_NOTES: Record<string, string> = {
   linked: "Spotify is connected. Press play on any song to hear it on your Spotify app.",
@@ -14,11 +15,15 @@ const SPOTIFY_NOTES: Record<string, string> = {
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const { supabase, profile } = await requireProfile();
   const { spotify: result } = await searchParams;
-  const { data: link } = await supabase
-    .from("spotify_links")
-    .select("spotify_name")
-    .eq("user_id", profile.id)
-    .maybeSingle<{ spotify_name: string | null }>();
+  const [{ data: link }, { data: blocks }] = await Promise.all([
+    supabase
+      .from("spotify_links")
+      .select("spotify_name")
+      .eq("user_id", profile.id)
+      .maybeSingle<{ spotify_name: string | null }>(),
+    supabase.rpc("my_blocks"),
+  ]);
+  const blocked = (blocks ?? []) as { id: string; username: string; display_name: string }[];
   const note = typeof result === "string" ? SPOTIFY_NOTES[result] : undefined;
 
   return (
@@ -53,6 +58,28 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           </div>
         )}
         {note && <p className="mt-3 text-xs text-card-muted">{note}</p>}
+      </Card>
+
+      {blocked.length > 0 && (
+        <>
+          <h2 className="display mb-3 mt-10 text-xl">Blocked</h2>
+          <Card className="flex flex-col gap-1">
+            {blocked.map((b) => (
+              <form key={b.id} action={unblockUser.bind(null, b.id)} className="flex h-11 items-center gap-3">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-semibold">{b.display_name}</span>
+                  <span className="truncate text-xs text-card-muted">@{b.username}</span>
+                </span>
+                <button className="text-xs font-semibold text-accent-deep">Unblock</button>
+              </form>
+            ))}
+          </Card>
+        </>
+      )}
+
+      <h2 className="display mb-3 mt-10 text-xl">Leave</h2>
+      <Card>
+        <DeleteAccount username={profile.username} />
       </Card>
 
       <form action={signOut} className="mt-8">

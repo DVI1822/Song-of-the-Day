@@ -22,7 +22,8 @@ export default function PrivacyPage() {
           Your songs: the link you paste, the song&apos;s title, artist and cover (looked up from public music pages), and
           any caption or photo you add.
         </li>
-        <li>Who you follow and who follows you.</li>
+        <li>Who you follow and who follows you, and anyone you block.</li>
+        <li>Reports you send about a song or a person, which only the site&apos;s team can read.</li>
       </ul>
 
       <h2>Spotify</h2>
@@ -54,8 +55,9 @@ export default function PrivacyPage() {
 
       <h2>Deleting your data</h2>
       <p>
-        You can delete a post on the day you share it. To delete your whole account and everything in it, ask the
-        person who runs the site and it will be removed.
+        You can delete a post on the day you share it. To delete your whole account and everything in it (songs,
+        photos, follows, blocks and your Spotify link), go to <strong>Settings → Delete my account</strong>. It&apos;s
+        erased right away and can&apos;t be undone.
       </p>
     </LegalPage>
   );

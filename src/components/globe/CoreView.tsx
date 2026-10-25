@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState, type Ref } from "react";
 import { formatDay, formatTime, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
+import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
+import { Safety } from "./Safety";
 import { Cover, CloseIcon, glass, glassThin } from "./ui";
 
 // Someone's profile, shown once the camera has flown into their core.
@@ -16,6 +18,8 @@ export function CoreView({
   sheetTop,
   onClose,
   onOpenToday,
+  api,
+  onBlocked,
   rootRef,
   sheetRef,
 }: {
@@ -26,11 +30,14 @@ export function CoreView({
   sheetTop: number;
   onClose(): void;
   onOpenToday(): void;
+  api: GlobeApi;
+  onBlocked(): void;
   rootRef: Ref<HTMLDivElement>;
   sheetRef: Ref<HTMLDivElement>;
 }) {
   const [month, setMonth] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [flagging, setFlagging] = useState(false);
   const tz = profile?.timezone ?? "UTC";
   const today = todayIn(tz);
   const list = posts ?? [];
@@ -160,6 +167,27 @@ export function CoreView({
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {!mine && profile && !flagging && (
+          <button
+            type="button"
+            onClick={() => setFlagging(true)}
+            className="self-start text-xs font-semibold text-muted underline-offset-4 hover:underline"
+          >
+            Report or block {first}
+          </button>
+        )}
+        {!mine && profile && flagging && (
+          <div className="min-h-[250px] rounded-[22px] bg-card-ink/[0.03] p-4">
+            <Safety
+              api={api}
+              who={profile.display_name}
+              userId={profile.id}
+              onBlocked={onBlocked}
+              onDone={() => setFlagging(false)}
+            />
           </div>
         )}
 

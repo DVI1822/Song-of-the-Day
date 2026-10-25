@@ -19,6 +19,15 @@ export default function TermsPage() {
           isn&apos;t responsible for it.
         </li>
         <li>
+          If a song or a person bothers you, use <strong>⋯</strong> on their song (or &ldquo;Report or block&rdquo; on
+          their core) to report them or block them. We read every report and remove what breaks these terms.
+        </li>
+        <li>
+          If you own the rights to something shared here and want it taken down, send a{" "}
+          <a href="/copyright">copyright takedown</a>. Accounts that repeatedly share things they don&apos;t have the
+          rights to will be closed.
+        </li>
+        <li>
           The site is offered as it is, without guarantees. It may change, pause or close, and posts or accounts that
           break these terms may be removed.
         </li>
