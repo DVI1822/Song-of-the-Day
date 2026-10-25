@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
 import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
+import { InviteCard } from "./Invite";
 import { SongPlayer } from "./Preview";
 import { Cover, SearchIcon, coverRadius } from "./ui";
 
@@ -148,11 +149,13 @@ type Found = Profile & { following: boolean };
 
 export function FindPanel({
   api,
+  me,
   friends,
   onFollowed,
   onSpin,
 }: {
   api: GlobeApi;
+  me: Profile;
   friends: Friend[];
   onFollowed(f: Friend): void;
   onSpin(k: number): void;
@@ -202,6 +205,17 @@ export function FindPanel({
         {error && <p className="px-2 pt-2 text-xs text-accent-deep">{error}</p>}
       </div>
       <div className="flex-1 overflow-y-auto px-2.5 pb-4">
+        {!q.trim() && (
+          <div className="-mx-2.5 pb-2">
+            <InviteCard
+              api={api}
+              username={me.username}
+              firstName={me.display_name.split(" ")[0]}
+              friends={friends}
+              onFollowed={onFollowed}
+            />
+          </div>
+        )}
         {found?.map((p) => {
           const k = friends.findIndex((f) => f.id === p.id);
           const on = p.following || k >= 0;

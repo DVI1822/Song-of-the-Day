@@ -975,6 +975,7 @@ function Globe({
           {panel === "find" && (
             <FindPanel
               api={api}
+              me={me}
               friends={friends}
               onFollowed={onFollowed}
               onSpin={(k) => {

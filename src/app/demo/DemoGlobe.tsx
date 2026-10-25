@@ -155,6 +155,10 @@ const demoApi: GlobeApi = {
     const p = profile(100 + j, POOL[j]);
     return { friend: { ...p, followed_at: new Date().toISOString(), post: song(200 + j, p.id, TODAY, 2) } };
   },
+  async matchContacts(emails) {
+    // pretend the first picked contact is already here
+    return emails.slice(0, 1).map((email, j) => ({ ...profile(100 + j, POOL[j]), email, following: false }));
+  },
   async report() {
     await new Promise((r) => setTimeout(r, 500));
     return {};

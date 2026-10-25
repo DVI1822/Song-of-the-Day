@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCore, getSession } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
 import type { Core, Friend, Post, Profile } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
+import { INVITE_COOKIE, cleanInvite } from "@/lib/invite";
 import { accessToken, spotifyApi } from "@/lib/spotify";
 
 export type FormState = { error?: string; ok?: boolean } | undefined;
@@ -36,6 +38,15 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
     if (error.code === "23505") return { error: "That username is taken. Try another." };
     if (error.code === "42501") return { error: "Your email isn't on the invite list yet." };
     return { error: error.message };
+  }
+  // Came in through someone's invite link: you're on each other's globes.
+  if (!profile) {
+    const jar = await cookies();
+    const inviter = cleanInvite(jar.get(INVITE_COOKIE)?.value);
+    if (inviter) {
+      await supabase.rpc("accept_invite", { inviter });
+      jar.delete(INVITE_COOKIE);
+    }
   }
   revalidatePath("/", "layout");
   redirect(profile ? `/u/${username}` : "/");
@@ -234,6 +245,29 @@ export async function follow(profileId: string): Promise<{ friend?: Friend; erro
   if (!profile) return { error: "Couldn't find that person." };
   revalidatePath("/", "layout");
   return { friend: { ...profile, post: post ?? null, followed_at: new Date().toISOString() } };
+}
+
+// Which of the contacts you picked are already here. Phones hand over names,
+// emails and numbers; only emails can be matched, since accounts are email.
+export type ContactMatch = Profile & { following: boolean; email: string };
+
+export async function matchContacts(emails: string[]): Promise<ContactMatch[]> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return [];
+  const list = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@")))].slice(0, 100);
+  if (!list.length) return [];
+  const [{ data }, { data: follows }] = await Promise.all([
+    supabase.rpc("people_by_email", { emails: list }),
+    supabase.from("follows").select("following_id").eq("follower_id", userId),
+  ]);
+  const followed = new Set((follows ?? []).map((f) => f.following_id as string));
+  type Row = { id: string; username: string; display_name: string; email: string };
+  return ((data ?? []) as Row[]).map((p) => ({
+    ...p,
+    timezone: "UTC",
+    created_at: "",
+    following: followed.has(p.id),
+  }));
 }
 
 export async function loadCore(userId: string): Promise<Core | null> {
