@@ -14,7 +14,7 @@ import { CELLS, TEX, atlas } from "./textures";
 // What's in it: soft clouds that slowly change shape, fine motion-blurred
 // rain that splashes on the songs, snow, low mist, lightning; and, by season,
 // leaves blowing past now and then in autumn, petals in spring, seeds on
-// summer days and fireflies on summer nights, with a little grass, flowers
+// summer days and fireflies on summer nights, with a few flowers
 // or fallen leaves on the ground under the globe.
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
@@ -45,7 +45,7 @@ export type SceneFrame = {
 };
 
 // How the weather shows on the songs themselves (GlobeApp's lighting uses it).
-export type Look = { overcast: number; wet: number; snow: number; frost: number };
+export type Look = { overcast: number; wet: number; frost: number };
 
 const P = PERSPECTIVE;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -436,7 +436,8 @@ export class Scene {
   private nextGust: number;
   private calm: number;
   private cloud = { cover: 0, lit: [1, 1, 1] as V3, shade: [0.8, 0.84, 0.89] as V3, alpha: 0 };
-  look: Look = { overcast: 0, wet: 0, snow: 0, frost: 0 };
+  look: Look = { overcast: 0, wet: 0, frost: 0 };
+  private winter = 0; // how frozen over winter and snowfall have left the songs
 
   constructor(
     skyCv: HTMLCanvasElement,
@@ -469,11 +470,13 @@ export class Scene {
     const overcast = storm ? 1 : clamp01(((wx?.cloud ?? 0) - 0.3) / 0.6) * (kind === "partly" ? 0.4 : 1);
     L.overcast += (overcast - L.overcast) * ez(0.3);
     L.wet = clamp01(L.wet + (wet ? dt * (this.fast ? 0.3 : 0.03 + 0.08 * intensity) : -dt / 500));
-    const snowBase = f.season === "winter" ? 0.3 : 0;
-    if (snow) L.snow = Math.min(1, L.snow + dt * (this.fast ? 0.15 : 0.006 + 0.01 * intensity));
-    else if (L.snow > snowBase && (temp === null || temp > 2)) L.snow = Math.max(snowBase, L.snow - dt / 900);
-    if (L.snow < snowBase) L.snow = Math.min(snowBase, L.snow + dt * 0.2);
-    const frost = temp !== null && temp <= 2 && !wet ? 0.35 + 0.65 * clamp01((2 - temp) / 6) : 0;
+    // frost: a light rime all winter, thicker while it snows, and whenever it's freezing
+    const base = f.season === "winter" ? 0.45 : 0;
+    if (snow) this.winter = Math.min(1, this.winter + dt * (this.fast ? 0.15 : 0.006 + 0.01 * intensity));
+    else if (this.winter > base && (temp === null || temp > 2)) this.winter = Math.max(base, this.winter - dt / 900);
+    if (this.winter < base) this.winter = Math.min(base, this.winter + dt * 0.2);
+    const freezing = temp !== null && temp <= 2 && !wet ? 0.35 + 0.65 * clamp01((2 - temp) / 6) : 0;
+    const frost = Math.max(freezing, this.winter);
     L.frost += (frost - L.frost) * ez(this.fast ? 1 : 0.08);
 
     // ------------------------------------------------------------- the clouds
@@ -576,11 +579,11 @@ export class Scene {
       for (const g of this.ground) g.age = Math.min(g.age, -1);
       const plan: [number, number][] =
         f.season === "spring"
-          ? [[TEX.grass, 14], [TEX.sprout, 6], [TEX.daisy, 4], [TEX.crocus, 4]]
+          ? [[TEX.sprout, 6], [TEX.daisy, 4], [TEX.crocus, 4]]
           : f.season === "summer"
-            ? [[TEX.grassLush, 20], [TEX.daisy, 4]]
+            ? [[TEX.daisy, 4]]
             : f.season === "autumn"
-              ? [[TEX.grassDry, 10], [-1, 9]]
+              ? [[-1, 9]]
               : [];
       for (const [tex, n] of plan) for (let i = 0; i < n; i++) this.ground.push(this.groundItem(tex, f));
     }
@@ -594,7 +597,7 @@ export class Scene {
       }
       let v = g.v;
       if (g.sway) {
-        // grass leans with the wind and stirs a little
+        // flowers lean with the wind and stir a little
         const lean = (0.08 + wind * 0.02) * g.sway + 0.06 * Math.sin(this.t * 1.3 + g.ph);
         v = [g.s * lean, -g.s, 0];
       }
@@ -909,7 +912,7 @@ export class Scene {
         b = rand(0, Math.PI * 2);
       return { p: [x, f.floorY - 0.5, z], u: [Math.cos(b) * s, 0, Math.sin(b) * s], v: [-Math.sin(b) * s, 0, Math.cos(b) * s], tex: t, s, sway: 0, ph: 0, age: 0 };
     }
-    const s = tex === TEX.grassLush ? rand(12, 17) : tex === TEX.grass || tex === TEX.grassDry ? rand(10, 14) : rand(7, 10);
+    const s = rand(7, 10);
     const b = rand(-0.6, 0.6);
     return { p: [x, f.floorY, z], u: [Math.cos(b) * s, 0, Math.sin(b) * s], v: [0, -s, 0], tex, s, sway: rand(0.6, 1.2), ph: rand(0, 20), age: 0 };
   }

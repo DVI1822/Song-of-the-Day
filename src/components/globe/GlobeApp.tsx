@@ -7,7 +7,7 @@ import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
-import { surfaceTexture } from "./textures";
+import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -58,7 +58,7 @@ type TileEls = {
   box: HTMLDivElement | null;
   facets: (HTMLDivElement | null)[];
   shades: (HTMLDivElement | null)[];
-  coats: (HTMLDivElement | null)[]; // snow or frost on the cover
+  coats: (HTMLDivElement | null)[]; // frost on the cover
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -95,7 +95,7 @@ function newMotion(posted: boolean) {
     mt: 0,
     last: 0,
     wxShow: 0,
-    look: { overcast: 0, wet: 0, snow: 0, frost: 0 } as Look,
+    look: { overcast: 0, wet: 0, frost: 0 } as Look,
     cam: { yaw: 0, pitch: 0, roll: 0 } as Camera,
     target: null as null | { yaw: number; pitch: number },
     zoomTarget: null as null | number,
@@ -975,15 +975,6 @@ sim: TileSim,
 
     const ex = camV([clo, 0, -slo], cam),
       ey = camV([sla * slo, cla, sla * clo], cam);
-    // snow lies along each cover's upper edge, deeper the more the cover faces up
-    let snowMask = "";
-    if (lk.snow > 0.01) {
-      const nu = -ez[1];
-      const fill = nu > -0.35 ? clamp01(lk.snow * (0.16 + 0.9 * Math.max(0, nu)) + Math.max(0, nu - 0.6) * 2.5 * lk.snow) : 0;
-      const ang = (Math.atan2(-ex[1], ey[1]) * 180) / Math.PI;
-      const at = (1 - fill) * 100;
-      snowMask = fill > 0.01 ? `linear-gradient(${ang.toFixed(1)}deg, transparent ${(at - 4).toFixed(1)}%, #000 ${(at + 4).toFixed(1)}%)` : "";
-    }
     const fadeOp =
       nearFade * (1 - reveal * 0.6) * (s.lens !== null ? (k !== s.lens ? 1 - 0.88 * lensP : 1 - s.fp) : 1);
     const morph = lockE < 1 || wait;
@@ -1040,21 +1031,14 @@ sim: TileSim,
         }
         const sh = te.shades[i];
         if (sh) sh.style.background = layers + amb;
-        // snow settles on the covers that face up; frost rims them all, and the sun melts it
+        // frost rims the covers in winter and when it's freezing; the sun melts it back
         const coat = te.coats[i];
         if (coat) {
-          const kind = lk.snow > 0.01 ? "snow" : lk.frost > 0.01 ? "frost" : "";
-          if (coat.dataset.k !== kind) {
-            coat.dataset.k = kind;
-            coat.style.backgroundImage = kind ? `url(${surfaceTexture(kind)})` : "none";
-            if (kind !== "snow") coat.style.maskImage = coat.style.webkitMaskImage = "none";
+          if (lk.frost > 0.01 && !coat.dataset.k) {
+            coat.dataset.k = "frost";
+            coat.style.backgroundImage = `url(${frostTexture()})`;
           }
-          let op = 0;
-          if (kind === "snow") {
-            op = snowMask ? 0.96 : 0;
-            if (snowMask && coat.style.maskImage !== snowMask) coat.style.maskImage = coat.style.webkitMaskImage = snowMask;
-          } else if (kind === "frost") op = lk.frost * (0.95 - 0.5 * Math.max(0, lit) * day);
-          coat.style.opacity = op.toFixed(3);
+          coat.style.opacity = (lk.frost > 0.01 ? lk.frost * (0.95 - 0.5 * Math.max(0, lit) * day) : 0).toFixed(3);
         }
         f.style.opacity = (fadeOp * lockE).toFixed(3);
       }
@@ -1218,12 +1202,6 @@ const TileLayer = memo(function TileLayer({
               style={{
                 backgroundSize: `${W}px ${W}px`,
                 backgroundPosition: `${-l0}px ${-t0}px`,
-                maskSize: `${W}px ${W}px`,
-                maskPosition: `${-l0}px ${-t0}px`,
-                maskRepeat: "no-repeat",
-                WebkitMaskSize: `${W}px ${W}px`,
-                WebkitMaskPosition: `${-l0}px ${-t0}px`,
-                WebkitMaskRepeat: "no-repeat",
               }}
             />
           )}

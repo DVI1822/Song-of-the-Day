@@ -39,8 +39,10 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
     const forced = override();
     let coords = "";
     let on = true;
-    const load = () =>
-      fetch(`/api/weather${coords}`)
+    let at = 0;
+    const load = () => {
+      at = Date.now();
+      return fetch(`/api/weather${coords}`, { cache: "no-store" })
         .then((r) => (r.ok ? (r.json() as Promise<WeatherReply>) : null))
         .then((w) => {
           if (!on || !w) return;
@@ -48,6 +50,7 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
           if (!forced && w.weather) setWeather(w.weather);
         })
         .catch(() => {});
+    };
     // The device's own location if it's already been allowed; otherwise the
     // server goes by the network, with no prompt.
     const located = () =>
@@ -65,10 +68,16 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
         .then((ps) => (ps.state === "granted" ? located() : load()))
         .catch(() => load());
     const t = setInterval(load, REFRESH);
+    // coming back to the app (a phone keeps the tab asleep): check again if it's been a while
+    const back = () => {
+      if (document.visibilityState === "visible" && Date.now() - at > 5 * 60_000) load();
+    };
+    document.addEventListener("visibilitychange", back);
     if (forced) queueMicrotask(() => on && setWeather(PRESETS[forced]));
     return () => {
       on = false;
       clearInterval(t);
+      document.removeEventListener("visibilitychange", back);
     };
   }, []);
 

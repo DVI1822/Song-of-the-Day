@@ -1,6 +1,6 @@
-// Little painted things for the Globe's world: leaves, petals, seeds, grass
-// and flowers (one atlas the weather layer draws from), and the snow and
-// frost that settle on the songs.
+// Little painted things for the Globe's world: leaves, petals, seeds and
+// flowers (one atlas the weather layer draws from), and the frost that
+// settles on the songs.
 
 export const CELLS = 4; // the atlas is 4 × 4
 export const TEX = {
@@ -11,12 +11,9 @@ export const TEX = {
   petal: 4,
   petalWhite: 5,
   seed: 6,
-  grass: 7,
-  grassLush: 8,
   daisy: 9,
   crocus: 10,
   sprout: 11,
-  grassDry: 12,
 } as const;
 
 const C = 128;
@@ -89,14 +86,6 @@ function blade(ctx: CanvasRenderingContext2D, x: number, h: number, bend: number
   ctx.quadraticCurveTo(x + w * 0.4 + bend * 0.3, C - h * 0.6, x + w, C);
   ctx.closePath();
   ctx.fill();
-}
-
-function tuft(ctx: CanvasRenderingContext2D, n: number, tall: number, cols: [string, string][]) {
-  for (let i = 0; i < n; i++) {
-    const x = 64 + (rand() - 0.5) * 50;
-    const h = tall * (0.5 + rand() * 0.5);
-    blade(ctx, x, h, (x - 64) * 0.9 + (rand() - 0.5) * 24, 2 + rand() * 2.2, cols[i % cols.length]);
-  }
 }
 
 function stem(ctx: CanvasRenderingContext2D, top: number, bend: number) {
@@ -233,21 +222,6 @@ export function atlas(): HTMLCanvasElement {
     }
   });
 
-  const greens: [string, string][] = [
-    ["#3E6B2E", "#8DBA5A"],
-    ["#4A7A33", "#A3C96A"],
-    ["#35602A", "#7CAE4E"],
-  ];
-  cell(TEX.grass, () => tuft(ctx, 11, 92, greens));
-  cell(TEX.grassLush, () => tuft(ctx, 16, 116, greens));
-  cell(TEX.grassDry, () =>
-    tuft(ctx, 10, 86, [
-      ["#6B6A34", "#C2B270"],
-      ["#7A6A3A", "#D3BE80"],
-      ["#5E6A32", "#AFAA66"],
-    ]),
-  );
-
   // a daisy on a stem
   cell(TEX.daisy, () => {
     stem(ctx, 40, 6);
@@ -308,10 +282,10 @@ export function atlas(): HTMLCanvasElement {
 }
 
 // ---------------------------------------------------------------------------
-// Snow and frost that settle on the songs (one tile wide, as data URLs)
+// Frost on the songs (one tile wide, as a data URL)
 // ---------------------------------------------------------------------------
 
-const surface: Record<string, string> = {};
+let frostCache = "";
 
 function valueNoise(size: number, cells: number, seed: number) {
   rnd = seed;
@@ -332,8 +306,8 @@ function valueNoise(size: number, cells: number, seed: number) {
   };
 }
 
-export function surfaceTexture(kind: "snow" | "frost"): string {
-  if (surface[kind]) return surface[kind];
+export function frostTexture(): string {
+  if (frostCache) return frostCache;
   const S = 96;
   const cv = document.createElement("canvas");
   cv.width = cv.height = S;
@@ -341,29 +315,8 @@ export function surfaceTexture(kind: "snow" | "frost"): string {
   const img = ctx.createImageData(S, S);
   // how far in from the tile's nearest edge, 0 at the edge .. 1 in the middle
   const inset = (x: number, y: number) => Math.min(x, y, S - 1 - x, S - 1 - y) / (S / 2);
-  if (kind === "snow") {
-    // a soft even blanket: gentle bumps of shadow, thinner and ragged at the edges
-    const n1 = valueNoise(S, 6, 11),
-      n2 = valueNoise(S, 16, 29);
-    for (let y = 0; y < S; y++)
-      for (let x = 0; x < S; x++) {
-        const n = 0.65 * n1(x, y) + 0.35 * n2(x, y);
-        const edge = Math.max(0, Math.min(1, inset(x, y) * 6 - 0.2 + (n - 0.5) * 1.2));
-        const shade = 241 + 14 * n2(x, y);
-        const i = (y * S + x) * 4;
-        img.data[i] = shade - 5;
-        img.data[i + 1] = shade - 2;
-        img.data[i + 2] = Math.min(255, shade + 4);
-        img.data[i + 3] = Math.round(255 * edge * (0.94 + 0.06 * n));
-      }
-    ctx.putImageData(img, 0, 0);
-    rnd = 3;
-    for (let i = 0; i < 40; i++) {
-      ctx.fillStyle = `rgba(255,255,255,${(0.7 + rand() * 0.3).toFixed(2)})`;
-      ctx.fillRect(4 + rand() * (S - 8), 4 + rand() * (S - 8), 1, 1);
-    }
-  } else {
-    // frost: a pale crystalline film, thickest round the edges
+  // a pale crystalline film, thickest round the edges
+  {
     const n1 = valueNoise(S, 10, 5);
     for (let y = 0; y < S; y++)
       for (let x = 0; x < S; x++) {
@@ -402,6 +355,6 @@ export function surfaceTexture(kind: "snow" | "frost"): string {
       ctx.stroke();
     }
   }
-  surface[kind] = cv.toDataURL("image/png");
-  return surface[kind];
+  frostCache = cv.toDataURL("image/png");
+  return frostCache;
 }
