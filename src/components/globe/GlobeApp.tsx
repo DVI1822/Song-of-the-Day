@@ -15,6 +15,7 @@ import { Feature } from "./Feature";
 import { Magma, MagmaFilters } from "./Magma";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
+import { beatOf, pulseAt, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass } from "./ui";
 import {
   PERSPECTIVE,
@@ -119,7 +120,10 @@ type Live = {
   L: ReturnType<typeof layoutFor>;
   zFeat: number;
   friends: Friend[];
+  beam: Beam;
 };
+// what's playing, for the energy streak: its tile, and how to find its beat
+type Beam = { k: number; paused: boolean; beat: Beat | null; playhead: () => { t: number; exact: boolean } } | null;
 type Motion = ReturnType<typeof newMotion>;
 type Els = ReturnType<typeof newEls>;
 
@@ -162,6 +166,9 @@ function newMotion(posted: boolean) {
     sun: null as null | Sun,
     sunAt: 0,
     geo: { lat: 40, lon: -90 },
+    beamA: 0,
+    beamLvl: 0,
+    beamK: -1,
   };
 }
 
@@ -182,6 +189,7 @@ function newEls() {
     wxFlash: null as HTMLDivElement | null,
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
+    beam: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
     featBack: null as HTMLDivElement | null,
@@ -202,7 +210,8 @@ function Globe({
   api = serverApi,
 }: Props) {
   // Songs keep playing as you move around; only pausing or starting another stops them.
-  const shuffleNow = usePreview().shuffle?.now ?? null;
+  const pv = usePreview();
+  const shuffleNow = pv.shuffle?.now ?? null;
   const [friends, setFriends] = useState(initialFriends);
   const [addedMe, setAddedMe] = useState(initialAddedMe);
   const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
@@ -254,10 +263,30 @@ function Globe({
     wx.current.dark = darkOn;
   });
 
+  // The song that's playing gets an energy streak from the core, pulsing to
+  // its beat (heard from its preview; see beat.ts).
+  const playingPost = pv.shuffle?.now ?? pv.track?.post ?? null;
+  const playingPaused = pv.shuffle ? pv.shuffle.paused : Boolean(pv.track?.paused);
+  const [beat, setBeat] = useState<{ url: string; b: Beat | null } | null>(null);
+  const beatUrl = playingPost?.preview_url ?? null;
+  useEffect(() => {
+    if (!beatUrl) return;
+    let live = true;
+    beatOf(beatUrl).then((b) => live && setBeat({ url: beatUrl, b }));
+    return () => {
+      live = false;
+    };
+  }, [beatUrl]);
+  const beamK = !playingPost ? -1 : playingPost.id === myPost?.id ? ME : friends.findIndex((f) => f.post?.id === playingPost.id);
+  const beam: Beam =
+    beamK === -1
+      ? null
+      : { k: beamK, paused: playingPaused, beat: beat?.url === beatUrl ? beat.b : null, playhead: pv.playhead };
+
   // Everything the frame loop needs from the latest render.
-  const live = useRef({ keys, half, Rb, L, zFeat, friends });
+  const live = useRef({ keys, half, Rb, L, zFeat, friends, beam });
   useLayoutEffect(() => {
-    live.current = { keys, half, Rb, L, zFeat, friends };
+    live.current = { keys, half, Rb, L, zFeat, friends, beam };
   });
 
   // -------------------------------------------------------------------------
@@ -538,6 +567,7 @@ function Globe({
       if (R.current.lensEl) R.current.lensEl.style.transform = g.k === 1 ? "" : `translate(${g.x.toFixed(2)}px,${g.y.toFixed(2)}px) scale(${g.k.toFixed(4)})`;
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
       draw(s, R.current, els.current, sim.current, live.current);
+      drawBeam(s, R.current.beam, sim.current, live.current, dt);
       const w = wx.current,
         el = R.current;
       if (!w.scene && !w.failed && el.wxSky && el.wxBack && el.wxFront)
@@ -847,6 +877,7 @@ function Globe({
             filter: "blur(3px)",
           }}
         />
+        <canvas ref={(el) => void (R.current.beam = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div
           ref={(el) => void (R.current.world = el)}
           className="preserve-3d absolute z-[1] h-0 w-0"
@@ -1279,6 +1310,114 @@ sim: TileSim,
       r.launch.style.boxShadow = `0 30px 70px -20px rgba(13,42,63,0.5), 0 0 ${Math.round(30 + 50 * p)}px ${Math.round(6 + 10 * p)}px rgba(13,42,63,${(0.06 + 0.1 * p).toFixed(2)})`;
     }
   }
+}
+
+// The energy streak: from the core out to the back of the playing song's
+// tile, flowing inwards, pulsing with the beat. Drawn on a canvas just behind
+// the globe, so the tile covers its end and the core its start.
+function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam }: Live, dt: number) {
+  if (!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.round(L.w * dpr),
+    H = Math.round(L.h * dpr);
+  if (cv.width !== W || cv.height !== H) {
+    cv.width = W;
+    cv.height = H;
+  }
+  const ctx = cv.getContext("2d");
+  if (!ctx) return;
+
+  // fades in when a song starts, out when it's paused or stopped
+  const on = beam !== null && !beam.paused && s.lens === null && !s.coreOn;
+  if (beam) s.beamK = beam.k;
+  s.beamA += ((on ? 1 : 0) - s.beamA) * Math.min(1, dt * (on ? 2.5 : 4));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (s.beamA < 0.01 || s.beamK < 0 || !s.cam) return;
+
+  // the beat: the preview's own pulse when it's the preview playing, else
+  // its tempo; a slow breath until the beat is known
+  let hit = 0.5 + 0.5 * Math.sin(s.mt * 3.4);
+  if (beam?.beat) {
+    const h = beam.playhead();
+    hit = pulseAt(beam.beat, h.t, h.exact);
+  }
+  s.beamLvl += (hit - s.beamLvl) * Math.min(1, dt * (hit > s.beamLvl ? 30 : 8));
+  const lvl = s.beamLvl;
+
+  const { lat, lon } = latLon(sim.pos(s.beamK));
+  const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam);
+  const z = v[2] * Rb * s.zoom;
+  const kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
+  const tx = L.cx + v[0] * Rb * kz,
+    ty = L.cy + v[1] * Rb * kz;
+  // round the back of the globe it dims, passing behind the core
+  const night = s.dk > 0.5;
+  // stronger by day, when it can't add light to a dark sky
+  const A = s.beamA * (0.35 + 0.65 * clamp01((v[2] + 0.35) / 0.7)) * (night ? 1 : 1.35);
+  const dx = tx - L.cx,
+    dy = ty - L.cy,
+    len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len,
+    ny = dx / len;
+  const w1 = half * kz * (0.55 + 0.25 * lvl),
+    w0 = (5 + 4 * lvl) * L.s;
+
+  const hue = (s.mt * 14 + 30) % 360;
+  const col = (dh: number, a: number) =>
+    `hsla(${((hue + dh) % 360).toFixed(0)},${night ? 100 : 95}%,${night ? 78 : 64}%,${clamp01(a).toFixed(3)})`;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = night ? "lighter" : "source-over";
+  const ribbon = (wa: number, wb: number, a0: number, a1: number, blur: number) => {
+    const g = ctx.createLinearGradient(tx, ty, L.cx, L.cy);
+    g.addColorStop(0, col(0, a1));
+    g.addColorStop(0.55, col(40, a1 * 0.55));
+    g.addColorStop(1, col(80, a0));
+    ctx.fillStyle = g;
+    ctx.shadowColor = col(20, Math.max(a0, a1));
+    ctx.shadowBlur = blur;
+    ctx.beginPath();
+    ctx.moveTo(L.cx + nx * wa, L.cy + ny * wa);
+    ctx.quadraticCurveTo(L.cx + dx * 0.5 + nx * (wa + wb) * 0.3, L.cy + dy * 0.5 + ny * (wa + wb) * 0.3, tx + nx * wb, ty + ny * wb);
+    ctx.lineTo(tx - nx * wb, ty - ny * wb);
+    ctx.quadraticCurveTo(L.cx + dx * 0.5 - nx * (wa + wb) * 0.3, L.cy + dy * 0.5 - ny * (wa + wb) * 0.3, L.cx - nx * wa, L.cy - ny * wa);
+    ctx.closePath();
+    ctx.fill();
+  };
+  // a wide soft glow, then the bright core of the streak
+  ribbon(w0 * 2.2, w1, A * (0.35 + 0.35 * lvl), A * (0.3 + 0.4 * lvl), 24 * L.s);
+  ribbon(w0 * 0.5, w1 * 0.22, A * (0.75 + 0.25 * lvl), A * (0.45 + 0.45 * lvl), 8 * L.s);
+  ctx.shadowBlur = 0;
+
+  // sparks of energy riding in from the song to the core, faster on the beat
+  ctx.globalCompositeOperation = night ? "lighter" : "source-over";
+  const flow = s.mt * (0.35 + 0.25 * lvl);
+  for (let i = 0; i < 14; i++) {
+    const u = (((i * 0.6180339 - flow) % 1) + 1) % 1; // 0 at the song, 1 at the core
+    const wob = Math.sin(i * 7.1 + s.mt * 3) * (1 - u) * w1 * 0.45;
+    const px = tx - dx * u + nx * wob,
+      py = ty - dy * u + ny * wob;
+    const r = (1.2 + 2.6 * lvl) * L.s * (1 - 0.5 * u);
+    ctx.fillStyle = night ? `rgba(255,255,255,${(A * 0.9 * Math.sin(Math.PI * u)).toFixed(3)})` : col(60, A * Math.sin(Math.PI * u));
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // the beat lands: a halo round the song's tile and a flare at the core
+  const halo = (x: number, y: number, r: number, a: number, dh: number) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, col(dh, a));
+    g.addColorStop(1, col(dh, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  halo(tx, ty, half * kz * (1.25 + 0.35 * lvl), A * (0.2 + 0.5 * lvl), 0);
+  halo(L.cx, L.cy, (34 + 26 * lvl) * L.s, A * (0.25 + 0.55 * lvl), 80);
+  ctx.globalCompositeOperation = "source-over";
 }
 
 // ---------------------------------------------------------------------------
