@@ -21,12 +21,12 @@ export async function GET(request: NextRequest) {
   lat = Math.round(lat * 10) / 10;
   lon = Math.round(lon * 10) / 10;
   const place = decodeURIComponent(h.get("x-vercel-ip-city") ?? "") || undefined;
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,cloud_cover,precipitation,wind_speed_10m&wind_speed_unit=ms`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,cloud_cover,precipitation,wind_speed_10m,temperature_2m&wind_speed_unit=ms`;
   try {
     const res = await fetch(url, { next: { revalidate: 900 } });
     if (!res.ok) return NextResponse.json({ lat, lon, place } satisfies WeatherReply);
     const c = (await res.json()).current;
-    const weather = weatherFrom(c.weather_code ?? 0, c.cloud_cover ?? 0, c.precipitation ?? 0, c.wind_speed_10m ?? 0);
+    const weather = weatherFrom(c.weather_code ?? 0, c.cloud_cover ?? 0, c.precipitation ?? 0, c.wind_speed_10m ?? 0, c.temperature_2m ?? undefined);
     return NextResponse.json({ weather, lat, lon, place } satisfies WeatherReply);
   } catch {
     return NextResponse.json({ lat, lon, place } satisfies WeatherReply);
