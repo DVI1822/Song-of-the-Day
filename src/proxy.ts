@@ -4,6 +4,15 @@ import { isConfigured, supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 
 // Keeps the Supabase login session fresh on every page load.
 export async function proxy(request: NextRequest) {
+  // A sign-in link Supabase sent to the home page instead of /auth/callback
+  // (it does that when the callback isn't on its allowed list).
+  const { pathname, searchParams } = request.nextUrl;
+  if (pathname === "/" && searchParams.has("code")) {
+    const to = request.nextUrl.clone();
+    to.pathname = "/auth/callback";
+    return NextResponse.redirect(to);
+  }
+
   let response = NextResponse.next({ request });
   if (!isConfigured) return response;
 

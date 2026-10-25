@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, buttonClass, inputClass } from "@/components/Shell";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createLinkClient } from "@/lib/supabase/client";
 
 // Email only. Spotify sign-in is off while the Spotify app is in development
 // mode, which lets in just 5 allowlisted accounts; Spotify is linked from
@@ -41,7 +41,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     e.preventDefault();
     setState("sending");
     setError(undefined);
-    const { error } = await createClient().auth.signInWithOtp({
+    const { error } = await createLinkClient().auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
