@@ -7,9 +7,11 @@ import {
   loadCore,
   previewSong,
   searchPeople,
+  spotifyNext,
   spotifyNow,
   spotifyPause,
   spotifyPlay,
+  spotifyPlayAll,
   type NewPost,
   type SpotifyNow,
   type SpotifyPlay,
@@ -33,6 +35,8 @@ export type GlobeApi = {
 
 export type SpotifyConnect = {
   play(uri: string, positionMs?: number): Promise<SpotifyPlay>;
+  playAll(uris: string[]): Promise<SpotifyPlay>;
+  next(): Promise<void>;
   pause(): Promise<void>;
   now(): Promise<SpotifyNow>;
 };
@@ -44,7 +48,7 @@ export const serverApi: GlobeApi = {
   searchPeople,
   follow,
   loadCore,
-  spotify: { play: spotifyPlay, pause: spotifyPause, now: spotifyNow },
+  spotify: { play: spotifyPlay, playAll: spotifyPlayAll, next: spotifyNext, pause: spotifyPause, now: spotifyNow },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();
     const path = `${userId}/${crypto.randomUUID()}.jpg`;

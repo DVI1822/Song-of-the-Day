@@ -6,6 +6,7 @@ import type { Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
+import { Shuffle } from "./Shuffle";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
@@ -329,6 +330,22 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
     return () => clearTimeout(t);
   }, [panelOn]);
 
+  // Phones: a pinch zooms the Globe, never the page (iOS ignores the
+  // viewport's no-zoom, so its gestures are stopped here).
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault();
+    const twoFingers = (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault();
+    };
+    const opts = { passive: false } as const;
+    for (const g of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(g, stop, opts);
+    document.addEventListener("touchmove", twoFingers, opts);
+    return () => {
+      for (const g of ["gesturestart", "gesturechange", "gestureend"]) document.removeEventListener(g, stop);
+      document.removeEventListener("touchmove", twoFingers);
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -399,7 +416,7 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
           s.yaw += dy * f;
           s.pitch += dp * f;
         } else if (s.featFly === null && s.launch === null) s.target = null; // arrived: let the spin carry on
-      } else if (!s.drag) {
+      } else if (!s.drag && !s.pinch) {
         s.vel += ((0.14 * dt) / Math.sqrt(Math.max(1, s.zoom)) - s.vel) * ease(0.05, dt);
         s.yaw += s.vel;
       }
@@ -615,6 +632,25 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
   const featWho = feat === ME ? "You" : feat !== null ? friends[feat]?.display_name ?? "" : "";
   const featTz = feat === ME ? me.timezone : feat !== null ? friends[feat]?.timezone ?? "UTC" : "UTC";
   const posted = landed && !!myPost;
+  const shuffleSongs = useMemo(
+    () => [
+      ...friends.flatMap((f, k) => (f.post ? [{ k, post: f.post }] : [])),
+      ...(myPost && landed ? [{ k: ME, post: myPost }] : []),
+    ],
+    [friends, myPost, landed],
+  );
+  // the Globe turns to whichever song shuffle is playing
+  const onShuffleSong = useCallback(
+    (k: number | null) => {
+      const s = m.current;
+      if (k === null) return setFocus(null);
+      if (s.featOn || s.coreOn || s.lens !== null) return;
+      s.vel = 0;
+      s.target = aim(sim.current.pos(k), s.yaw);
+      setFocus(k);
+    },
+    [],
+  );
   const ink = darkOn ? "#EEF3F8" : "#0D2A3F";
   const muted = darkOn ? "#93A6B8" : "#6A818C";
   const tabTop = Math.max(100, L.cy - 240);
@@ -739,11 +775,14 @@ function Globe({ me, myPost: initialPost, friends: initialFriends, mySongs: init
       {/* lightning lights up everything */}
       <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
-      {/* + until you've posted, then the countdown to midnight */}
+      {/* + until you've posted, then the countdown to midnight, with shuffle all just above */}
       <div
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
       >
+        <div className="absolute inset-x-0 bottom-full flex justify-center pb-1">
+          <Shuffle songs={shuffleSongs} dark={darkOn} onNow={onShuffleSong} />
+        </div>
         {!posted && !launching && (
           <button
             type="button"

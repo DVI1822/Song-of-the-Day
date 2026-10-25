@@ -182,27 +182,46 @@ export type SpotifyPlay =
   | { ok: true; device: string }
   | { error: "not-linked" | "no-device" | "premium" | "failed" };
 
-export async function spotifyPlay(uri: string, positionMs = 0): Promise<SpotifyPlay> {
-  if (!/^spotify:(track|album):[A-Za-z0-9]+$/.test(uri)) return { error: "failed" };
+// The device that's playing now, else whichever Spotify app is open.
+async function spotifyDevice(token: string) {
+  const list = await spotifyApi(token, "/me/player/devices").then((r) => (r.ok ? r.json() : null));
+  type Device = { id: string | null; name: string; is_active: boolean; is_restricted: boolean };
+  const devices: Device[] = (list?.devices ?? []).filter((d: Device) => d.id && !d.is_restricted);
+  return devices.find((d) => d.is_active) ?? devices[0] ?? null;
+}
+
+async function startPlayback(body: object): Promise<SpotifyPlay> {
   const { supabase, userId } = await getSession();
   if (!userId) return { error: "not-linked" };
   const token = await accessToken(supabase, userId);
   if (!token) return { error: "not-linked" };
-
-  // the device that's playing now, else whichever Spotify app is open
-  const list = await spotifyApi(token, "/me/player/devices").then((r) => (r.ok ? r.json() : null));
-  type Device = { id: string | null; name: string; is_active: boolean; is_restricted: boolean };
-  const devices: Device[] = (list?.devices ?? []).filter((d: Device) => d.id && !d.is_restricted);
-  const device = devices.find((d) => d.is_active) ?? devices[0];
+  const device = await spotifyDevice(token);
   if (!device) return { error: "no-device" };
-
-  const at = Math.max(0, Math.floor(positionMs) || 0);
-  const body = uri.startsWith("spotify:album:") ? { context_uri: uri } : { uris: [uri], position_ms: at };
   const res = await spotifyApi(token, `/me/player/play?device_id=${device.id}`, { method: "PUT", body: JSON.stringify(body) });
   if (res.ok) return { ok: true, device: device.name };
   if (res.status === 403) return { error: "premium" };
   if (res.status === 404) return { error: "no-device" };
   return { error: "failed" };
+}
+
+export async function spotifyPlay(uri: string, positionMs = 0): Promise<SpotifyPlay> {
+  if (!/^spotify:(track|album):[A-Za-z0-9]+$/.test(uri)) return { error: "failed" };
+  const at = Math.max(0, Math.floor(positionMs) || 0);
+  return startPlayback(uri.startsWith("spotify:album:") ? { context_uri: uri } : { uris: [uri], position_ms: at });
+}
+
+// Shuffle all: the whole list goes to Spotify, which plays it through.
+export async function spotifyPlayAll(uris: string[]): Promise<SpotifyPlay> {
+  const list = uris.filter((u) => /^spotify:track:[A-Za-z0-9]+$/.test(u)).slice(0, 100);
+  if (!list.length) return { error: "failed" };
+  return startPlayback({ uris: list });
+}
+
+export async function spotifyNext(): Promise<void> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return;
+  const token = await accessToken(supabase, userId);
+  if (token) await spotifyApi(token, "/me/player/next", { method: "POST" });
 }
 
 export async function spotifyPause(): Promise<void> {
