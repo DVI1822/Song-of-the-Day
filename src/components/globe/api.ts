@@ -5,7 +5,9 @@ import {
   createPost,
   deleteTodayPost,
   follow,
+  hideSongs,
   loadCore,
+  loadNews,
   matchContacts,
   previewSong,
   reportUser,
@@ -24,6 +26,7 @@ import {
 } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
+import type { News } from "@/lib/data";
 import type { Core, Friend, Post, Profile } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
@@ -38,6 +41,9 @@ export type GlobeApi = {
   loadCore(userId: string): Promise<Core | null>;
   report(input: { reportedId: string; postId?: string | null; reason: ReportReason; note?: string }): Promise<{ error?: string }>;
   block(profileId: string): Promise<{ error?: string }>;
+  hideSongs(profileId: string, hide: boolean): Promise<{ error?: string }>;
+  // what's new since the Globe opened; the demo has nothing new
+  news?(): Promise<News | null>;
   // Spotify Connect, for people who linked Spotify. The demo has none.
   spotify?: SpotifyConnect;
 };
@@ -61,6 +67,8 @@ export const serverApi: GlobeApi = {
   loadCore,
   report: reportUser,
   block: blockUser,
+  hideSongs,
+  news: loadNews,
   spotify: { play: spotifyPlay, playAll: spotifyPlayAll, next: spotifyNext, pause: spotifyPause, resume: spotifyResume, now: spotifyNow },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();

@@ -216,7 +216,15 @@ function Globe({
   const [friends, setFriends] = useState(initialFriends);
   const [addedMe, setAddedMe] = useState(initialAddedMe);
   const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
-  const newAdds = addedMe.filter((p) => p.added_at > seen).length;
+  // what's new since you last opened My friends: people who added you or
+  // added you back, and new songs
+  const seenAt = seen === "~" ? Infinity : Date.parse(seen) || 0;
+  const [seenBefore, setSeenBefore] = useState(seenAt);
+  const afterFeat = useRef<(() => void) | null>(null); // runs once the song view has closed
+  const fresh = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenAt;
+  const newCount =
+    addedMe.filter((p) => fresh(p.added_at)).length +
+    friends.filter((f) => fresh(f.followed_back_at) || (!f.hidden && fresh(f.post?.created_at))).length;
   const [myPost, setMyPost] = useState(initialPost);
   const [mySongs, setMySongs] = useState(initialSongs);
   const [redoUsed, setRedoUsed] = useState(initialRedo);
@@ -235,7 +243,7 @@ function Globe({
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
   const L = layoutFor(size?.w ?? 390, size?.h ?? 844);
-  const keys = useMemo(() => [...friends.map((_, i) => i), ME], [friends]);
+  const keys = useMemo(() => [...friends.flatMap((f, i) => (f.hidden ? [] : [i])), ME], [friends]);
   // Tiles share the globe: a few songs get big tiles (up to 112px on a phone)
   // so it never feels empty, shrinking as more arrive, down to 64px, and only
   // past ~30 songs smaller still.
@@ -279,7 +287,7 @@ function Globe({
       live = false;
     };
   }, [beatUrl]);
-  const beamK = !playingPost ? -1 : playingPost.id === myPost?.id ? ME : friends.findIndex((f) => f.post?.id === playingPost.id);
+  const beamK = !playingPost ? -1 : playingPost.id === myPost?.id ? ME : friends.findIndex((f) => !f.hidden && f.post?.id === playingPost.id);
   const beam: Beam =
     beamK === -1
       ? null
@@ -512,6 +520,8 @@ function Globe({
         if (!s.featOpen && s.fp === 0) {
           s.featOn = false;
           setFeat(null);
+          afterFeat.current?.();
+          afterFeat.current = null;
         }
       }
       if (s.launch !== null) {
@@ -722,9 +732,56 @@ function Globe({
     return null;
   };
 
+  // Every couple of minutes, and whenever you come back to the app, check for
+  // new songs and people, so the My friends count stays current.
+  useEffect(() => {
+    const news = api.news;
+    if (!news) return;
+    let last = Date.now();
+    const check = () => {
+      if (document.hidden) return;
+      last = Date.now();
+      news().then((n) => {
+        if (!n) return;
+        const byUser = new Map(n.posts.map((p) => [p.user_id, p]));
+        setFriends((list) =>
+          list.map((f) => ({ ...f, post: byUser.get(f.id) ?? f.post, followed_back_at: n.backAt[f.id] ?? f.followed_back_at })),
+        );
+        setAddedMe(n.addedMe);
+      });
+    };
+    const t = setInterval(check, 120_000);
+    const back = () => !document.hidden && Date.now() - last > 30_000 && check();
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [api]);
+
+  // Hide someone's songs from your globe (their tile leaves once the song
+  // view has closed), or bring them back.
+  const setHidden = async (f: Friend, hide: boolean) => {
+    const r = await api.hideSongs(f.id, hide);
+    if (r.error) return r.error;
+    const k = friends.findIndex((x) => x.id === f.id);
+    const apply = () => setFriends((list) => list.map((x) => (x.id === f.id ? { ...x, hidden: hide } : x)));
+    if (hide && m.current.featOn) {
+      afterFeat.current = apply;
+      closeFeat();
+    } else {
+      if (!hide) m.current.born.set(k, m.current.t);
+      apply();
+    }
+    return null;
+  };
+
   const openTab = (name: PanelName) => {
     if (panel === name && panelOn) return closePanel();
-    if (name === "friends" && addedMe.length) seenStore.set(addedMe[0].added_at); // newest first
+    if (name === "friends") {
+      setSeenBefore(seenAt);
+      seenStore.set(new Date().toISOString());
+    }
     setPanel(name);
     setPanelOn(true);
   };
@@ -761,7 +818,7 @@ function Globe({
   const featTz = feat === ME ? me.timezone : feat !== null ? friends[feat]?.timezone ?? "UTC" : "UTC";
   const posted = landed && !!myPost;
   const shuffleSongs = useMemo(
-    () => [...friends.flatMap((f) => (f.post ? [f.post] : [])), ...(myPost && landed ? [myPost] : [])],
+    () => [...friends.flatMap((f) => (f.post && !f.hidden ? [f.post] : [])), ...(myPost && landed ? [myPost] : [])],
     [friends, myPost, landed],
   );
   // the Globe turns to whichever song shuffle is playing
@@ -947,12 +1004,12 @@ function Globe({
             style={{ height, ...glass(darkOn), ...activeTab(name) }}
           >
             <TabIcon name={name} />
-            {name === "friends" && newAdds > 0 && (
+            {name === "friends" && newCount > 0 && (
               <span
-                aria-label={`${newAdds} new`}
+                aria-label={`${newCount} new`}
                 className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
               >
-                {newAdds}
+                {newCount}
               </span>
             )}
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
@@ -1001,7 +1058,9 @@ function Globe({
             <FriendsPanel
               friends={friends}
               addedMe={addedMe}
+              seenBefore={seenBefore}
               onAddBack={onAddBack}
+              onShow={(f) => setHidden(f, false)}
               onOpen={fly}
               onSpin={(k) => {
                 m.current.moved = false;
@@ -1049,6 +1108,7 @@ function Globe({
           onCore={() => openCore(feat === ME ? null : feat)}
           api={api}
           onBlocked={() => window.location.reload()}
+          onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
           rootRef={(el) => void (R.current.feat = el)}
           backdropRef={(el) => void (R.current.featBack = el)}
           cardRef={(el) => void (R.current.featCard = el)}

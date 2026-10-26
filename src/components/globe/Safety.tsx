@@ -21,6 +21,7 @@ export function Safety({
   userId,
   postId,
   onBlocked,
+  onHide,
   onDone,
 }: {
   api: GlobeApi;
@@ -28,6 +29,7 @@ export function Safety({
   userId: string;
   postId?: string | null;
   onBlocked(): void;
+  onHide?: () => Promise<string | null>; // hide their songs from your globe
   onDone(): void;
 }) {
   const [step, setStep] = useState<"menu" | "report" | "block" | "sent">("menu");
@@ -46,6 +48,14 @@ export function Safety({
     if (r.error) setError(r.error);
     else setStep("sent");
   };
+  const hide = async () => {
+    if (!onHide) return;
+    setBusy(true);
+    setError(null);
+    const e = await onHide();
+    setBusy(false);
+    if (e) setError(e);
+  };
   const block = async () => {
     setBusy(true);
     setError(null);
@@ -62,7 +72,16 @@ export function Safety({
     <div className="rise-in flex h-full flex-col gap-3 text-card-ink">
       {step === "menu" && (
         <>
-          <div className="display text-xl">Something wrong?</div>
+          <div className="display text-xl">{onHide ? "Not your vibe?" : "Something wrong?"}</div>
+          {onHide && (
+            <button type="button" onClick={hide} disabled={busy} className={`${option} disabled:opacity-60`}>
+              <HideIcon />
+              <span className="flex flex-col">
+                <span className="text-sm font-semibold">Hide {first}&apos;s songs</span>
+                <span className="text-xs text-muted">Still friends, just off your globe. {first} won&apos;t know.</span>
+              </span>
+            </button>
+          )}
           <button type="button" onClick={() => setStep("report")} className={option}>
             <FlagIcon />
             <span className="flex flex-col">
@@ -77,6 +96,7 @@ export function Safety({
               <span className="text-xs text-muted">You&apos;ll vanish from each other&apos;s globes.</span>
             </span>
           </button>
+          {error && <p className="text-xs text-accent-deep">{error}</p>}
           <button type="button" onClick={onDone} className="mt-auto text-xs font-semibold text-muted">
             Never mind
           </button>
@@ -169,6 +189,11 @@ export const MoreIcon = () => (
 const FlagIcon = () => (
   <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D7262B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+  </svg>
+);
+const HideIcon = () => (
+  <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c5 0 8.5 4.5 9.5 7a13 13 0 0 1-2.7 3.9M6.1 6.6A13 13 0 0 0 2.5 12c1 2.5 4.5 7 9.5 7a9.6 9.6 0 0 0 4.4-1.1M9.9 9.9a3 3 0 0 0 4.2 4.2" />
   </svg>
 );
 const BlockIcon = () => (

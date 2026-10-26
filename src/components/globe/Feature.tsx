@@ -26,6 +26,7 @@ export function Feature({
   onCore,
   api,
   onBlocked,
+  onHide,
   rootRef,
   backdropRef,
   cardRef,
@@ -43,6 +44,7 @@ export function Feature({
   onCore(): void;
   api: GlobeApi;
   onBlocked(): void;
+  onHide?: () => Promise<string | null>;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
   cardRef: Ref<HTMLDivElement>;
@@ -77,7 +79,7 @@ export function Feature({
               <button
                 type="button"
                 onClick={() => setFlagging((f) => !f)}
-                aria-label="Report or block"
+                aria-label="More"
                 aria-expanded={flagging}
                 className="flex h-11 w-11 items-center justify-center text-card-ink"
               >
@@ -110,6 +112,7 @@ export function Feature({
                 userId={post.user_id}
                 postId={post.id}
                 onBlocked={onBlocked}
+                onHide={onHide}
                 onDone={() => setFlagging(false)}
               />
             </div>
