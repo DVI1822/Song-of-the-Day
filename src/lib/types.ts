@@ -40,3 +40,12 @@ export type Core = {
   followers: number;
   following: number;
 };
+
+// A note left on a song, with who left it.
+export type Note = { id: string; post_id: string; body: string; created_at: string; user: Profile };
+
+// Who felt a song, and the notes on it.
+export type Reactions = { feels: { user: Profile; created_at: string }[]; notes: Note[] };
+
+// Something someone did on your song today: felt it, or left a note.
+export type Activity = { kind: "feel" | "note"; id: string; at: string; user: Profile; body?: string };

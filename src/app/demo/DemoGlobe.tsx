@@ -3,7 +3,7 @@
 import type { GlobeApi } from "@/components/globe/api";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { addDays, todayIn } from "@/lib/day";
-import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Note, Post, Profile, Reactions } from "@/lib/types";
 
 // The Globe with made-up friends. Works without signing in; nothing is saved.
 
@@ -110,6 +110,38 @@ const FRIENDS: Friend[] = NAMES.map((name, i) => ({
 }));
 const MY_SONGS = history("u0", 0, 40);
 
+// Feels and notes on friends' songs: a few made up per song, plus whatever
+// you do in the demo (kept until the page reloads).
+const NOTE_LINES = [
+  "this one hits every time",
+  "ok adding this to my morning playlist",
+  "the bridge!!",
+  "you always find these first",
+  "on repeat since you posted it",
+];
+const reactions = new Map<string, Reactions>();
+function reactionsOf(postId: string): Reactions {
+  let r = reactions.get(postId);
+  if (!r) {
+    const seed = [...postId].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const by = (j: number) => FRIENDS[(seed + j * 5) % FRIENDS.length];
+    const feels = Array.from({ length: 2 + (seed % 6) }, (_, j) => ({
+      user: by(j),
+      created_at: new Date(now.getTime() - (j + 1) * 1_500_000).toISOString(),
+    }));
+    const notes: Note[] = Array.from({ length: seed % 3 }, (_, j) => ({
+      id: `${postId}-n${j}`,
+      post_id: postId,
+      body: NOTE_LINES[(seed + j) % NOTE_LINES.length],
+      created_at: new Date(now.getTime() - (3 - j) * 2_400_000).toISOString(),
+      user: by(j + 2),
+    }));
+    r = { feels, notes };
+    reactions.set(postId, r);
+  }
+  return r;
+}
+
 const demoApi: GlobeApi = {
   async previewSong() {
     await new Promise((r) => setTimeout(r, 1100));
@@ -174,6 +206,27 @@ const demoApi: GlobeApi = {
     await new Promise((r) => setTimeout(r, 300));
     return {};
   },
+  async reactions(postId) {
+    await new Promise((r) => setTimeout(r, 250));
+    const r = reactionsOf(postId);
+    return { feels: [...r.feels], notes: [...r.notes] };
+  },
+  async feel(postId, on) {
+    const r = reactionsOf(postId);
+    r.feels = r.feels.filter((f) => f.user.id !== ME.id);
+    if (on) r.feels.unshift({ user: ME, created_at: new Date().toISOString() });
+    return {};
+  },
+  async addNote(postId, body) {
+    await new Promise((r) => setTimeout(r, 300));
+    const note: Note = { id: `${postId}-${Date.now()}`, post_id: postId, body: body.trim(), created_at: new Date().toISOString(), user: ME };
+    reactionsOf(postId).notes.push(note);
+    return { note };
+  },
+  async deleteNote(noteId) {
+    for (const r of reactions.values()) r.notes = r.notes.filter((n) => n.id !== noteId);
+    return {};
+  },
   async loadCore(id) {
     const f = FRIENDS.find((x) => x.id === id);
     const p = f ?? profile(Number(id.slice(1)), POOL[Number(id.slice(1)) - 100] ?? "Friend");
@@ -189,8 +242,24 @@ const ADDED_ME: AddedMe[] = [0, 1].map((j) => ({
   added_at: new Date(Date.now() - (j + 1) * 3_600_000).toISOString(),
 }));
 
+// Someone felt your song and someone left a note, for "On your song".
+const ACTIVITY: Activity[] = [
+  { kind: "note", id: "a1", at: new Date(now.getTime() - 600_000).toISOString(), user: FRIENDS[4], body: "this is exactly my monday" },
+  { kind: "feel", id: "a2", at: new Date(now.getTime() - 1_200_000).toISOString(), user: FRIENDS[9] },
+  { kind: "feel", id: "a3", at: new Date(now.getTime() - 2_400_000).toISOString(), user: FRIENDS[1] },
+];
+
 export function DemoGlobe() {
   return (
-    <GlobeApp me={ME} myPost={null} friends={FRIENDS} mySongs={MY_SONGS} redoUsed={false} addedMe={ADDED_ME} api={demoApi} />
+    <GlobeApp
+      me={ME}
+      myPost={null}
+      friends={FRIENDS}
+      mySongs={MY_SONGS}
+      redoUsed={false}
+      addedMe={ADDED_ME}
+      activity={ACTIVITY}
+      api={demoApi}
+    />
   );
 }

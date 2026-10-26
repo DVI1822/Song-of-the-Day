@@ -2,18 +2,21 @@
 
 import { useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
-import type { Post } from "@/lib/types";
+import type { Post, Profile } from "@/lib/types";
 import { Magma } from "./Magma";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
+import { NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon, coverRadius } from "./ui";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
-// a place to report the song or block them.
+// a place to report the song or block them. Beside the title: feel it, and
+// the notes people left.
 export function Feature({
   post,
+  me,
   who,
   timeZone,
   cover,
@@ -32,6 +35,7 @@ export function Feature({
   cardRef,
 }: {
   post: Post;
+  me: Profile;
   who: string;
   timeZone: string;
   cover: number;
@@ -54,6 +58,21 @@ export function Feature({
   const face = "absolute inset-0 overflow-hidden backface-hidden";
   const [flagging, setFlagging] = useState(false);
   const mine = who === "You";
+  const [r, setR] = useReactions(api, post.id);
+  const [notesOpen, setNotesOpen] = useState(false);
+
+  // feel it, or take it back, straight away; undone if it doesn't stick
+  const feel = async () => {
+    if (!r || mine) return;
+    const on = !r.feels.some((f) => f.user.id === me.id);
+    const before = r;
+    setR({
+      ...r,
+      feels: on ? [{ user: me, created_at: new Date().toISOString() }, ...r.feels] : r.feels.filter((f) => f.user.id !== me.id),
+    });
+    const res = await api.feel(post.id, on);
+    if (res.error) setR(before);
+  };
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
@@ -166,9 +185,12 @@ export function Feature({
             </div>
           </button>
         )}
-        <div className="relative flex flex-col gap-[3px]">
-          <div className="display text-[26px] leading-tight text-card-ink">{post.title}</div>
-          <div className="text-[15px] text-muted">{[post.artist, post.album].filter(Boolean).join(" · ")}</div>
+        <div className="relative flex items-start gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+            <div className="display text-[26px] leading-tight text-card-ink">{post.title}</div>
+            <div className="text-[15px] text-muted">{[post.artist, post.album].filter(Boolean).join(" · ")}</div>
+          </div>
+          <ReactionButtons r={r} mine={mine} meId={me.id} onFeel={feel} onNotes={() => setNotesOpen(true)} />
         </div>
         <div className="relative">
           <SongPlayer
@@ -187,6 +209,18 @@ export function Feature({
           />
         </div>
       </div>
+      {notesOpen && (
+        <NotesSheet
+          api={api}
+          post={post}
+          r={r}
+          setR={setR}
+          meId={me.id}
+          mine={mine}
+          who={who}
+          onClose={() => setNotesOpen(false)}
+        />
+      )}
     </div>
   );
 }

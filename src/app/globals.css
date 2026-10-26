@@ -85,6 +85,30 @@ body {
   animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
+/* feeling a song: the drop swells with magma and a ring ripples out */
+@keyframes feel-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  55% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes feel-ring {
+  from {
+    opacity: 0.7;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
 @keyframes panel-in {
   from {
     opacity: 0;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
-import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
 import { Magma } from "./Magma";
@@ -22,6 +22,8 @@ const Kicker = ({ children }: { children: React.ReactNode }) => (
 export function FriendsPanel({
   friends,
   addedMe,
+  activity,
+  onMine,
   seenBefore,
   onAddBack,
   onShow,
@@ -32,6 +34,8 @@ export function FriendsPanel({
 }: {
   friends: Friend[];
   addedMe: AddedMe[];
+  activity: Activity[];
+  onMine(): void; // open your song
   seenBefore: number; // when you last looked, in ms
   onAddBack(p: AddedMe): Promise<string | null>;
   onShow(f: Friend): Promise<string | null>;
@@ -49,12 +53,17 @@ export function FriendsPanel({
   const back = all.filter((x) => isNew(x.f.followed_back_at)).sort((a, b) => b.f.followed_back_at!.localeCompare(a.f.followed_back_at!));
   const hidden = all.filter((x) => x.f.hidden).sort(byName);
 
-  const added = addedMe.length > 0 && <AddedYou people={addedMe} isNew={isNew} onAddBack={onAddBack} onCore={onCore} />;
+  const added = (
+    <>
+      {activity.length > 0 && <OnYourSong activity={activity} isNew={isNew} onMine={onMine} />}
+      {addedMe.length > 0 && <AddedYou people={addedMe} isNew={isNew} onAddBack={onAddBack} onCore={onCore} />}
+    </>
+  );
 
   if (!friends.length)
     return (
       <div className="flex flex-1 flex-col items-start gap-3 overflow-y-auto px-[18px] pt-2">
-        {added && <div className="-mx-2 self-stretch">{added}</div>}
+        {(activity.length > 0 || addedMe.length > 0) && <div className="-mx-2 self-stretch">{added}</div>}
         <div className="text-sm text-muted">No one on your globe yet.</div>
         <button type="button" onClick={onFind} className="h-10 rounded-full bg-accent px-4 text-[13px] font-semibold text-white">
           Find a friend
@@ -79,7 +88,7 @@ export function FriendsPanel({
               <Avatar name={f.display_name} />
               <div className="flex min-w-0 flex-1 flex-col gap-px">
                 <div className="truncate text-sm font-semibold">{f.display_name}</div>
-                <div className="truncate text-[11px] text-muted">added you back · {formatTime(f.followed_back_at!, f.timezone)}</div>
+                <div className="truncate text-[11px] text-muted">added you back · {formatTime(f.followed_back_at!, localZone())}</div>
               </div>
               <NewDot />
             </button>
@@ -132,6 +141,46 @@ export function FriendsPanel({
         </div>
       ))}
       {hidden.length > 0 && <Hidden people={hidden.map((x) => x.f)} onShow={onShow} onCore={onCore} />}
+    </div>
+  );
+}
+
+// Feels and notes on your song today, newest first.
+function OnYourSong({ activity, isNew, onMine }: { activity: Activity[]; isNew(at: string): boolean; onMine(): void }) {
+  const feels = activity.filter((a) => a.kind === "feel").length,
+    notes = activity.length - feels;
+  return (
+    <div className="pb-2.5">
+      <Kicker>
+        On your song · {feels} {feels === 1 ? "feel" : "feels"}
+        {notes > 0 && `, ${notes} ${notes === 1 ? "note" : "notes"}`}
+      </Kicker>
+      {activity.slice(0, 12).map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          onClick={onMine}
+          className="flex min-h-[50px] w-full items-center gap-3 rounded-[14px] px-2 py-1.5 text-left hover:bg-card-ink/5"
+        >
+          <span className="relative flex-none">
+            <Avatar name={a.user.display_name} />
+            {a.kind === "feel" && (
+              <span className="absolute -bottom-1 -right-1 h-[15px] w-[15px]">
+                <Magma className="h-full w-full" />
+              </span>
+            )}
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-px">
+            <div className="truncate text-sm">
+              <span className="font-semibold">{a.user.display_name}</span>
+              {a.kind === "feel" ? " felt it" : " left a note"}
+            </div>
+            {a.body && <div className="line-clamp-2 text-[12px] leading-snug text-muted">“{a.body}”</div>}
+          </div>
+          <div className="flex-none text-[10px] text-muted">{formatTime(a.at, localZone())}</div>
+          {isNew(a.at) && <NewDot />}
+        </button>
+      ))}
     </div>
   );
 }
@@ -211,6 +260,9 @@ const CoreButton = ({ name, onClick }: { name: string; onClick(): void }) => (
     <Magma className="h-[18px] w-[18px] drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
   </button>
 );
+
+// times of things done to you read in your own clock
+const localZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const NewDot = () => <span aria-hidden className="h-2 w-2 flex-none rounded-full bg-accent" />;
 
