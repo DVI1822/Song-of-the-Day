@@ -4,6 +4,7 @@ import { CoreOrb } from "@/components/CoreOrb";
 import { LegalLinks } from "@/components/Legal";
 import { buttonClass } from "@/components/Shell";
 import type { Post, Profile } from "@/lib/types";
+import { PlayToday } from "./PlayToday";
 
 // Where an invite link lands: the inviter's songs circling their core, a
 // little globe with an empty spot waiting for you.
@@ -93,13 +94,14 @@ export function JoinView({
         {today && !mine && (
           <div className="mt-5 flex w-full max-w-[300px] items-center gap-3 rounded-[22px] border border-line bg-white/70 p-2.5 text-left backdrop-blur">
             <Artwork src={today.artwork_url} alt="" className="h-12 w-12 flex-none rounded-[13px]" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                 {first}&apos;s song today
               </div>
               <div className="truncate text-sm font-semibold">{today.title}</div>
               <div className="truncate text-xs text-muted">{today.artist}</div>
             </div>
+            {today.preview_url && <PlayToday src={today.preview_url} title={today.title} />}
           </div>
         )}
 
