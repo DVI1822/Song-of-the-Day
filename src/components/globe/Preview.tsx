@@ -39,9 +39,9 @@ type PreviewState = {
   // the Globe shows its own player bar, so the mini player steps aside
   docked: boolean;
   setDocked(on: boolean): void;
-  // how far into what's playing we are, in seconds; exact when it's the
-  // 30-second preview itself (so its beat can be followed)
-  playhead(): { t: number; exact: boolean };
+  // how far into the 30-second preview we are, while it's what's playing (so
+  // its beat can be followed); null for a whole song, which the site can't hear
+  clipTime(): number | null;
 };
 const Ctx = createContext<PreviewState | null>(null);
 export const SHUFFLE = "shuffle";
@@ -70,8 +70,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const [embedShown, setEmbedShown] = useState(false);
   const [shuffle, setShuffle] = useState<ShuffleState | null>(null);
   const [docked, setDocked] = useState(false);
-  const startedAt = useRef(0);
-  const embedAt = useRef<{ position: number; playing: boolean; stamp: number } | null>(null);
 
   useEffect(() => {
     const a = new Audio();
@@ -96,7 +94,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     other.current?.();
     other.current = null;
     controls.current = null;
-    embedAt.current = null;
     setEmbedShown(false);
   }, []);
 
@@ -111,7 +108,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const claim = useCallback<PreviewState["claim"]>(
     (k, stopIt, t) => {
       silence();
-      startedAt.current = performance.now();
       other.current = stopIt;
       controls.current = t?.controls ?? null;
       setAt(0);
@@ -127,7 +123,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
       const a = audio.current;
       if (!a) return;
       silence();
-      startedAt.current = performance.now();
       ended.current = onEnd ?? null;
       controls.current = { pause: () => a.pause(), resume: () => void a.play() };
       a.src = url;
@@ -162,7 +157,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
             c.addListener("playback_update", (e) => {
               const { isPaused, position, duration } = e.data;
               setEmbed({ uri, playing: !isPaused, position, duration });
-              embedAt.current = { position, playing: !isPaused, stamp: performance.now() };
               setTrack((t) => (t?.kind === "embed" && spotifyUriOf(t.post) === uri ? { ...t, paused: isPaused } : t));
               if (!isPaused) setEmbedShown(false);
             });
@@ -256,12 +250,9 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(t);
   }, [whole, connect]);
 
-  const playhead = useCallback(() => {
+  const clipTime = useCallback(() => {
     const a = audio.current;
-    if (a?.src && !a.paused) return { t: a.currentTime, exact: true };
-    const e = embedAt.current;
-    if (e?.playing) return { t: (e.position + performance.now() - e.stamp) / 1000, exact: false };
-    return { t: (performance.now() - startedAt.current) / 1000, exact: false };
+    return a?.src && !a.paused ? a.currentTime : null;
   }, []);
 
   return (
@@ -286,7 +277,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
         shuffleToggle,
         docked,
         setDocked,
-        playhead,
+        clipTime,
       }}
     >
       {children}

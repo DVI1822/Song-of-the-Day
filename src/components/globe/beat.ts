@@ -1,13 +1,11 @@
 // A song's beat, heard from its 30-second preview. Spotify doesn't share
 // tempo or audio with apps any more, so the Globe listens for itself: the
 // preview is fetched through our own server (so the browser may read it),
-// decoded, and its loudness swings give the tempo and where the beats fall.
+// decoded, and the sharp rises in its loudness show where the hits land.
 
 export type Beat = {
-  period: number; // seconds per beat
-  phase: number; // seconds into the preview of the first beat
-  hop: number; // seconds per envelope step
-  env: Float32Array; // loudness through the preview, 0..1
+  hop: number; // seconds per step
+  pulse: Float32Array; // how hard the music is hitting at each step, 0..1
 };
 
 const cache = new Map<string, Promise<Beat | null>>();
@@ -35,82 +33,77 @@ async function listen(url: string): Promise<Beat | null> {
 }
 
 export function analyze(data: Float32Array, sr: number): Beat | null {
-  // loudness every ~12ms, and how sharply it rises (where the hits are)
+  // the hits: how sharply the loudness rises every ~12ms, listening mostly
+  // to the low end (kick and bass), where a song's beat lives
   const win = Math.round(sr * 0.046),
     step = Math.round(sr * 0.0116);
   const n = Math.floor((data.length - win) / step);
   if (n < 200) return null;
   const hop = step / sr;
-  const env = new Float32Array(n),
-    onset = new Float32Array(n);
-  let prev = 0,
-    peak = 1e-9;
+  const low = new Float32Array(data.length);
+  const k = 1 - Math.exp((-2 * Math.PI * 160) / sr);
+  for (let i = 0, y = 0; i < data.length; i++) low[i] = y += k * (data[i] - y);
+  const onset = new Float32Array(n);
+  let pl = 0,
+    pa = 0;
   for (let i = 0; i < n; i++) {
-    let e = 0;
-    for (let j = i * step, end = j + win; j < end; j++) e += data[j] * data[j];
-    const l = Math.log1p(1000 * Math.sqrt(e / win));
-    env[i] = l;
-    onset[i] = Math.max(0, l - prev);
-    prev = l;
-    if (l > peak) peak = l;
+    let el = 0,
+      ea = 0;
+    for (let j = i * step, end = j + win; j < end; j++) {
+      el += low[j] * low[j];
+      ea += data[j] * data[j];
+    }
+    const l = Math.log1p(1000 * Math.sqrt(el / win)),
+      a = Math.log1p(1000 * Math.sqrt(ea / win));
+    onset[i] = i ? 0.7 * Math.max(0, l - pl) + 0.3 * Math.max(0, a - pa) : 0;
+    pl = l;
+    pa = a;
   }
-  for (let i = 0; i < n; i++) env[i] /= peak;
+
+  // only the real hits count: anything below the song's usual murmur is
+  // dropped, and the biggest hits reach full strength
+  const sorted = Float32Array.from(onset).sort();
+  const floor = sorted[Math.floor(n * 0.6)],
+    top = sorted[Math.floor(n * 0.97)];
+  if (top <= floor) return null;
+  const hits = onset.map((o) => Math.min(1, Math.max(0, (o - floor) / (top - floor))));
 
   // the tempo: the beat length (70 to 180 a minute) at which the hits line up
-  // best with themselves, nudged towards a natural ~120, then refined between
-  // steps so it holds over the whole song
+  // best with themselves. When it's clear, hits on the beat count fully and
+  // stray ones (a vocal, a fill) only a little.
   const lo = Math.round(60 / 180 / hop),
     hi = Math.round(60 / 70 / hop);
-  const score = new Float32Array(hi + 2);
-  for (let L = lo - 1; L <= hi + 1; L++) {
-    let c = 0;
-    for (let i = L; i < n; i++) c += onset[i] * onset[i - L];
-    score[L] = c;
-  }
   let best = 0,
-    lag = 0;
+    lag = 0,
+    sum = 0;
   for (let L = lo; L <= hi; L++) {
-    const bpm = 60 / (L * hop);
-    const c = score[L] * Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 0.9, 2));
+    let c = 0;
+    for (let i = L; i < n; i++) c += hits[i] * hits[i - L];
+    sum += c;
     if (c > best) {
       best = c;
       lag = L;
     }
   }
-  if (!lag) return null;
-  // a beat that lines up just as well at half the length is the real one
-  const h0 = Math.floor(lag / 2),
-    h1 = Math.ceil(lag / 2),
-    halfL = score[h0] >= score[h1] ? h0 : h1;
-  if (halfL >= lo && score[halfL] >= 0.7 * score[lag]) lag = halfL;
-  const [a, b, c] = [score[lag - 1], score[lag], score[lag + 1]];
-  const P = lag + (a - c !== 0 && 2 * b - a - c > 0 ? (0.5 * (a - c)) / (a - 2 * b + c) : 0);
-
-  // where the beats fall: the offset whose every beat lands on a hit
-  let bestO = 0,
-    off = 0;
-  for (let o = 0; o < P; o += 0.25) {
-    let sum = 0;
-    for (let x = o; x < n - 1; x += P) {
-      const i = Math.floor(x),
-        f = x - i;
-      sum += onset[i] * (1 - f) + onset[i + 1] * f;
-    }
-    if (sum > bestO) {
-      bestO = sum;
-      off = o;
+  if (lag > 0 && best > 1.6 * (sum / (hi - lo + 1))) {
+    // a hit counts fully when another sits about a beat before or after it
+    const heard = Float32Array.from(hits);
+    for (let i = 0; i < n; i++) {
+      let near = 0;
+      for (let j = -2; j <= 2; j++) near = Math.max(near, heard[i - lag + j] ?? 0, heard[i + lag + j] ?? 0);
+      hits[i] = heard[i] * (0.3 + 0.7 * Math.min(1, near * 1.5));
     }
   }
-  return { period: P * hop, phase: off * hop, hop, env };
+
+  // a hit flares at once and fades over a fifth of a second
+  const pulse = new Float32Array(n);
+  const fade = Math.exp(-hop / 0.2);
+  for (let i = 0, p = 0; i < n; i++) pulse[i] = p = Math.max(hits[i], p * fade);
+  return { hop, pulse };
 }
 
-// How hard the beat is hitting at time t (0..1). With the preview itself
-// playing, t is the preview's own clock and the pulse follows its loudness
-// too; for a whole song the pulse keeps the tempo.
-export function pulseAt(b: Beat, t: number, exact: boolean) {
-  const u = (((t - b.phase) / b.period) % 1 + 1) % 1;
-  const kick = Math.exp(-u * 5);
-  if (!exact) return kick;
-  const i = Math.min(b.env.length - 1, Math.max(0, Math.round(t / b.hop)));
-  return 0.55 * kick + 0.45 * b.env[i] * b.env[i];
+// How hard the song is hitting at time t (0..1), on the preview's own clock.
+export function pulseAt(b: Beat, t: number) {
+  const i = Math.round(t / b.hop);
+  return i >= 0 && i < b.pulse.length ? b.pulse[i] : 0;
 }
