@@ -49,3 +49,13 @@ export type Reactions = { feels: { user: Profile; created_at: string }[]; notes:
 
 // Something someone did on your song today: felt it, or left a note.
 export type Activity = { kind: "feel" | "note"; id: string; at: string; user: Profile; body?: string };
+
+// Something said in the globe chat (to_id null), or to one person.
+export type Message = {
+  id: string;
+  user_id: string;
+  to_id: string | null;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+};
