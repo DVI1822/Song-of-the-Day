@@ -16,7 +16,7 @@ export default async function Home() {
   if (!userId) return <Landing />;
   if (!profile) redirect("/welcome");
 
-  const [{ friends, myPost, mySongs, redoUsed, addedMe }, { data: spotify }] = await Promise.all([
+  const [{ friends, myPost, mySongs, redoUsed, addedMe, activity }, { data: spotify }] = await Promise.all([
     getGlobe(profile),
     supabase.from("spotify_links").select("user_id").eq("user_id", userId).maybeSingle(),
   ]);
@@ -28,6 +28,7 @@ export default async function Home() {
       mySongs={mySongs}
       redoUsed={redoUsed}
       addedMe={addedMe}
+      activity={activity}
       spotifyLinked={Boolean(spotify)}
     />
   );

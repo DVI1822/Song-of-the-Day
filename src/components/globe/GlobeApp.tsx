@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -39,6 +39,7 @@ type Props = {
   mySongs: Post[];
   redoUsed: boolean;
   addedMe?: AddedMe[];
+  activity?: Activity[]; // feels and notes on your song today
   spotifyLinked?: boolean;
   api?: GlobeApi;
 };
@@ -208,6 +209,7 @@ function Globe({
   mySongs: initialSongs,
   redoUsed: initialRedo,
   addedMe: initialAddedMe = [],
+  activity: initialActivity = [],
   api = serverApi,
 }: Props) {
   // Songs keep playing as you move around; only pausing or starting another stops them.
@@ -215,15 +217,17 @@ function Globe({
   const shuffleNow = pv.shuffle?.now ?? null;
   const [friends, setFriends] = useState(initialFriends);
   const [addedMe, setAddedMe] = useState(initialAddedMe);
+  const [activity, setActivity] = useState(initialActivity);
   const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
   // what's new since you last opened My friends: people who added you or
-  // added you back, and new songs
+  // added you back, new songs, and feels and notes on your song
   const seenAt = seen === "~" ? Infinity : Date.parse(seen) || 0;
   const [seenBefore, setSeenBefore] = useState(seenAt);
   const afterFeat = useRef<(() => void) | null>(null); // runs once the song view has closed
   const fresh = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenAt;
   const newCount =
     addedMe.filter((p) => fresh(p.added_at)).length +
+    activity.filter((a) => fresh(a.at)).length +
     friends.filter((f) => fresh(f.followed_back_at) || (!f.hidden && fresh(f.post?.created_at))).length;
   const [myPost, setMyPost] = useState(initialPost);
   const [mySongs, setMySongs] = useState(initialSongs);
@@ -770,6 +774,7 @@ function Globe({
           list.map((f) => ({ ...f, post: byUser.get(f.id) ?? f.post, followed_back_at: n.backAt[f.id] ?? f.followed_back_at })),
         );
         setAddedMe(n.addedMe);
+        setActivity(n.activity);
       });
     };
     const t = setInterval(check, 120_000);
@@ -1080,6 +1085,8 @@ function Globe({
             <FriendsPanel
               friends={friends}
               addedMe={addedMe}
+              activity={activity}
+              onMine={() => myPost && landed && fly(ME)}
               seenBefore={seenBefore}
               onAddBack={onAddBack}
               onShow={(f) => setHidden(f, false)}
@@ -1119,7 +1126,9 @@ function Globe({
 
       {feat !== null && featPost && (
         <Feature
+          key={featPost.id}
           post={featPost}
+          me={me}
           who={featWho}
           timeZone={featTz}
           cover={L.cover}

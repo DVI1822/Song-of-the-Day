@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCore, getNews, getSession, type News } from "@/lib/data";
+import { getCore, getNews, getReactions, getSession, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
-import type { Core, Friend, Post, Profile } from "@/lib/types";
+import type { Core, Friend, Note, Post, Profile, Reactions } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
 import { INVITE_COOKIE, cleanInvite } from "@/lib/invite";
 import { accessToken, spotifyApi } from "@/lib/spotify";
@@ -261,6 +261,46 @@ export async function hideSongs(profileId: string, hide: boolean): Promise<{ err
   if (error && error.code !== "23505") return { error: "Couldn't change that. Try again." };
   revalidatePath("/", "layout");
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// Feels and notes on a song
+// ---------------------------------------------------------------------------
+
+export async function loadReactions(postId: string): Promise<Reactions | null> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return null;
+  return getReactions(supabase, postId);
+}
+
+export async function feelSong(postId: string, on: boolean): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "Sign in to feel songs." };
+  const { error } = on
+    ? await supabase.from("feels").insert({ post_id: postId })
+    : await supabase.from("feels").delete().eq("post_id", postId).eq("user_id", userId);
+  return error && error.code !== "23505" ? { error: "Couldn't do that. Try again." } : {};
+}
+
+export async function addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "Sign in to leave a note." };
+  const text = body.trim().slice(0, 200);
+  if (!text) return { error: "Write something first." };
+  const { data, error } = await supabase
+    .from("notes")
+    .insert({ post_id: postId, body: text })
+    .select("id, post_id, body, created_at, user:profiles!notes_user_id_fkey(*)")
+    .single();
+  if (error || !data) return { error: "Couldn't post that note. Try again." };
+  return { note: data as unknown as Note };
+}
+
+export async function deleteNote(noteId: string): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "Sign in first." };
+  const { error } = await supabase.from("notes").delete().eq("id", noteId);
+  return error ? { error: "Couldn't delete that note. Try again." } : {};
 }
 
 export async function loadNews(): Promise<News | null> {
