@@ -235,7 +235,8 @@ function Globe({
   const [feat, setFeat] = useState<number | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [compose, setCompose] = useState(false);
-  const [coreFor, setCoreFor] = useState<{ k: number | null } | null>(null);
+  // whose core we're in (null: yours), and their tile if they're on the globe
+  const [coreFor, setCoreFor] = useState<{ who: Profile | null; k: number | null } | null>(null);
   const [coreOpen, setCoreOpen] = useState(false);
   const [friendCore, setFriendCore] = useState<{ id: string; profile: Profile; posts: Post[] } | null>(null);
   const [darkOn, setDarkOn] = useState(false);
@@ -352,8 +353,15 @@ function Globe({
   );
 
   // Fly through the near side of the globe into someone's core.
+  // Anyone's core: yours (null), a friend's tile, or anyone else's.
   const openCore = useCallback(
-    (k: number | null) => {
+    (k: number | null, person?: Profile) => {
+      let who = person ?? (k === null || k === ME ? null : friends[k] ?? null);
+      if (who?.id === me.id) who = null;
+      if (person) {
+        const i = friends.findIndex((f) => f.id === person.id && !f.hidden);
+        k = i >= 0 ? i : null;
+      }
       const s = m.current;
       s.vel = 0;
       s.zoomTarget = 6.8;
@@ -363,11 +371,11 @@ function Globe({
       s.featFly = null;
       s.featOpen = false;
       s.target = null;
-      setCoreFor({ k });
+      setCoreFor({ who, k: k === ME ? null : k });
       setFocus(null);
       closePanel();
     },
-    [closePanel],
+    [closePanel, friends, me.id],
   );
 
   const closeCore = useCallback(() => {
@@ -400,23 +408,37 @@ function Globe({
     [fly, openCompose, spinTo],
   );
 
-  // Load the archive of whichever friend's core we're flying into.
-  const coreFriend = coreFor && coreFor.k !== null && coreFor.k !== ME ? friends[coreFor.k] : null;
+  // Load the archive of whoever's core we're flying into.
+  const coreWho = coreFor?.who ?? null;
   useEffect(() => {
-    if (!coreFriend) return;
+    if (!coreWho) return;
     let on = true;
-    api.loadCore(coreFriend.id).then((c) => on && c && setFriendCore({ id: coreFriend.id, profile: c.profile, posts: c.posts }));
+    api.loadCore(coreWho.id).then((c) => on && c && setFriendCore({ id: coreWho.id, profile: c.profile, posts: c.posts }));
     return () => {
       on = false;
     };
-  }, [coreFriend, api]);
+  }, [coreWho, api]);
   const coreData = !coreFor
     ? null
-    : coreFriend
-      ? friendCore?.id === coreFriend.id
+    : coreWho
+      ? friendCore?.id === coreWho.id
         ? friendCore
-        : { profile: coreFriend as Profile, posts: null }
+        : { profile: coreWho, posts: null }
       : { profile: me, posts: mySongs };
+  const coreAdded = !coreWho || friends.some((f) => f.id === coreWho.id);
+
+  // Add someone from inside their core; their tile joins the globe behind.
+  const addFromCore = async () => {
+    if (!coreWho) return null;
+    if (friends.length >= 90) return "Your globe is full.";
+    const r = await api.follow(coreWho.id);
+    if (!r.friend) return r.error ?? "Couldn't add them. Try again.";
+    m.current.born.set(friends.length, m.current.t);
+    setFriends((list) => [...list, r.friend!]);
+    setAddedMe((list) => list.filter((x) => x.id !== coreWho.id));
+    setCoreFor((c) => c && { ...c, k: friends.length });
+    return null;
+  };
 
   // Panels slide away before they unmount.
   useEffect(() => {
@@ -1062,6 +1084,7 @@ function Globe({
               onAddBack={onAddBack}
               onShow={(f) => setHidden(f, false)}
               onOpen={fly}
+              onCore={(p) => openCore(null, p)}
               onSpin={(k) => {
                 m.current.moved = false;
                 spinTo(k);
@@ -1075,6 +1098,7 @@ function Globe({
               me={me}
               friends={friends}
               onFollowed={onFollowed}
+              onCore={(p) => openCore(null, p)}
               onSpin={(k) => {
                 m.current.moved = false;
                 spinTo(k);
@@ -1139,7 +1163,8 @@ function Globe({
           dark={darkOn}
           sheetTop={Math.round(L.cy + Math.max(56, L.R * 0.5))}
           onClose={closeCore}
-          onOpenToday={() => fly(coreFor?.k ?? ME)}
+          onOpenToday={!coreWho ? () => fly(ME) : coreFor?.k != null ? () => fly(coreFor.k!) : undefined}
+          onAdd={coreAdded ? undefined : addFromCore}
           api={api}
           onBlocked={() => window.location.reload()}
           rootRef={(el) => void (R.current.prof = el)}
