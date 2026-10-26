@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCore, getSession } from "@/lib/data";
+import { getCore, getNews, getSession, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
 import type { Core, Friend, Post, Profile } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
@@ -238,13 +238,35 @@ export async function follow(profileId: string): Promise<{ friend?: Friend; erro
   if (!userId) redirect("/login");
   const { error } = await supabase.from("follows").insert({ following_id: profileId });
   if (error && error.code !== "23505") return { error: error.message };
-  const [{ data: profile }, { data: post }] = await Promise.all([
+  const [{ data: profile }, { data: post }, { data: hidden }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", profileId).single<Profile>(),
     supabase.from("today_posts").select("*").eq("user_id", profileId).maybeSingle<Post>(),
+    supabase.from("hidden_songs").select("hidden_id").eq("hidden_id", profileId).maybeSingle(),
   ]);
   if (!profile) return { error: "Couldn't find that person." };
   revalidatePath("/", "layout");
-  return { friend: { ...profile, post: post ?? null, followed_at: new Date().toISOString() } };
+  return {
+    friend: { ...profile, post: post ?? null, followed_at: new Date().toISOString(), followed_back_at: null, hidden: Boolean(hidden) },
+  };
+}
+
+// Hide someone's songs from your globe, or show them again. You keep
+// following them, and they're never told.
+export async function hideSongs(profileId: string, hide: boolean): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) redirect("/login");
+  const { error } = hide
+    ? await supabase.from("hidden_songs").insert({ hidden_id: profileId })
+    : await supabase.from("hidden_songs").delete().eq("user_id", userId).eq("hidden_id", profileId);
+  if (error && error.code !== "23505") return { error: "Couldn't change that. Try again." };
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function loadNews(): Promise<News | null> {
+  const { userId } = await getSession();
+  if (!userId) return null;
+  return getNews(userId);
 }
 
 // Which of the contacts you picked are already here. Phones hand over names,

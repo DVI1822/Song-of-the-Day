@@ -103,6 +103,9 @@ const ME = profile(0, "You");
 const FRIENDS: Friend[] = NAMES.map((name, i) => ({
   ...profile(i + 1, name),
   followed_at: now.toISOString(),
+  // a couple of them just added you back
+  followed_back_at: i === 3 || i === 7 ? new Date(now.getTime() - (i + 1) * 300_000).toISOString() : null,
+  hidden: false,
   post: rnd(i, 12) < 0.28 ? null : song(i + 1, `u${i + 1}`, TODAY, 1 + rnd(i, 1) * 10),
 }));
 const MY_SONGS = history("u0", 0, 40);
@@ -153,7 +156,7 @@ const demoApi: GlobeApi = {
   async follow(id) {
     const j = Number(id.slice(1)) - 100;
     const p = profile(100 + j, POOL[j]);
-    return { friend: { ...p, followed_at: new Date().toISOString(), post: song(200 + j, p.id, TODAY, 2) } };
+    return { friend: { ...p, followed_at: new Date().toISOString(), followed_back_at: null, hidden: false, post: song(200 + j, p.id, TODAY, 2) } };
   },
   async matchContacts(emails) {
     // pretend the first picked contact is already here
@@ -165,6 +168,10 @@ const demoApi: GlobeApi = {
   },
   async block() {
     await new Promise((r) => setTimeout(r, 500));
+    return {};
+  },
+  async hideSongs() {
+    await new Promise((r) => setTimeout(r, 300));
     return {};
   },
   async loadCore(id) {

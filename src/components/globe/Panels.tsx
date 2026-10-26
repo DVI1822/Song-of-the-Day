@@ -5,6 +5,7 @@ import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
 import type { AddedMe, Friend, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
+import { Magma } from "./Magma";
 import { SongPlayer } from "./Preview";
 import { Cover, SearchIcon, coverRadius } from "./ui";
 
@@ -13,30 +14,42 @@ const Kicker = ({ children }: { children: React.ReactNode }) => (
 );
 
 // ---------------------------------------------------------------------------
-// My friends: who added you, who's posted today, and who hasn't yet.
+// My friends: who added you or added you back, who's posted today, who
+// hasn't yet, and whose songs you've hidden. Anything new since you last
+// looked gets a dot.
 // ---------------------------------------------------------------------------
 
 export function FriendsPanel({
   friends,
   addedMe,
+  seenBefore,
   onAddBack,
+  onShow,
   onOpen,
+  onCore,
   onSpin,
   onFind,
 }: {
   friends: Friend[];
   addedMe: AddedMe[];
+  seenBefore: number; // when you last looked, in ms
   onAddBack(p: AddedMe): Promise<string | null>;
+  onShow(f: Friend): Promise<string | null>;
   onOpen(k: number): void;
+  onCore(p: Profile): void;
   onSpin(k: number): void;
   onFind(): void;
 }) {
+  const isNew = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenBefore;
   const byName = (a: { f: Friend }, b: { f: Friend }) => a.f.display_name.localeCompare(b.f.display_name);
   const all = friends.map((f, k) => ({ f, k }));
-  const posted = all.filter((x) => x.f.post).sort(byName);
-  const waiting = all.filter((x) => !x.f.post).sort(byName);
+  const shown = all.filter((x) => !x.f.hidden);
+  const posted = shown.filter((x) => x.f.post).sort(byName);
+  const waiting = shown.filter((x) => !x.f.post).sort(byName);
+  const back = all.filter((x) => isNew(x.f.followed_back_at)).sort((a, b) => b.f.followed_back_at!.localeCompare(a.f.followed_back_at!));
+  const hidden = all.filter((x) => x.f.hidden).sort(byName);
 
-  const added = addedMe.length > 0 && <AddedYou people={addedMe} onAddBack={onAddBack} />;
+  const added = addedMe.length > 0 && <AddedYou people={addedMe} isNew={isNew} onAddBack={onAddBack} onCore={onCore} />;
 
   if (!friends.length)
     return (
@@ -52,52 +65,167 @@ export function FriendsPanel({
   return (
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
       {added}
+      {back.length > 0 && (
+        <div className="pb-2.5">
+          <Kicker>Added you back · {back.length}</Kicker>
+          {back.map(({ f }) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => onCore(f)}
+              aria-label={`${f.display_name} added you back. Open their core`}
+              className="flex h-[50px] w-full items-center gap-3 rounded-[14px] px-2 text-left hover:bg-card-ink/5"
+            >
+              <Avatar name={f.display_name} />
+              <div className="flex min-w-0 flex-1 flex-col gap-px">
+                <div className="truncate text-sm font-semibold">{f.display_name}</div>
+                <div className="truncate text-[11px] text-muted">added you back · {formatTime(f.followed_back_at!, f.timezone)}</div>
+              </div>
+              <NewDot />
+            </button>
+          ))}
+        </div>
+      )}
       <Kicker>Posted today · {posted.length}</Kicker>
       {posted.map(({ f, k }) => (
-        <button
-          key={f.id}
-          type="button"
-          onClick={() => onOpen(k)}
-          aria-label={`Open ${f.display_name}'s song`}
-          className="flex h-[50px] w-full items-center gap-3 rounded-[14px] px-2 text-left hover:bg-card-ink/5"
-        >
-          <Cover src={f.post!.artwork_url} seed={f.post!.title} size={34} />
-          <div className="flex min-w-0 flex-1 flex-col gap-px">
-            <div className="truncate text-sm font-semibold">{f.display_name}</div>
-            <div className="truncate text-[11px] text-muted">
-              {f.post!.title}
-              {f.post!.artist && ` · ${f.post!.artist}`}
+        <div key={f.id} className="flex items-center">
+          <button
+            type="button"
+            onClick={() => onOpen(k)}
+            aria-label={`Open ${f.display_name}'s song${isNew(f.post!.created_at) ? ", new" : ""}`}
+            className="flex h-[50px] min-w-0 flex-1 items-center gap-3 rounded-[14px] px-2 text-left hover:bg-card-ink/5"
+          >
+            <Cover src={f.post!.artwork_url} seed={f.post!.title} size={34} />
+            <div className="flex min-w-0 flex-1 flex-col gap-px">
+              <div className="truncate text-sm font-semibold">{f.display_name}</div>
+              <div className="truncate text-[11px] text-muted">
+                {f.post!.title}
+                {f.post!.artist && ` · ${f.post!.artist}`}
+              </div>
             </div>
-          </div>
-          <div className="text-[10px] text-muted">{formatTime(f.post!.created_at, f.timezone)}</div>
-        </button>
+            <div className="text-[10px] text-muted">{formatTime(f.post!.created_at, f.timezone)}</div>
+            {isNew(f.post!.created_at) && <NewDot />}
+          </button>
+          <CoreButton name={f.display_name} onClick={() => onCore(f)} />
+        </div>
       ))}
       <div className="pt-2.5">
         <Kicker>Not yet · {waiting.length}</Kicker>
       </div>
       {waiting.map(({ f, k }) => (
-        <button
-          key={f.id}
-          type="button"
-          onClick={() => onSpin(k)}
-          aria-label={`Spin to ${f.display_name}`}
-          className="flex h-[46px] w-full items-center gap-3 rounded-[14px] px-2 text-left hover:bg-card-ink/5"
-        >
-          <div
-            className="box-border flex h-[34px] w-[34px] flex-none items-center justify-center border border-dashed border-muted text-[10px] font-semibold text-muted"
-            style={{ borderRadius: coverRadius(34) }}
+        <div key={f.id} className="flex items-center">
+          <button
+            type="button"
+            onClick={() => onSpin(k)}
+            aria-label={`Spin to ${f.display_name}`}
+            className="flex h-[46px] min-w-0 flex-1 items-center gap-3 rounded-[14px] px-2 text-left hover:bg-card-ink/5"
           >
-            {initials(f.display_name)}
-          </div>
-          <div className="min-w-0 flex-1 truncate text-sm text-muted">{f.display_name}</div>
-        </button>
+            <div
+              className="box-border flex h-[34px] w-[34px] flex-none items-center justify-center border border-dashed border-muted text-[10px] font-semibold text-muted"
+              style={{ borderRadius: coverRadius(34) }}
+            >
+              {initials(f.display_name)}
+            </div>
+            <div className="min-w-0 flex-1 truncate text-sm text-muted">{f.display_name}</div>
+          </button>
+          <CoreButton name={f.display_name} onClick={() => onCore(f)} />
+        </div>
       ))}
+      {hidden.length > 0 && <Hidden people={hidden.map((x) => x.f)} onShow={onShow} onCore={onCore} />}
     </div>
   );
 }
 
+// People whose songs you've hidden: still friends, just off your globe.
+function Hidden({
+  people,
+  onShow,
+  onCore,
+}: {
+  people: Friend[];
+  onShow(f: Friend): Promise<string | null>;
+  onCore(p: Profile): void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const show = async (f: Friend) => {
+    setBusy(f.id);
+    setError(null);
+    const e = await onShow(f);
+    setBusy(null);
+    if (e) setError(e);
+  };
+  return (
+    <div className="pt-2.5">
+      <Kicker>Hidden from your globe · {people.length}</Kicker>
+      {people.map((f) => (
+        <div key={f.id} className="flex h-[50px] items-center gap-3 px-2">
+          <PersonButton p={f} onCore={onCore}>
+            <Avatar name={f.display_name} muted />
+            <div className="min-w-0 flex-1 truncate text-sm text-muted">{f.display_name}</div>
+          </PersonButton>
+          <button
+            type="button"
+            onClick={() => show(f)}
+            disabled={busy === f.id}
+            aria-label={`Show ${f.display_name}'s songs again`}
+            className="h-[30px] flex-none rounded-[15px] bg-card-ink/[0.06] px-3 text-xs font-semibold disabled:opacity-60"
+          >
+            Show
+          </button>
+        </div>
+      ))}
+      {error && <p className="px-2 pt-1 text-xs text-accent-deep">{error}</p>}
+    </div>
+  );
+}
+
+const Avatar = ({ name, muted = false }: { name: string; muted?: boolean }) => (
+  <div
+    className={`flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[11px] font-semibold ${muted ? "opacity-50" : ""}`}
+    style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
+  >
+    {initials(name)}
+  </div>
+);
+
+// Tapping a person opens their core: every song they've shared, by month.
+const PersonButton = ({ p, onCore, children }: { p: Profile; onCore(p: Profile): void; children: React.ReactNode }) => (
+  <button
+    type="button"
+    onClick={() => onCore(p)}
+    aria-label={`Open ${p.display_name}'s core`}
+    className="flex min-w-0 flex-1 items-center gap-3 self-stretch text-left"
+  >
+    {children}
+  </button>
+);
+
+const CoreButton = ({ name, onClick }: { name: string; onClick(): void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={`Open ${name}'s core`}
+    className="flex h-11 w-11 flex-none items-center justify-center rounded-full"
+  >
+    <Magma className="h-[18px] w-[18px] drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+  </button>
+);
+
+const NewDot = () => <span aria-hidden className="h-2 w-2 flex-none rounded-full bg-accent" />;
+
 // People who added you and you haven't added back, each with an "Add back".
-function AddedYou({ people, onAddBack }: { people: AddedMe[]; onAddBack(p: AddedMe): Promise<string | null> }) {
+function AddedYou({
+  people,
+  isNew,
+  onAddBack,
+  onCore,
+}: {
+  people: AddedMe[];
+  isNew(at: string): boolean;
+  onAddBack(p: AddedMe): Promise<string | null>;
+  onCore(p: Profile): void;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const add = async (p: AddedMe) => {
@@ -112,16 +240,16 @@ function AddedYou({ people, onAddBack }: { people: AddedMe[]; onAddBack(p: Added
       <Kicker>Added you · {people.length}</Kicker>
       {people.map((p) => (
         <div key={p.id} className="flex h-[54px] items-center gap-3 px-2">
-          <div
-            className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[11px] font-semibold"
-            style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-          >
-            {initials(p.display_name)}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-px">
-            <div className="truncate text-sm font-semibold">{p.display_name}</div>
-            <div className="truncate text-[11px] text-muted">added you · {formatDay(p.added_at.slice(0, 10))}</div>
-          </div>
+          <PersonButton p={p} onCore={onCore}>
+            <Avatar name={p.display_name} />
+            <div className="flex min-w-0 flex-1 flex-col gap-px">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-semibold">{p.display_name}</span>
+                {isNew(p.added_at) && <NewDot />}
+              </div>
+              <div className="truncate text-[11px] text-muted">added you · {formatDay(p.added_at.slice(0, 10))}</div>
+            </div>
+          </PersonButton>
           <button
             type="button"
             onClick={() => add(p)}
@@ -153,12 +281,14 @@ export function FindPanel({
   friends,
   onFollowed,
   onSpin,
+  onCore,
 }: {
   api: GlobeApi;
   me: Profile;
   friends: Friend[];
   onFollowed(f: Friend): void;
   onSpin(k: number): void;
+  onCore(p: Profile): void;
 }) {
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Found[] | null>(null);
@@ -221,16 +351,18 @@ export function FindPanel({
           const on = p.following || k >= 0;
           return (
             <div key={p.id} className="flex h-[54px] items-center gap-3 px-2">
-              <div
-                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[11px] font-semibold"
-                style={{ background: "linear-gradient(135deg, #DDE3F5, #A9DCD6)", color: "#245866" }}
-              >
-                {initials(p.display_name)}
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-px">
-                <div className="truncate text-sm font-semibold">{p.display_name}</div>
-                <div className="truncate text-xs text-muted">@{p.username}</div>
-              </div>
+              <PersonButton p={p} onCore={onCore}>
+                <div
+                  className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[11px] font-semibold"
+                  style={{ background: "linear-gradient(135deg, #DDE3F5, #A9DCD6)", color: "#245866" }}
+                >
+                  {initials(p.display_name)}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-px">
+                  <div className="truncate text-sm font-semibold">{p.display_name}</div>
+                  <div className="truncate text-xs text-muted">@{p.username}</div>
+                </div>
+              </PersonButton>
               {on ? (
                 <button
                   type="button"

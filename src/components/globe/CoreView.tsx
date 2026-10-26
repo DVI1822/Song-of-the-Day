@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type Ref } from "react";
+import { useRef, useState, type Ref } from "react";
 import { formatDay, formatTime, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
@@ -18,6 +18,7 @@ export function CoreView({
   sheetTop,
   onClose,
   onOpenToday,
+  onAdd,
   api,
   onBlocked,
   rootRef,
@@ -29,7 +30,8 @@ export function CoreView({
   dark: boolean;
   sheetTop: number;
   onClose(): void;
-  onOpenToday(): void;
+  onOpenToday?: () => void; // their tile on the globe; without one, today opens here
+  onAdd?: () => Promise<string | null>; // for someone not on your globe yet
   api: GlobeApi;
   onBlocked(): void;
   rootRef: Ref<HTMLDivElement>;
@@ -38,6 +40,9 @@ export function CoreView({
   const [month, setMonth] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [flagging, setFlagging] = useState(false);
+  // the sheet slides up to fill the screen: drag its handle, tap it, or scroll
+  const [full, setFull] = useState(false);
+  const drag = useRef<number | null>(null);
   const tz = profile?.timezone ?? "UTC";
   const today = todayIn(tz);
   const list = posts ?? [];
@@ -56,6 +61,7 @@ export function CoreView({
     [(posts && usualHour(list.map((p) => p.created_at), tz)) || "–", "usual post time"],
   ];
 
+
   return (
     <div ref={rootRef} className="pointer-events-none fixed inset-0 z-[500]" style={{ opacity: 0 }}>
       <div className="pointer-events-auto absolute left-6 right-3 top-[max(30px,env(safe-area-inset-top))] flex items-start">
@@ -70,6 +76,7 @@ export function CoreView({
             @{profile?.username}
           </div>
         </div>
+        {onAdd && <AddPill name={first ?? ""} onAdd={onAdd} />}
         <button
           type="button"
           onClick={onClose}
@@ -83,9 +90,49 @@ export function CoreView({
 
       <div
         ref={sheetRef}
-        className="pointer-events-auto absolute inset-x-3 bottom-3 mx-auto flex max-w-[520px] flex-col gap-5 overflow-y-auto rounded-[28px] px-4 pb-[22px] pt-4"
-        style={{ top: sheetTop, ...glassThin(dark) }}
+        onScroll={(e) => !full && e.currentTarget.scrollTop > 40 && setFull(true)}
+        className={`pointer-events-auto absolute mx-auto flex max-w-[560px] flex-col gap-5 overflow-y-auto px-4 pb-[22px] transition-[top,left,right,bottom,border-radius] duration-500 ease-[cubic-bezier(.2,.75,.25,1)] ${
+          full ? "inset-x-0 bottom-0 rounded-t-[28px]" : "inset-x-3 bottom-3 rounded-[28px]"
+        }`}
+        style={{ top: full ? "max(10px, env(safe-area-inset-top))" : sheetTop, ...glassThin(dark) }}
       >
+        <div
+          className="sticky top-0 z-10 -mx-4 flex flex-none touch-none flex-col items-center px-4 pb-1 pt-2 backdrop-blur-xl"
+          onPointerDown={(e) => void (drag.current = e.clientY)}
+          onPointerUp={(e) => {
+            const dy = drag.current === null ? 0 : e.clientY - drag.current;
+            drag.current = null;
+            if (dy < -24) setFull(true);
+            else if (dy > 24) setFull(false);
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setFull((f) => !f)}
+            aria-label={full ? "Shrink the sheet" : "Fill the screen"}
+            aria-expanded={full}
+            className="flex h-6 w-24 items-center justify-center"
+          >
+            <span className="h-[5px] w-10 rounded-full bg-card-ink/20" />
+          </button>
+          {full && (
+            <div className="rise-in flex w-full items-center gap-2 pb-1">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="display truncate text-[22px] leading-tight">{profile?.display_name}</div>
+                <div className="truncate text-xs text-muted">@{profile?.username}</div>
+              </div>
+              {onAdd && <AddPill name={first ?? ""} onAdd={onAdd} />}
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Leave the core"
+                className="flex h-11 w-11 items-center justify-center"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-3 gap-2">
           {stats.map(([n, label]) => (
             <div key={label} className="flex flex-col gap-0.5 rounded-[18px] bg-card-ink/5 p-3">
@@ -96,14 +143,27 @@ export function CoreView({
         </div>
 
         {todayPost && (
-          <button type="button" onClick={onOpenToday} className="flex items-center gap-3 rounded-[20px] bg-card-ink/5 p-2.5 text-left">
-            <Cover src={todayPost.artwork_url} seed={todayPost.title} size={52} />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <div className="text-[11px] text-muted">Today · {formatTime(todayPost.created_at, tz)}</div>
-              <div className="truncate text-[15px] font-semibold">{todayPost.title}</div>
-              <div className="truncate text-xs text-muted">{todayPost.artist}</div>
-            </div>
-          </button>
+          <div className="flex flex-col gap-2.5 rounded-[20px] bg-card-ink/5 p-2.5">
+            <button
+              type="button"
+              onClick={onOpenToday ?? (() => setOpen(open === todayPost.id ? null : todayPost.id))}
+              aria-expanded={onOpenToday ? undefined : open === todayPost.id}
+              className="flex items-center gap-3 text-left"
+            >
+              <Cover src={todayPost.artwork_url} seed={todayPost.title} size={52} />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <div className="text-[11px] text-muted">Today · {formatTime(todayPost.created_at, tz)}</div>
+                <div className="truncate text-[15px] font-semibold">{todayPost.title}</div>
+                <div className="truncate text-xs text-muted">{todayPost.artist}</div>
+              </div>
+            </button>
+            {!onOpenToday && open === todayPost.id && (
+              <div className="rise-in flex flex-col gap-2.5 px-1 pb-1">
+                {todayPost.caption && <div className="text-sm leading-relaxed">“{todayPost.caption}”</div>}
+                <SongPlayer post={todayPost} />
+              </div>
+            )}
+          </div>
         )}
 
         {months.length > 0 && (
@@ -198,5 +258,33 @@ export function CoreView({
         )}
       </div>
     </div>
+  );
+}
+
+// Add someone to your globe from their core.
+function AddPill({ name, onAdd }: { name: string; onAdd(): Promise<string | null> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const add = async () => {
+    setBusy(true);
+    setError(null);
+    const e = await onAdd();
+    setBusy(false);
+    if (e) setError(e);
+  };
+  return (
+    <button
+      type="button"
+      onClick={add}
+      disabled={busy}
+      aria-label={`Add ${name} to your globe`}
+      title={error ?? undefined}
+      className="mr-1.5 flex h-[34px] flex-none items-center gap-1.5 self-center rounded-[17px] bg-accent px-3.5 text-xs font-semibold text-white disabled:opacity-60"
+    >
+      <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      {error ? "Try again" : "Add"}
+    </button>
   );
 }

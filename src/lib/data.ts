@@ -28,9 +28,34 @@ export async function requireProfile() {
   return { supabase: s.supabase, profile: s.profile };
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+// Who added you: those you haven't added back yet (newest first), and when
+// each of the rest added you, to tell when someone added you back.
+async function addedYou(supabase: Supabase, userId: string, mine: Set<string>) {
+  const { data } = await supabase
+    .from("follows")
+    .select("created_at, profile:profiles!follows_follower_id_fkey(*)")
+    .eq("following_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const all = (data ?? [])
+    .map((f) => ({ ...(f.profile as unknown as Profile), added_at: f.created_at as string }))
+    .filter((p) => p.id);
+  return {
+    addedMe: all.filter((p) => !mine.has(p.id)) as AddedMe[],
+    addedAt: new Map(all.map((p) => [p.id, p.added_at])),
+  };
+}
+
+const backAt = (addedAt: Map<string, string>, id: string, followedAt: string) => {
+  const at = addedAt.get(id);
+  return at && Date.parse(at) > Date.parse(followedAt) ? at : null;
+};
+
 export async function getGlobe(profile: Profile) {
   const supabase = await createClient();
-  const [{ data: follows }, { data: mySongs }, { data: redo }, { data: followers }, { data: following }] = await Promise.all([
+  const [{ data: follows }, { data: mySongs }, { data: redo }, { data: hidden }] = await Promise.all([
     supabase
       .from("follows")
       .select("created_at, profile:profiles!follows_following_id_fkey(*)")
@@ -44,32 +69,24 @@ export async function getGlobe(profile: Profile) {
       .eq("user_id", profile.id)
       .eq("day", todayIn(profile.timezone))
       .maybeSingle(),
-    // who added you, newest first, and everyone you've added (for "add back")
-    supabase
-      .from("follows")
-      .select("created_at, profile:profiles!follows_follower_id_fkey(*)")
-      .eq("following_id", profile.id)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase.from("follows").select("following_id").eq("follower_id", profile.id),
+    supabase.from("hidden_songs").select("hidden_id"),
   ]);
-  const mine = new Set((following ?? []).map((f) => f.following_id as string));
-  const addedMe: AddedMe[] = (followers ?? [])
-    .map((f) => ({ ...(f.profile as unknown as Profile), added_at: f.created_at as string }))
-    .filter((p) => p.id && !mine.has(p.id));
-
   const people = (follows ?? [])
     .map((f) => ({ followed_at: f.created_at as string, profile: f.profile as unknown as Profile }))
     .filter((f) => f.profile);
   const ids = people.map((p) => p.profile.id);
-  const { data: posts } = ids.length
-    ? await supabase.from("today_posts").select("*").in("user_id", ids)
-    : { data: [] as Post[] };
+  const [{ data: posts }, { addedMe, addedAt }] = await Promise.all([
+    ids.length ? supabase.from("today_posts").select("*").in("user_id", ids) : Promise.resolve({ data: [] as Post[] }),
+    addedYou(supabase, profile.id, new Set(ids)),
+  ]);
   const byUser = new Map((posts as Post[]).map((p) => [p.user_id, p]));
+  const hiddenIds = new Set((hidden ?? []).map((h) => h.hidden_id as string));
 
   const friends: Friend[] = people.map(({ profile: p, followed_at }) => ({
     ...p,
     followed_at,
+    followed_back_at: backAt(addedAt, p.id, followed_at),
+    hidden: hiddenIds.has(p.id),
     post: byUser.get(p.id) ?? null,
   }));
   const songs = (mySongs ?? []) as Post[];
@@ -81,6 +98,26 @@ export async function getGlobe(profile: Profile) {
     redoUsed: Boolean(redo),
     addedMe,
   };
+}
+
+// What's new since the Globe opened: today's songs from the people you
+// follow, who added you, and who added you back.
+export type News = { posts: Post[]; addedMe: AddedMe[]; backAt: Record<string, string> };
+
+export async function getNews(userId: string): Promise<News> {
+  const supabase = await createClient();
+  const { data: follows } = await supabase.from("follows").select("following_id, created_at").eq("follower_id", userId);
+  const ids = (follows ?? []).map((f) => f.following_id as string);
+  const [{ data: posts }, { addedMe, addedAt }] = await Promise.all([
+    ids.length ? supabase.from("today_posts").select("*").in("user_id", ids) : Promise.resolve({ data: [] as Post[] }),
+    addedYou(supabase, userId, new Set(ids)),
+  ]);
+  const back: Record<string, string> = {};
+  for (const f of follows ?? []) {
+    const at = backAt(addedAt, f.following_id as string, f.created_at as string);
+    if (at) back[f.following_id as string] = at;
+  }
+  return { posts: (posts ?? []) as Post[], addedMe, backAt: back };
 }
 
 export async function getCore(userId: string): Promise<Core | null> {
