@@ -6,6 +6,7 @@ import type { Post, Profile } from "@/lib/types";
 import { Magma } from "./Magma";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
+import { ShareIcon, ShareSheet, useStory } from "./ShareStory";
 import { NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon, coverRadius } from "./ui";
@@ -60,6 +61,8 @@ export function Feature({
   const mine = who === "You";
   const [r, setR] = useReactions(api, post.id);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const story = useStory(me.username, post, mine);
 
   // feel it, or take it back, straight away; undone if it doesn't stick
   const feel = async () => {
@@ -94,6 +97,16 @@ export function Feature({
             {time} · {who}
           </div>
           <div className="-mr-2.5 flex">
+            {mine && (
+              <button
+                type="button"
+                onClick={() => setSharing(true)}
+                aria-label="Share to your Instagram Story"
+                className="flex h-11 w-11 items-center justify-center text-card-ink"
+              >
+                <ShareIcon size={19} />
+              </button>
+            )}
             {!mine && (
               <button
                 type="button"
@@ -221,6 +234,7 @@ export function Feature({
           onClose={() => setNotesOpen(false)}
         />
       )}
+      {sharing && <ShareSheet story={story} username={me.username} onClose={() => setSharing(false)} />}
     </div>
   );
 }
