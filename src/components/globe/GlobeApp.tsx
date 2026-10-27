@@ -99,8 +99,7 @@ const seenStore = {
 const ease = (k: number, dt: number) => 1 - Math.pow(1 - k, dt * 60);
 
 function layoutFor(w: number, h: number) {
-  // on a phone the globe stays clear of the side tabs
-  const R = Math.round(Math.min(w * 0.36, h * 0.24, 300));
+  const R = Math.round(Math.min(w * 0.41, h * 0.24, 300));
   const s = R / 160;
   const cx = w / 2,
     cy = Math.round(h * 0.462);
