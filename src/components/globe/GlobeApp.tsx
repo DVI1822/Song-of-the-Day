@@ -14,6 +14,7 @@ import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
+import { type CoreLook, alpha, drift, useCoreLook } from "./coreLook";
 import { Magma, MagmaFilters } from "./Magma";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
@@ -125,6 +126,7 @@ type Live = {
   zFeat: number;
   friends: Friend[];
   beam: Beam;
+  look: CoreLook | null;
 };
 // what's playing, for the energy streak: its tile, and how to find its beat
 type Beam = { k: number; paused: boolean; beat: Beat | null; clipTime: () => number | null } | null;
@@ -309,10 +311,13 @@ function Globe({
       ? null
       : { k: beamK, paused: playingPaused, beat: beat?.url === beatUrl ? beat.b : null, clipTime: pv.clipTime };
 
+  // your core grows from your songs; the stream to what's playing matches it
+  const look = useCoreLook(mySongs, me.timezone);
+
   // Everything the frame loop needs from the latest render.
-  const live = useRef({ keys, half, Rb, L, zFeat, friends, beam });
+  const live = useRef<Live>({ keys, half, Rb, L, zFeat, friends, beam, look });
   useLayoutEffect(() => {
-    live.current = { keys, half, Rb, L, zFeat, friends, beam };
+    live.current = { keys, half, Rb, L, zFeat, friends, beam, look };
   });
 
   // -------------------------------------------------------------------------
@@ -399,6 +404,7 @@ function Globe({
     s.pendingCore = false;
     s.zoomTarget = 1;
     setCoreOpen(false);
+    setCoreFor(null);
   }, []);
 
   const closeFeat = useCallback(() => {
@@ -441,6 +447,9 @@ function Globe({
         : { profile: coreWho, posts: null }
       : { profile: me, posts: mySongs };
   const coreAdded = !coreWho || friends.some((f) => f.id === coreWho.id);
+  // flying into someone else's core, the core in the middle becomes theirs
+  const theirSongs = coreWho && friendCore?.id === coreWho.id ? friendCore.posts : null;
+  const theirLook = useCoreLook(theirSongs, coreWho?.timezone ?? "UTC");
 
   // Add someone from inside their core; their tile joins the globe behind.
   const addFromCore = async () => {
@@ -624,6 +633,14 @@ function Globe({
         const fr = live.current.friends;
         const posted = keys.filter((k) => (k === ME ? s.myLanded : !!fr[k]?.post));
         sim.current.pull(posted, [f[0], -f[1], f[2]], dt);
+      } else if (s.featFly === null && s.lens === null && !s.coreOn) {
+        // the stream holds the playing song at the front while the rest spin,
+        // a little below the core so you can see it reach out
+        const b = live.current.beam;
+        if (b && !b.paused) {
+          const f = camInv([0, 0.42, 0.91], { yaw: s.yaw, pitch: s.pitch, roll: 0 });
+          sim.current.pull([b.k], [f[0], -f[1], f[2]], dt);
+        }
       }
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
       draw(s, R.current, els.current, sim.current, live.current);
@@ -1001,7 +1018,7 @@ function Globe({
             aria-label="Your core. Open profile"
             className="absolute -left-[60px] -top-[60px] h-[120px] w-[120px]"
           >
-            <Magma full className="h-full w-full" />
+            <Magma full look={coreWho ? theirLook : look} className="h-full w-full" />
           </button>
         </div>
         {/* the weather and seasons nearer than the globe's middle */}
@@ -1100,7 +1117,7 @@ function Globe({
           className="box-border flex h-[84px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
           style={glass(darkOn)}
         >
-          <Magma className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+          <Magma look={look} className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
             Core
           </span>
@@ -1496,7 +1513,7 @@ sim: TileSim,
 // The magma stream: from the back of the playing song's tile into the core,
 // flowing inwards and swelling on the song's hits. Drawn on a canvas just
 // behind the globe, so the tile covers its end and the core its start.
-function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam }: Live, dt: number) {
+function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam, look }: Live, dt: number) {
   if (!cv) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const W = Math.round(L.w * dpr),
@@ -1559,10 +1576,15 @@ function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half,
     return (wTile + (wCore - wTile) * u) * k;
   };
 
-  // the core's own colours, light and slowly shifting
+  // the core's own colours, slowly shifting: your songs' colours once your
+  // core has them, the original light magma before
   const hue = (s.mt * 14) % 360;
-  const mag = (dh: number, sat: number, l: number, a: number) =>
-    `hsla(${((hue + dh) % 360).toFixed(0)},${sat}%,${night ? l : l - 6}%,${clamp01(a).toFixed(3)})`;
+  const mag = look
+    ? (dh: number, _sat: number, l: number, a: number) =>
+        drift(look.colors, s.mt * 0.12 + dh / 60, clamp01((l - (night ? 70 : 74)) / 50), clamp01(a))
+    : (dh: number, sat: number, l: number, a: number) =>
+        `hsla(${((hue + dh) % 360).toFixed(0)},${sat}%,${night ? l : l - 6}%,${clamp01(a).toFixed(3)})`;
+  const style = look?.style;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = night ? "screen" : "source-over";
@@ -1588,15 +1610,22 @@ function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half,
     ctx.closePath();
     ctx.fill();
   };
-  // a soft warm haze, the molten body, and its hot glowing heart
-  stream(1.7, A * (0.16 + 0.12 * lvl), 16 * L.s, 70, 40, 78);
-  stream(0.85, A * (0.5 + 0.2 * lvl), 6 * L.s, 60, 25, 76);
+  // a soft haze, the flowing body, and its bright heart; matte cores don't
+  // glow, hazy ones glow wider, electric ones have a hot wire down the middle
+  const hazy = style === "hazy";
+  if (style !== "matte") stream(hazy ? 2.2 : 1.7, A * (0.16 + 0.12 * lvl), (hazy ? 24 : 16) * L.s, 70, 40, 78);
+  stream(0.85, A * (0.5 + 0.2 * lvl), (style === "matte" ? 0 : 6) * L.s, 60, 25, 76);
   ctx.shadowBlur = 0;
   stream(0.3, A * (0.55 + 0.3 * lvl), 0, 20, 0, 88);
+  if (style === "electric") {
+    ctx.shadowBlur = 8 * L.s;
+    stream(0.08, A * (0.7 + 0.3 * Math.abs(Math.sin(s.mt * 3.1))), 8 * L.s, 0, 30, 100);
+    ctx.shadowBlur = 0;
+  }
 
   // gooey globs riding in from the song to the core, hot at their hearts,
   // with a few darker cooling patches between them
-  const flow = s.mt * 0.2;
+  const flow = s.mt * 0.2 * (look ? Math.max(0.6, look.speed / 0.8) : 1);
   const glob = (u: number, r: number, inner: string, outer: string) => {
     const [x, y] = at(u);
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -1616,7 +1645,23 @@ function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half,
   ctx.globalCompositeOperation = night ? "source-over" : "multiply";
   for (let i = 0; i < 5; i++) {
     const u = (((i * 0.381966 + 0.13 + flow * 0.8) % 1) + 1) % 1;
-    glob(u, width(u) * 0.55, mag(110, 55, 52, A * 0.22 * Math.sin(Math.PI * u)), mag(110, 55, 52, 0));
+    const a = A * 0.22 * Math.sin(Math.PI * u);
+    if (look) glob(u, width(u) * 0.55, alpha(look.base, clamp01(a * 1.4)), alpha(look.base, 0));
+    else glob(u, width(u) * 0.55, mag(110, 55, 52, a), mag(110, 55, 52, 0));
+  }
+  // a night owl's stream carries a few stars down with it
+  if (look?.stars) {
+    ctx.globalCompositeOperation = "source-over";
+    for (let i = 0; i < 9; i++) {
+      const u = (((i * 0.7548 + flow * 1.3) % 1) + 1) % 1,
+        [x, y] = at(u),
+        off = Math.sin(i * 5.3) * width(u) * 0.6;
+      const tw = 0.4 + 0.6 * Math.abs(Math.sin(s.mt * 2 + i));
+      ctx.fillStyle = `rgba(255,255,255,${(A * Math.sin(Math.PI * u) * tw).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x + nx * off, y + ny * off, 1.1 * L.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // where it meets the song and where it pours into the core
