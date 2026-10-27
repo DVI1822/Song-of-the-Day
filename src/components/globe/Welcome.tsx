@@ -49,15 +49,15 @@ export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
         <h2 className="display text-[26px] leading-tight">Song of the Day</h2>
         <p className="text-[15px] leading-relaxed">
           <b>Share and discover music.</b> Each day, post the one song that hit you hardest. Your friends do the same,
-          and their songs spin on your globe.
+          so you feel their energy and your globe fills with top quality tunes.
         </p>
         <p className="text-[15px] leading-relaxed">
-          <b>Why.</b> Your friends post the best song of their day, so you feel their energy and your globe is always
-          full of top quality tunes to find.
+          <b>How.</b> Spotify only for now. In Spotify, copy your song&apos;s link, tap + here and paste it. You get one
+          repost a day, and it all resets at midnight (watch the countdown).
         </p>
         <p className="text-[15px] leading-relaxed">
-          <b>How.</b> Spotify only for now. In Spotify, copy the link to your song, tap + here and paste it. Tap any
-          song on your globe to play it.
+          <b>Grow your world.</b> Share your link with more people. The more friends you bring, the more good music
+          fills your globe.
         </p>
         <button type="button" onClick={close} className="mt-1.5 h-12 rounded-full bg-accent text-[15px] font-semibold text-white">
           Let&apos;s go
