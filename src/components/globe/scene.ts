@@ -43,6 +43,8 @@ export type SceneFrame = {
   floorY: number;
   dk: number; // 0 day .. 1 night
   day: number; // how much sunlight
+  warm: number; // 0..1 a low sun's golden light (sky.ts)
+  warmC: V3;
   L: V3; // toward the sun, camera space
   yaw: number;
   cam: Camera; // the globe's turn, to carry what's resting on it
@@ -556,12 +558,20 @@ export class Scene {
     const dk = f.dk;
     const cover = kind === "clear" ? 0 : kind === "partly" ? Math.max(0.35, wx!.cloud * 0.8) : storm ? 1 : kind === "cloudy" ? 0.9 : 0.85;
     const goal = storm
-      ? { lit: tint(dk, [0.68, 0.71, 0.75], [0.16, 0.18, 0.23]), shade: tint(dk, [0.4, 0.43, 0.48], [0.05, 0.06, 0.09]), alpha: 0.95 }
+      ? { lit: tint(dk, [0.5, 0.53, 0.58], [0.16, 0.18, 0.23]), shade: tint(dk, [0.26, 0.29, 0.34], [0.05, 0.06, 0.09]), alpha: 0.95 }
+      : kind === "rain"
+        ? { lit: tint(dk, [0.64, 0.68, 0.73], [0.19, 0.22, 0.28]), shade: tint(dk, [0.4, 0.44, 0.5], [0.07, 0.08, 0.12]), alpha: 0.9 }
       : wet || snow || kind === "fog"
         ? { lit: tint(dk, [0.94, 0.95, 0.96], [0.22, 0.25, 0.31]), shade: tint(dk, [0.74, 0.77, 0.81], [0.08, 0.09, 0.13]), alpha: dk > 0.5 ? 0.85 : 0.88 }
         : kind === "cloudy"
           ? { lit: tint(dk, [0.98, 0.98, 0.99], [0.24, 0.27, 0.34]), shade: tint(dk, [0.78, 0.81, 0.85], [0.09, 0.1, 0.14]), alpha: dk > 0.5 ? 0.85 : 0.9 }
           : { lit: tint(dk, [1, 1, 1], [0.26, 0.29, 0.36]), shade: tint(dk, [0.8, 0.84, 0.89], [0.1, 0.11, 0.16]), alpha: dk > 0.5 ? 0.75 : 0.92 };
+    // a low sun lights the clouds gold and pink from below, less through thick cloud
+    const gw = f.warm * (storm ? 0.15 : wet || snow || kind === "fog" ? 0.35 : kind === "cloudy" ? 0.55 : 1);
+    for (let i = 0; i < 3; i++) {
+      goal.lit[i] = goal.lit[i] * (1 - 0.55 * gw) + f.warmC[i] * 0.55 * gw;
+      goal.shade[i] = goal.shade[i] * (1 - 0.4 * gw) + f.warmC[i] * [0.62, 0.48, 0.62][i] * 0.4 * gw;
+    }
     const c = this.cloud;
     const k = ez(0.4);
     c.cover += (cover - c.cover) * k;

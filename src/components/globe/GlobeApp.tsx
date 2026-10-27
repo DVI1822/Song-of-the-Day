@@ -5,7 +5,8 @@ import { todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, Post, Profile } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
-import { WeatherSky, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
+import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
+import { skyAt, weatherSky, type SkyLook } from "./sky";
 import { Shuffle } from "./Shuffle";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
@@ -174,6 +175,8 @@ function newMotion(posted: boolean) {
     gather: 0,
     sun: null as null | Sun,
     sunAt: 0,
+    sky: null as null | SkyLook,
+    skyBg: "",
     geo: { lat: 40, lon: -90 },
     beamA: 0,
     beamLvl: 0,
@@ -258,6 +261,8 @@ function Globe({
   const [coreOpen, setCoreOpen] = useState(false);
   const [friendCore, setFriendCore] = useState<{ id: string; profile: Profile; posts: Post[] } | null>(null);
   const [darkOn, setDarkOn] = useState(false);
+  const [skyLight, setSkyLight] = useState(false);
+  const [warm, setWarm] = useState(0);
   const [focus, setFocus] = useState<number | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -567,11 +572,14 @@ function Globe({
 
       // the sun moves slowly; work it out once a second
       if (!s.sun || now - s.sunAt > 1000) {
-        s.sun = sunLight(new Date(), s.geo);
+        s.sun = sunLight(clockNow(), s.geo);
+        s.sky = skyAt((s.sun.el * 180) / Math.PI, s.sun.az);
+        setSkyLight(s.sky.light);
+        setWarm(Math.round(s.sky.warm * 20) / 20);
         s.sunAt = now;
       }
-      // the sky follows the real time of day: space at night, light blue by
-      // day.
+      // the sky follows the real time of day (sky.ts): twilight, sunrise,
+      // golden hour, bright day, sunset, then space.
       const dGoal = 1 - s.sun.day;
       s.dk = s.t === 0 || Math.abs(dGoal - s.dk) < 0.01 ? dGoal : s.dk + (dGoal - s.dk) * Math.min(1, dt * 5);
       if (s.dk > 0.5 !== s.darkOn) {
@@ -673,7 +681,7 @@ function Globe({
           w.season = seasonOverride() ?? seasonAt(new Date(), s.geo.lat);
           w.seasonAt = now;
         }
-        const d = new Date();
+        const d = clockNow();
         const show = s.wxShow < 0.02 ? 0 : s.wxShow;
         w.scene.step(dt, w.weather, {
           zoom: s.zoom,
@@ -686,6 +694,8 @@ function Globe({
           floorY: 216 * Lw.s,
           dk: s.dk,
           day: s.sun.day,
+          warm: s.sky?.warm ?? 0,
+          warmC: s.sky?.warmC ?? [1, 1, 1],
           L: s.sun.L,
           yaw: s.yaw,
           cam: s.cam,
@@ -903,8 +913,13 @@ function Globe({
     s.target = aim(sim.current.pos(shuffleK), s.yaw);
     setFocus(shuffleK);
   }, [shuffleK]);
-  const ink = darkOn ? "#EEF3F8" : "#0D2A3F";
-  const muted = darkOn ? "#93A6B8" : "#6A818C";
+  // the title follows how dark the top of the sky is (sky.ts): the weather's
+  // sky when there's one, and dark lettering under the pale clouds of a fair day
+  const wxSky = weatherSky(weather, darkOn ? 1 : 0, warm);
+  const inkLight =
+    wxSky && wxSky.opacity > 0.5 ? wxSky.light : skyLight && (darkOn || !weather || weather.kind === "clear" || weather.cloud < 0.3);
+  const ink = inkLight ? "#EEF3F8" : "#0D2A3F";
+  const muted = inkLight ? "#C2D0DE" : "#3E5566";
   const tabTop = Math.max(100, L.cy - 240);
   const panelW = Math.min(296, L.w - 58);
   // The star field turns with the globe, so it covers the screen's diagonal.
@@ -983,7 +998,7 @@ function Globe({
             />
           </div>
         </div>
-        <WeatherSky weather={weather} dark={darkOn} />
+        <WeatherSky weather={weather} dark={darkOn} warm={warm} />
         {/* the little sky moments only on clear-ish days */}
         {size && (!weather || weather.kind === "clear" || weather.kind === "partly") && <Ambient dark={darkOn} w={L.w} h={L.h} />}
         {/* clouds, then the weather and seasons further away than the globe's middle */}
@@ -1470,15 +1485,22 @@ sim: TileSim,
     st.filter = `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day) + 7 * lk.overcast).toFixed(1)}px)`;
   }
   if (r.floor) r.floor.style.opacity = roomOp.toFixed(3);
+  const warm = s.sky?.warm ?? 0,
+    wc = s.sky?.warmC ?? [1, 1, 1];
+  const glass = [0, 1, 2].map((j) => Math.round([255, 250, 236][j] * (1 - 0.6 * warm) + 255 * wc[j] * 0.6 * warm)).join(",");
   if (r.sphere) {
     const hx = 50 + 42 * Lc[0],
       hy = 50 + 42 * Lc[1],
       lit = 18 + (30 * (1 + Lc[2])) / 2;
     r.sphere.style.opacity = ((1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3)).toFixed(3);
-    r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(255,250,236,${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk).toFixed(3)}) 0%, rgba(255,250,236,0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
+    r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(${glass},${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk + 0.12 * warm * direct).toFixed(3)}) 0%, rgba(${glass},0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
     r.sphere.style.boxShadow = dk > 0 ? `0 0 ${(40 * dk).toFixed(0)}px rgba(180,210,255,${(0.08 * dk).toFixed(3)})` : "";
   }
-  if (r.space) r.space.style.opacity = dk.toFixed(3);
+  if (s.sky && r.day && s.sky.bg !== s.skyBg) {
+    s.skyBg = s.sky.bg;
+    r.day.style.background = s.skyBg;
+  }
+  if (r.space) r.space.style.opacity = (s.sky ? s.sky.space : dk).toFixed(3);
   if (r.stars) r.stars.style.transform = `rotate(${(s.yaw * 0.08).toFixed(4)}rad)`;
   if (r.starsB) r.starsB.style.opacity = (0.65 + 0.35 * Math.sin(s.mt * 1.7)).toFixed(3);
 
