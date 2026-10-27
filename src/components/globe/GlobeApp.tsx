@@ -22,6 +22,8 @@ import { beatOf, pulseAt, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass } from "./ui";
 import {
   PERSPECTIVE,
+  RIPPLE_LIFE,
+  RIPPLE_SPEED,
   TILT,
   TileSim,
   aim,
@@ -34,6 +36,7 @@ import {
   sunLight,
   type Camera,
   type Sun,
+  type V3,
 } from "./math";
 
 type Props = {
@@ -96,7 +99,8 @@ const seenStore = {
 };
 
 // how long a new song takes to fall in, and when you last had the Globe open
-const FALL = 0.85;
+const FALL = 0.85,
+  DROP_HEIGHT = 520;
 const OPEN_KEY = "sotd-last-open";
 
 // Per-frame easing written for 60fps, made frame-rate independent.
@@ -194,6 +198,7 @@ function newEls() {
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
     beam: null as HTMLCanvasElement | null,
+    ripples: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
     featBack: null as HTMLDivElement | null,
@@ -591,6 +596,7 @@ function Globe({
           s.launch = null;
           s.myLanded = true;
           s.myLock = s.t;
+          sim.current.splash(ME, live.current.keys);
           setLanded(true);
           setLaunching(false);
         }
@@ -649,6 +655,7 @@ function Globe({
       sim.current.water(keys, Math.min(dt, 0.1));
       draw(s, R.current, els.current, sim.current, live.current);
       drawBeam(s, R.current.beam, sim.current, live.current, dt);
+      drawRipples(s, R.current.ripples, sim.current, live.current);
       const w = wx.current,
         el = R.current;
       if (!w.scene && !w.failed && el.wxSky && el.wxBack && el.wxFront)
@@ -1000,6 +1007,7 @@ function Globe({
           }}
         />
         <canvas ref={(el) => void (R.current.beam = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <canvas ref={(el) => void (R.current.ripples = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div
           ref={(el) => void (R.current.world = el)}
           className="preserve-3d absolute z-[1] h-0 w-0"
@@ -1335,21 +1343,18 @@ sim: TileSim,
     const lockAt = k === ME ? s.myLock : null;
     const lockAge = wait || lockAt === null ? 99 : s.t - lockAt;
     const grow = 1 - Math.pow(1 - Math.min(1, (b === undefined ? 99 : s.t - b) / 0.9), 3);
-    // falling in from above the screen, quicker and quicker, until it splashes
-    let fall = "";
+    // falling straight down onto its spot from high above the water, so it
+    // comes in from wherever on screen that is, quicker and quicker, and splashes
+    let lift = 0,
+      unborn = false;
     const d0 = s.drops.get(k);
     if (d0 !== undefined) {
       const u = (s.t - d0) / FALL;
       if (u >= 1) {
         s.drops.delete(k);
         sim.splash(k, keys);
-      } else {
-        const up = ((u < 0 ? 1 : 1 - u * u) * 1.1 * L.h) / s.zoom;
-        fall =
-          `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) ` +
-          `rotateZ(${(-cam.roll).toFixed(4)}rad) translateY(${(-up).toFixed(1)}px) rotateZ(${cam.roll.toFixed(4)}rad) ` +
-          `rotateX(${s.pitch.toFixed(4)}rad) rotateZ(${TILT.toFixed(4)}rad) rotateY(${s.yaw.toFixed(4)}rad) `;
-      }
+      } else if (u < 0) unborn = true;
+      else lift = (1 - u * u) * DROP_HEIGHT;
     }
     const lockE = 1 - Math.pow(1 - Math.min(1, lockAge / 0.7), 3);
     const sla = Math.sin(lat),
@@ -1359,12 +1364,11 @@ sim: TileSim,
     const ez = camV([cla * slo, -sla, cla * clo], cam);
     const camZ = s.zoom * Rb * ez[2];
     const nearFade = clamp01((880 - camZ) / 220);
-    te.box.style.visibility = nearFade <= 0 ? "hidden" : "";
+    te.box.style.visibility = nearFade <= 0 || unborn ? "hidden" : "";
     // riding the water: up and down, and rocked a little
     const fl = sim.float(k);
     te.box.style.transform =
-      fall +
-      `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h).toFixed(2)}px) ` +
+      `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h + lift).toFixed(2)}px) ` +
       `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`;
     if (nearFade <= 0 || ez[2] < visibleZ) continue; // facing away: nothing to light
 
@@ -1530,6 +1534,69 @@ sim: TileSim,
 // The magma stream: from the back of the playing song's tile into the core,
 // flowing inwards and swelling on the song's hits. Drawn on a canvas just
 // behind the globe, so the tile covers its end and the core its start.
+const cross = (u: V3, v: V3): V3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+const norm3 = (v: V3): V3 => {
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / n, v[1] / n, v[2] / n];
+};
+
+// The ripples of energy from songs landing: bright rings spreading over the
+// globe in the core's colours, fading as they go round to the far side.
+function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb, L, look }: Live) {
+  if (!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.round(L.w * dpr),
+    H = Math.round(L.h * dpr);
+  if (cv.width !== W || cv.height !== H) {
+    cv.width = W;
+    cv.height = H;
+  }
+  const ctx = cv.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!sim.ripples.length || !s.cam || s.lens !== null || s.coreOn) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineCap = "round";
+  const night = s.dk > 0.5;
+  for (const r of sim.ripples) {
+    const age = sim.t - r.t,
+      th = age * RIPPLE_SPEED,
+      fade = 1 - age / RIPPLE_LIFE;
+    if (th < 0.02) continue;
+    // a frame round the landing spot
+    const p = r.p,
+      a = norm3(Math.abs(p[1]) < 0.9 ? cross([0, 1, 0], p) : cross([1, 0, 0], p)),
+      b = cross(p, a);
+    const color = look ? drift(look.colors, s.t * 0.3 + r.t, night ? 0.35 : 0.15) : night ? "rgb(190,225,255)" : "rgb(255,255,255)";
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 14 * L.s;
+    ctx.lineWidth = (2 + 3 * fade) * L.s;
+    let prev: [number, number, number] | null = null;
+    for (let i = 0; i <= 96; i++) {
+      const f = (i / 96) * Math.PI * 2;
+      const q: V3 = [0, 1, 2].map((j) => p[j] * Math.cos(th) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(th)) as V3;
+      const { lat, lon } = latLon(q);
+      const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam);
+      const z = v[2] * Rb * s.zoom,
+        kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
+      const pt: [number, number, number] = [L.cx + v[0] * Rb * kz, L.cy + v[1] * Rb * kz, v[2]];
+      if (prev) {
+        // brightest on the near side of the globe
+        ctx.globalAlpha = 0.7 * fade * Math.min(1, Math.sin(th) * 3) * (0.15 + 0.85 * clamp01((prev[2] + pt[2]) / 2 + 0.3));
+        ctx.beginPath();
+        ctx.moveTo(prev[0], prev[1]);
+        ctx.lineTo(pt[0], pt[1]);
+        ctx.stroke();
+      }
+      prev = pt;
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
 function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam, look }: Live, dt: number) {
   if (!cv) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);

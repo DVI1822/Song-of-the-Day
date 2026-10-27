@@ -139,9 +139,14 @@ const segPt = (px: number, py: number, ax: number, ay: number, bx: number, by: n
   return [ax + ex * t, ay + ey * t];
 };
 
+// A ripple of energy spreading round the globe from where a song landed.
+export const RIPPLE_SPEED = 1.5, // radians of the globe a second
+  RIPPLE_LIFE = Math.PI / RIPPLE_SPEED;
+
 export class TileSim {
   bodies = new Map<number, Body>();
   t = 0;
+  ripples: { p: V3; t: number }[] = [];
 
   // How each song is floating right now.
   float(k: number): Float {
@@ -154,6 +159,7 @@ export class TileSim {
   splash(k: number, keys: number[]) {
     const f = this.float(k),
       p = this.pos(k);
+    this.ripples.push({ p: [p[0], p[1], p[2]], t: this.t });
     f.hv -= 300;
     f.av += (Math.random() - 0.5) * 2.4;
     f.bv += (Math.random() - 0.5) * 2.4;
@@ -184,9 +190,17 @@ export class TileSim {
     this.t += dt;
     // small steps keep the springs steady on a slow frame
     const n = Math.ceil(dt / 0.02);
+    this.ripples = this.ripples.filter((r) => this.t - r.t < RIPPLE_LIFE);
     for (const k of keys) {
       this.pos(k);
       const o = this.bodies.get(k)!;
+      // a passing ripple lifts each song as it goes by
+      for (const r of this.ripples) {
+        const age = this.t - r.t,
+          ang = Math.acos(Math.max(-1, Math.min(1, dot(r.p, o.p))));
+        const d = (ang - age * RIPPLE_SPEED) / 0.12;
+        o.f.hv += 520 * dt * Math.exp(-d * d) * (1 - age / RIPPLE_LIFE);
+      }
       for (let j = 0; j < n; j++) this.bob(k, o, dt / n);
     }
   }
