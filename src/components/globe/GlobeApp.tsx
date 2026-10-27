@@ -1540,8 +1540,8 @@ const norm3 = (v: V3): V3 => {
   return [v[0] / n, v[1] / n, v[2] / n];
 };
 
-// The ripples of energy from songs landing: bright rings spreading over the
-// globe in the core's colours, fading as they go round to the far side.
+// The ripples of energy from songs landing: a quick, thin woosh of light
+// sweeping out over the globe in the core's colours, gone in under a second.
 function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb, L, look }: Live) {
   if (!cv) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1557,12 +1557,13 @@ function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb
   ctx.clearRect(0, 0, W, H);
   if (!sim.ripples.length || !s.cam || s.lens !== null || s.coreOn) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.lineCap = "round";
+  ctx.lineCap = "butt";
   const night = s.dk > 0.5;
   for (const r of sim.ripples) {
     const age = sim.t - r.t,
       th = age * RIPPLE_SPEED,
-      fade = 1 - age / RIPPLE_LIFE;
+      u = age / RIPPLE_LIFE,
+      fade = (1 - u) * (1 - u);
     if (th < 0.02) continue;
     // a frame round the landing spot
     const p = r.p,
@@ -1570,31 +1571,41 @@ function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb
       b = cross(p, a);
     const color = look ? drift(look.colors, s.t * 0.3 + r.t, night ? 0.35 : 0.15) : night ? "rgb(190,225,255)" : "rgb(255,255,255)";
     ctx.strokeStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 14 * L.s;
-    ctx.lineWidth = (2 + 3 * fade) * L.s;
-    let prev: [number, number, number] | null = null;
-    for (let i = 0; i <= 96; i++) {
-      const f = (i / 96) * Math.PI * 2;
-      const q: V3 = [0, 1, 2].map((j) => p[j] * Math.cos(th) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(th)) as V3;
-      const { lat, lon } = latLon(q);
-      const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam);
-      const z = v[2] * Rb * s.zoom,
-        kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
-      const pt: [number, number, number] = [L.cx + v[0] * Rb * kz, L.cy + v[1] * Rb * kz, v[2]];
-      if (prev) {
-        // brightest on the near side of the globe
-        ctx.globalAlpha = 0.7 * fade * Math.min(1, Math.sin(th) * 3) * (0.15 + 0.85 * clamp01((prev[2] + pt[2]) / 2 + 0.3));
+    const ring = (back: number) => {
+      const t = Math.max(0.01, th - back),
+        pts: [number, number, number][] = [];
+      for (let i = 0; i <= 72; i++) {
+        const f = (i / 72) * Math.PI * 2;
+        const q: V3 = [0, 1, 2].map((j) => p[j] * Math.cos(t) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(t)) as V3;
+        const { lat, lon } = latLon(q);
+        const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam!);
+        const z = v[2] * Rb * s.zoom,
+          kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
+        pts.push([L.cx + v[0] * Rb * kz, L.cy + v[1] * Rb * kz, v[2]]);
+      }
+      return pts;
+    };
+    // a faint wake trailing behind a thin bright edge, near side only
+    const passes: [number, number, number][] = [
+      [0.12, 7, 0.07],
+      [0.05, 3.5, 0.12],
+      [0, 1.1, 0.45],
+    ];
+    for (const [back, width, alpha] of passes) {
+      const pts = ring(back);
+      ctx.lineWidth = width * L.s;
+      for (let i = 1; i < pts.length; i++) {
+        const z = (pts[i - 1][2] + pts[i][2]) / 2;
+        if (z < -0.05) continue;
+        ctx.globalAlpha = alpha * fade * Math.min(1, th * 4) * clamp01(z * 2 + 0.1);
         ctx.beginPath();
-        ctx.moveTo(prev[0], prev[1]);
-        ctx.lineTo(pt[0], pt[1]);
+        ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+        ctx.lineTo(pts[i][0], pts[i][1]);
         ctx.stroke();
       }
-      prev = pt;
     }
   }
   ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
 }
 
 function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam, look }: Live, dt: number) {

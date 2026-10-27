@@ -140,8 +140,8 @@ const segPt = (px: number, py: number, ax: number, ay: number, bx: number, by: n
 };
 
 // A ripple of energy spreading round the globe from where a song landed.
-export const RIPPLE_SPEED = 1.5, // radians of the globe a second
-  RIPPLE_LIFE = Math.PI / RIPPLE_SPEED;
+export const RIPPLE_SPEED = 3.4, // radians of the globe a second
+  RIPPLE_LIFE = 0.85;
 
 export class TileSim {
   bodies = new Map<number, Body>();
@@ -198,8 +198,8 @@ export class TileSim {
       for (const r of this.ripples) {
         const age = this.t - r.t,
           ang = Math.acos(Math.max(-1, Math.min(1, dot(r.p, o.p))));
-        const d = (ang - age * RIPPLE_SPEED) / 0.12;
-        o.f.hv += 520 * dt * Math.exp(-d * d) * (1 - age / RIPPLE_LIFE);
+        const d = (ang - age * RIPPLE_SPEED) / 0.1;
+        o.f.hv += 150 * dt * Math.exp(-d * d) * (1 - age / RIPPLE_LIFE);
       }
       for (let j = 0; j < n; j++) this.bob(k, o, dt / n);
     }
