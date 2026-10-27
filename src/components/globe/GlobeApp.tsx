@@ -837,7 +837,7 @@ function Globe({
         if (!n) return;
         const byUser = new Map(n.posts.map((p) => [p.user_id, p]));
         setFriends((list) =>
-          list.map((f) => ({ ...f, post: byUser.get(f.id) ?? f.post, followed_back_at: n.backAt[f.id] ?? f.followed_back_at })),
+          list.map((f) => ({ ...f, post: byUser.get(f.id) ?? f.post, followed_back_at: n.backAt[f.id] ?? f.followed_back_at, follows_me: f.follows_me || Boolean(n.backAt[f.id]) })),
         );
         setAddedMe(n.addedMe);
         setActivity(n.activity);
@@ -1299,7 +1299,7 @@ function Globe({
           onOpenToday={!coreWho ? () => fly(ME) : coreFor?.k != null ? () => fly(coreFor.k!) : undefined}
           onAdd={coreAdded ? undefined : addFromCore}
           onMessage={
-            coreWho && (coreAdded || addedMe.some((p) => p.id === coreWho.id))
+            coreWho && friends.some((f) => f.id === coreWho.id && f.follows_me)
               ? () => {
                   closeCore();
                   closePanel();

@@ -107,6 +107,7 @@ const FRIENDS: Friend[] = NAMES.map((name, i) => ({
   followed_at: now.toISOString(),
   // a couple of them just added you back
   followed_back_at: i === 3 || i === 7 ? new Date(now.getTime() - (i + 1) * 300_000).toISOString() : null,
+  follows_me: i % 3 !== 2,
   hidden: false,
   post: rnd(i, 12) < 0.28 ? null : song(i + 1, `u${i + 1}`, TODAY, 1 + rnd(i, 1) * 10),
 }));
@@ -219,7 +220,7 @@ const demoApi: GlobeApi = {
   async follow(id) {
     const j = Number(id.slice(1)) - 100;
     const p = profile(100 + j, POOL[j]);
-    return { friend: { ...p, followed_at: new Date().toISOString(), followed_back_at: null, hidden: false, post: song(200 + j, p.id, TODAY, 2) } };
+    return { friend: { ...p, followed_at: new Date().toISOString(), followed_back_at: null, follows_me: true, hidden: false, post: song(200 + j, p.id, TODAY, 2) } };
   },
   async matchContacts(emails) {
     // pretend the first picked contact is already here

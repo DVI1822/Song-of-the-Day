@@ -7,9 +7,9 @@ import type { GlobeApi } from "./api";
 import { BackIcon, CloseIcon, glass } from "./ui";
 
 // The globe chat: a tab on the right edge that pulls out a live chat with
-// everyone on your globe. What you say reaches everyone who has you on their
-// globe; you see what the people on yours say. Messages to one person start
-// from their core and live here too, under Messages.
+// your mutual friends: people you've added who have added you back. Only they
+// see what you say, and you see only what they say. Messages to one person
+// start from their core (mutual friends only) and live here too, under Messages.
 
 type View = { kind: "globe" } | { kind: "inbox" } | { kind: "dm"; with: Profile };
 
@@ -281,7 +281,7 @@ export function Chat({
               loaded={loaded}
               empty={
                 view.kind === "globe"
-                  ? "Say hi to your globe. Everyone who has you on theirs will see it."
+                  ? "Say hi to your globe. Only people you've added who added you back will see it."
                   : `Start a conversation with ${view.with.display_name.split(" ")[0]}.`
               }
               onCore={onCore}

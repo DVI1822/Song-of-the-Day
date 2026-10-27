@@ -125,6 +125,7 @@ export async function getGlobe(profile: Profile) {
     ...p,
     followed_at,
     followed_back_at: backAt(addedAt, p.id, followed_at),
+    follows_me: addedAt.has(p.id),
     hidden: hiddenIds.has(p.id),
     post: byUser.get(p.id) ?? null,
   }));
