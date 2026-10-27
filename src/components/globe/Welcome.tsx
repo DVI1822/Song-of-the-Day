@@ -49,7 +49,7 @@ export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
         <h2 className="display text-[26px] leading-tight">Song of the Day</h2>
         <p className="text-[15px] leading-relaxed">
           <b>Share and discover music.</b> Post the song that hit you hardest today, and discover the best of what your
-          friends are jamming to today. Your world follows the real weather, seasons and time of day. Relax, explore,
+          friends are jamming to. Your world follows the real weather, seasons and time of day. Relax, explore,
           and post what you really feel.
         </p>
         <p className="text-[15px] leading-relaxed">
