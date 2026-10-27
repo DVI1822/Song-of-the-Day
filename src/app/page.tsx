@@ -5,7 +5,7 @@ import { GlobeApp } from "@/components/globe/GlobeApp";
 import { Magma, MagmaFilters } from "@/components/globe/Magma";
 import { LegalLinks } from "@/components/Legal";
 import { Shell, buttonClass } from "@/components/Shell";
-import { getGlobe, getSession } from "@/lib/data";
+import { getGlobe, getSession, sweepPhotos } from "@/lib/data";
 import { isConfigured } from "@/lib/supabase/env";
 
 export default async function Home() {
@@ -19,6 +19,7 @@ export default async function Home() {
   const [{ friends, myPost, mySongs, redoUsed, addedMe, activity }, { data: spotify }] = await Promise.all([
     getGlobe(profile),
     supabase.from("spotify_links").select("user_id").eq("user_id", userId).maybeSingle(),
+    sweepPhotos(supabase, profile).catch(() => {}),
   ]);
   return (
     <GlobeApp

@@ -215,3 +215,18 @@ export async function getProfilePage(username: string, viewerId: string | null) 
     isFollowing: Boolean(viewerFollows.data),
   };
 }
+
+// Photos last one day. Unlink yesterday's (and older) from your songs, then
+// delete every file in your folder that today's song isn't using. Files
+// under an hour old are left alone: they may be mid-post in another tab.
+export async function sweepPhotos(supabase: Awaited<ReturnType<typeof createClient>>, profile: Profile) {
+  await supabase.rpc("clear_old_photos");
+  const [{ data: today }, { data: files }] = await Promise.all([
+    supabase.from("posts").select("photo_url").eq("user_id", profile.id).eq("day", todayIn(profile.timezone)).maybeSingle(),
+    supabase.storage.from("photos").list(profile.id, { limit: 1000 }),
+  ]);
+  const keep = today?.photo_url?.split("/").pop();
+  const hourAgo = Date.now() - 3600e3;
+  const old = (files ?? []).filter((f) => f.name !== keep && Date.parse(f.created_at ?? "") < hourAgo);
+  if (old.length) await supabase.storage.from("photos").remove(old.map((f) => `${profile.id}/${f.name}`));
+}
