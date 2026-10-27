@@ -6,7 +6,8 @@ import type { Post, Profile } from "@/lib/types";
 import { Magma } from "./Magma";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
-import { ShareIcon, ShareSheet, useStory } from "./ShareStory";
+import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
+import type { StorySky } from "./storyVideo";
 import { NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon } from "./ui";
@@ -31,6 +32,7 @@ export function Feature({
   api,
   onBlocked,
   onHide,
+  story,
   rootRef,
   backdropRef,
   cardRef,
@@ -50,6 +52,7 @@ export function Feature({
   api: GlobeApi;
   onBlocked(): void;
   onHide?: () => Promise<string | null>;
+  story: StoryOf;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
   cardRef: Ref<HTMLDivElement>;
@@ -63,8 +66,8 @@ export function Feature({
   const mine = who === "You";
   const [r, setR] = useReactions(api, post.id);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const story = useStory(me.username, post, mine);
+  // the sky the Story starts on: the one outside when you tap share
+  const [sharing, setSharing] = useState<StorySky | null>(null);
 
   // feel it, or take it back, straight away; undone if it doesn't stick
   const feel = async () => {
@@ -103,7 +106,7 @@ export function Feature({
             {mine && (
               <button
                 type="button"
-                onClick={() => setSharing(true)}
+                onClick={() => setSharing(story.sky())}
                 aria-label="Share to your Instagram Story"
                 className="flex h-11 w-11 items-center justify-center text-card-ink"
               >
@@ -245,7 +248,9 @@ export function Feature({
           onClose={() => setNotesOpen(false)}
         />
       )}
-      {sharing && <ShareSheet story={story} username={me.username} onClose={() => setSharing(false)} />}
+      {sharing && (
+        <ShareSheet post={post} name={me.display_name} username={me.username} of={story} initialSky={sharing} onClose={() => setSharing(null)} />
+      )}
     </div>
   );
 }
