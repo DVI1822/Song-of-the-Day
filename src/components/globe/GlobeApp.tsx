@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Post, Profile } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Post, Profile, SavedSong } from "@/lib/types";
 import { serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -484,6 +484,17 @@ function Globe({
         : { profile: coreWho, posts: null }
       : { profile: me, posts: mySongs };
   const coreAdded = !coreWho || friends.some((f) => f.id === coreWho.id);
+  // your own core: the songs you saved, fresh each time it opens
+  const [saved, setSaved] = useState<SavedSong[] | null>(null);
+  const ownCore = Boolean(coreFor) && !coreWho;
+  useEffect(() => {
+    if (!ownCore) return;
+    let on = true;
+    api.saved().then((list) => on && setSaved(list));
+    return () => {
+      on = false;
+    };
+  }, [ownCore, api]);
   // flying into someone else's core, the core in the middle becomes theirs
   const theirSongs = coreWho && friendCore?.id === coreWho.id ? friendCore.posts : null;
   const theirLook = useCoreLook(theirSongs, coreWho?.timezone ?? "UTC");
@@ -1280,6 +1291,7 @@ function Globe({
         <CoreView
           profile={coreData.profile}
           posts={coreData.posts}
+          saved={saved}
           mine={coreData.profile.id === me.id}
           dark={darkOn}
           sheetTop={Math.round(L.cy + Math.max(56, L.R * 0.5))}

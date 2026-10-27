@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { formatTime, initials } from "@/lib/day";
 import type { Note, Post, Reactions } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { Magma } from "./Magma";
 import { CloseIcon } from "./ui";
 
-// Feeling a song (the like) and the notes people leave on it. The feel is
-// a drop that fills with the core's magma; notes open in a sheet under the
-// song.
+// Liking a song and the notes people leave on it. The like is a set of level
+// bars that jump up and light up when tapped, with the count beside it;
+// notes open in a sheet under the song. (The likes are "feels" in the data.)
 
 export function useReactions(api: GlobeApi, postId: string) {
   const [r, setR] = useState<Reactions | null>(null);
@@ -23,84 +23,137 @@ export function useReactions(api: GlobeApi, postId: string) {
   return [r, setR] as const;
 }
 
-const DropIcon = () => (
-  <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-    <path d="M12 3.2c3.6 4.3 6 7.7 6 10.6a6 6 0 0 1-12 0c0-2.9 2.4-6.3 6-10.6z" />
+// The like: three level bars that jump up when it's tapped.
+const BARS: [number, number, number][] = [
+  [3.5, 12, 7 / 12],
+  [10, 18, 11 / 18],
+  [16.5, 14.5, 5 / 14.5],
+];
+export const LevelsIcon = ({ on, size = 22 }: { on?: boolean; size?: number }) => (
+  <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+    {BARS.map(([x, h, low], i) => (
+      <rect
+        key={x}
+        x={x}
+        y={21 - h}
+        width="4"
+        height={h}
+        rx="1.3"
+        fill={on ? "currentColor" : "none"}
+        style={{
+          transform: `scaleY(${on ? 1 : low})`,
+          transformBox: "fill-box",
+          transformOrigin: "bottom",
+          transition: `transform .35s cubic-bezier(.3,1.5,.5,1) ${i * 0.05}s`,
+          vectorEffect: "non-scaling-stroke",
+        }}
+      />
+    ))}
   </svg>
 );
-const NoteIcon = () => (
-  <svg aria-hidden width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-    <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 17h-7l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z" />
+// Notes: a speech bubble with a little music note in it, filled once you've
+// left one.
+const NoteIcon = ({ on }: { on?: boolean }) => (
+  <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path
+      d="M12 3.5c4.9 0 8.5 3.3 8.5 7.6s-3.6 7.6-8.5 7.6c-1 0-2-.1-2.9-.4L4.5 20.5l1.3-3.8C4.3 15.3 3.5 13.3 3.5 11.1c0-4.3 3.6-7.6 8.5-7.6z"
+      fill={on ? "currentColor" : "none"}
+    />
+    <path d="M11 13.5V8.2l3.2-.8" stroke={on ? "white" : "currentColor"} strokeWidth="1.6" />
+    <circle cx="9.9" cy="13.6" r="1.4" fill={on ? "white" : "currentColor"} stroke="none" />
   </svg>
 );
 
-// The two buttons beside a song's title.
+// The buttons beside a song's title: save it to your core (not on your own
+// song), like it, and notes, each count beside its button.
 export function ReactionButtons({
   r,
   mine,
   meId,
   onFeel,
   onNotes,
+  onSave,
+  saveRef,
 }: {
   r: Reactions | null;
   mine: boolean;
   meId: string;
   onFeel(): void;
   onNotes(): void;
+  onSave(): void;
+  saveRef?: Ref<HTMLButtonElement>;
 }) {
-  const felt = Boolean(r?.feels.some((f) => f.user.id === meId));
-  const [burst, setBurst] = useState(0);
-  const feels = r?.feels.length ?? 0,
+  const liked = Boolean(r?.feels.some((f) => f.user.id === meId));
+  const saved = Boolean(r?.saved);
+  const noted = Boolean(r?.notes.some((n) => n.user.id === meId));
+  const [savePop, setSavePop] = useState(0);
+  const likes = r?.feels.length ?? 0,
     notes = r?.notes.length ?? 0;
-  const count = "min-w-[1ch] text-[11px] font-semibold tabular-nums leading-none text-muted";
+  const count = "min-w-[1ch] text-[12px] font-semibold tabular-nums leading-none";
   return (
-    <div className="-mr-1.5 flex flex-none items-start">
+    <div className="-mr-1 flex flex-none items-center gap-0.5 pt-0.5">
+      {!mine && (
+        <button
+          ref={saveRef}
+          type="button"
+          onClick={() => {
+            if (!saved) setSavePop((b) => b + 1);
+            onSave();
+          }}
+          aria-label={saved ? "Saved to your core. Tap to take it out" : "Save to your core"}
+          aria-pressed={saved}
+          className="relative flex h-10 w-9 items-center justify-center"
+        >
+          <span
+            key={savePop}
+            className="relative block h-[21px] w-[21px] transition-[opacity,filter] duration-300"
+            style={{
+              opacity: saved ? 1 : 0.5,
+              filter: saved ? undefined : "saturate(0.35)",
+              animation: savePop ? "core-pop .45s cubic-bezier(.2,.75,.25,1)" : undefined,
+            }}
+          >
+            <Magma className="h-full w-full drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+          </span>
+          <span
+            aria-hidden
+            className={`absolute bottom-[7px] right-0.5 flex h-[13px] w-[13px] items-center justify-center rounded-full text-white shadow-[0_1px_2px_rgba(13,42,63,0.3)] ${saved ? "bg-accent" : "bg-card-ink/70"}`}
+          >
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+              <path d={saved ? "M5 12.5l4.5 4.5L19 7.5" : "M12 5v14M5 12h14"} />
+            </svg>
+          </span>
+        </button>
+      )}
       <button
         type="button"
         onClick={() => {
           if (mine) return onNotes();
-          if (!felt) setBurst((b) => b + 1);
           onFeel();
         }}
-        aria-label={mine ? `${feels} felt your song` : felt ? "Felt it. Tap to take it back" : "Feel it"}
-        aria-pressed={mine ? undefined : felt}
-        className="flex w-11 flex-col items-center gap-1 pt-0.5 text-card-ink"
+        aria-label={
+          mine ? `${likes} ${likes === 1 ? "like" : "likes"} on your song` : liked ? "Liked. Tap to take it back" : "Like"
+        }
+        aria-pressed={mine ? undefined : liked}
+        className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors ${liked ? "text-accent" : "text-card-ink"}`}
       >
-        <span className="relative flex h-7 w-7 items-center justify-center">
-          {felt || (mine && feels > 0) ? (
-            <span key={burst} className="block h-[22px] w-[22px]" style={{ animation: burst ? "feel-pop .5s cubic-bezier(.2,.75,.25,1)" : undefined }}>
-              <Magma className="h-full w-full drop-shadow-[0_1px_5px_rgba(60,90,110,0.5)]" />
-            </span>
-          ) : (
-            <DropIcon />
-          )}
-          {burst > 0 && (
-            <span
-              key={`r${burst}`}
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-full border-2 border-accent/60"
-              style={{ animation: "feel-ring .7s ease-out forwards" }}
-            />
-          )}
-        </span>
-        <span className={count}>{feels || ""}</span>
+        <LevelsIcon on={liked} />
+        <span className={`${count} ${liked ? "" : "text-muted"}`}>{likes || ""}</span>
       </button>
       <button
         type="button"
         onClick={onNotes}
         aria-label={notes ? `${notes} ${notes === 1 ? "note" : "notes"}` : "Leave a note"}
-        className="flex w-11 flex-col items-center gap-1 pt-0.5 text-card-ink"
+        className={`flex h-10 items-center gap-1.5 rounded-full px-2 ${noted ? "text-accent" : "text-card-ink"}`}
       >
-        <span className="flex h-7 w-7 items-center justify-center">
-          <NoteIcon />
-        </span>
-        <span className={count}>{notes || ""}</span>
+        <NoteIcon on={noted} />
+        <span className={`${count} ${noted ? "" : "text-muted"}`}>{notes || ""}</span>
       </button>
     </div>
   );
 }
 
-// Who felt the song, its notes, and a place to leave one.
+// Who liked the song, its notes, and a place to leave one.
 export function NotesSheet({
   api,
   post,
@@ -155,14 +208,14 @@ export function NotesSheet({
   };
 
   const names = feels.map((f) => (f.user.id === meId ? "You" : f.user.display_name.split(" ")[0]));
-  const feltLine =
+  const likedLine =
     names.length === 0
       ? mine
-        ? "No one's felt it yet"
-        : `Be the first to feel ${first}'s song`
+        ? "No likes yet"
+        : `Be the first to like ${first}'s song`
       : names.length <= 3
-        ? `${names.slice(0, -1).join(", ")}${names.length > 1 ? " and " : ""}${names[names.length - 1]} felt it`
-        : `${names.slice(0, 2).join(", ")} and ${names.length - 2} others felt it`;
+        ? `${names.slice(0, -1).join(", ")}${names.length > 1 ? " and " : ""}${names[names.length - 1]} liked it`
+        : `${names.slice(0, 2).join(", ")} and ${names.length - 2} others liked it`;
 
   return (
     <div className="fixed inset-0 z-[490] flex flex-col justify-end">
@@ -195,8 +248,12 @@ export function NotesSheet({
               </span>
             ))}
           </div>
-          {feels.length > 0 && <Magma className="h-4 w-4 flex-none" />}
-          <div className="min-w-0 flex-1 text-[13px] text-muted">{feltLine}</div>
+          {feels.length > 0 && (
+            <span className="flex-none text-accent">
+              <LevelsIcon on size={16} />
+            </span>
+          )}
+          <div className="min-w-0 flex-1 text-[13px] text-muted">{likedLine}</div>
         </div>
 
         <div ref={list} className="flex min-h-[90px] flex-1 flex-col gap-3 overflow-y-auto border-t border-card-ink/[0.07] px-5 py-3">

@@ -2,10 +2,14 @@ import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 
-// The database calls this every hour with the people to nudge (see the push
-// migration). It's signed with PUSH_SECRET, so nobody else can send nudges.
+// The database calls this every hour with the people to nudge, and whenever
+// someone likes a song or leaves a note on it (see the push migrations). It's
+// signed with PUSH_SECRET, so nobody else can send anything.
 
-type Sub = { endpoint: string; p256dh: string; auth: string; kind: "noon" | "night" };
+type Sub = { endpoint: string; p256dh: string; auth: string } & (
+  | { kind: "noon" | "night" }
+  | { kind: "reaction"; title: string; body: string; tag: string }
+);
 
 const NUDGE = {
   noon: { title: "What's your song today?", body: "Pick the one that hit hardest and put it on your globe." },
@@ -29,7 +33,11 @@ export async function POST(req: Request) {
       webpush
         .sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify({ ...(NUDGE[s.kind] ?? NUDGE.noon), url: "/" }),
+          JSON.stringify(
+            s.kind === "reaction"
+              ? { title: s.title, body: s.body, tag: s.tag, url: "/" }
+              : { ...(NUDGE[s.kind] ?? NUDGE.noon), url: "/" },
+          ),
           { TTL: 60 * 60 * 3, urgency: "normal" },
         )
         .catch((e: { statusCode?: number }) => {

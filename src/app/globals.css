@@ -85,27 +85,16 @@ body {
   animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
-/* feeling a song: the drop swells with magma and a ring ripples out */
-@keyframes feel-pop {
+/* saving a song to your core: the little core pops */
+@keyframes core-pop {
   0% {
-    transform: scale(0.6);
+    transform: scale(0.7);
   }
   55% {
-    transform: scale(1.22);
+    transform: scale(1.25);
   }
   100% {
     transform: scale(1);
-  }
-}
-
-@keyframes feel-ring {
-  from {
-    opacity: 0.7;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.9);
   }
 }
 

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isConfigured } from "./supabase/env";
 import { createClient } from "./supabase/server";
 import { todayIn } from "./day";
-import type { Activity, AddedMe, Core, Friend, Note, Post, Profile, Reactions } from "./types";
+import type { Activity, AddedMe, Core, Friend, Note, Post, Profile, Reactions, SavedSong } from "./types";
 
 export async function getSession() {
   // Until Supabase is connected, the home page explains what to do.
@@ -50,7 +50,7 @@ async function addedYou(supabase: Supabase, userId: string, mine: Set<string>) {
 
 // Who felt a song and the notes on it, oldest notes first.
 export async function getReactions(supabase: Supabase, postId: string): Promise<Reactions> {
-  const [{ data: feels }, { data: notes }] = await Promise.all([
+  const [{ data: feels }, { data: notes }, { count: saved }] = await Promise.all([
     supabase
       .from("feels")
       .select("created_at, user:profiles!feels_user_id_fkey(*)")
@@ -63,12 +63,15 @@ export async function getReactions(supabase: Supabase, postId: string): Promise<
       .eq("post_id", postId)
       .order("created_at", { ascending: true })
       .limit(200),
+    // only your own saves are visible to you
+    supabase.from("saves").select("post_id", { count: "exact", head: true }).eq("post_id", postId),
   ]);
   return {
     feels: (feels ?? [])
       .map((f) => ({ created_at: f.created_at as string, user: f.user as unknown as Profile }))
       .filter((f) => f.user),
     notes: ((notes ?? []) as unknown as Note[]).filter((n) => n.user),
+    saved: (saved ?? 0) > 0,
   };
 }
 
@@ -177,6 +180,19 @@ export async function getCore(userId: string): Promise<Core | null> {
     followers: followers.count ?? 0,
     following: following.count ?? 0,
   };
+}
+
+// The songs you saved to your core, newest saved first.
+export async function getSaved(supabase: Supabase): Promise<SavedSong[]> {
+  const { data } = await supabase
+    .from("saves")
+    .select("created_at, post:posts(*, by:profiles!posts_user_id_fkey(*))")
+    .order("created_at", { ascending: false })
+    .limit(300);
+  type Row = { created_at: string; post: (Post & { by: Profile | null }) | null };
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => r.post?.by)
+    .map((r) => ({ ...(r.post as Post & { by: Profile }), saved_at: r.created_at }));
 }
 
 export async function getProfilePage(username: string, viewerId: string | null) {

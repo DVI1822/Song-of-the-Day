@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, type Ref } from "react";
 import { formatDay, formatTime, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
-import type { Post, Profile } from "@/lib/types";
+import type { Post, Profile, SavedSong } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { ChatIcon } from "./Chat";
 import { SongPlayer } from "./Preview";
@@ -16,6 +16,7 @@ const FULL_TOP = "max(10px, env(safe-area-inset-top))";
 export function CoreView({
   profile,
   posts,
+  saved,
   mine,
   dark,
   sheetTop,
@@ -30,6 +31,7 @@ export function CoreView({
 }: {
   profile: Profile | null;
   posts: Post[] | null; // null while loading
+  saved?: SavedSong[] | null; // your own core: the songs you saved
   mine: boolean;
   dark: boolean;
   sheetTop: number;
@@ -191,6 +193,36 @@ export function CoreView({
                   <SongPlayer post={todayPost} />
                 </div>
               )}
+            </div>
+          )}
+
+          {mine && saved && saved.length > 0 && (
+            <div className="flex flex-col">
+              <div className="display pb-1.5 text-[17px]">Saved</div>
+              {saved.map((p, j) => (
+                <div key={p.id} className={j ? "border-t border-card-ink/[0.08]" : ""}>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(open === p.id ? null : p.id)}
+                    aria-expanded={open === p.id}
+                    className="flex h-[54px] w-full items-center gap-3 text-left"
+                  >
+                    <Cover src={p.artwork_url} seed={p.title} size={38} />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="truncate text-[13px] font-semibold">{p.title}</div>
+                      <div className="truncate text-[11px] text-muted">
+                        {p.artist} · {p.by.display_name.split(" ")[0]}&apos;s song, {formatDay(p.day)}
+                      </div>
+                    </div>
+                  </button>
+                  {open === p.id && (
+                    <div className="rise-in flex flex-col gap-2.5 pb-3">
+                      {p.caption && <div className="text-sm leading-relaxed">“{p.caption}”</div>}
+                      <SongPlayer post={p} />
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
