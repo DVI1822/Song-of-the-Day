@@ -3,7 +3,7 @@
 import type { GlobeApi } from "@/components/globe/api";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { addDays, todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Message, Note, Post, Profile, Reactions } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Message, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 
 // The Globe with made-up friends. Works without signing in; nothing is saved.
 
@@ -122,6 +122,10 @@ const NOTE_LINES = [
   "on repeat since you posted it",
 ];
 const reactions = new Map<string, Reactions>();
+// Songs you saved to your core: two to start, plus whatever you save.
+const SAVED: SavedSong[] = FRIENDS.filter((f) => f.post)
+  .slice(3, 5)
+  .map((f, j) => ({ ...f.post!, by: f, saved_at: new Date(now.getTime() - (j + 1) * 86_400_000).toISOString() }));
 function reactionsOf(postId: string): Reactions {
   let r = reactions.get(postId);
   if (!r) {
@@ -236,7 +240,18 @@ const demoApi: GlobeApi = {
   async reactions(postId) {
     await new Promise((r) => setTimeout(r, 250));
     const r = reactionsOf(postId);
-    return { feels: [...r.feels], notes: [...r.notes] };
+    return { feels: [...r.feels], notes: [...r.notes], saved: SAVED.some((s) => s.id === postId) };
+  },
+  async save(postId, on) {
+    const i = SAVED.findIndex((s) => s.id === postId);
+    if (i >= 0) SAVED.splice(i, 1);
+    const f = FRIENDS.find((x) => x.post?.id === postId);
+    if (on && f?.post) SAVED.unshift({ ...f.post, by: f, saved_at: new Date().toISOString() });
+    return {};
+  },
+  async saved() {
+    await new Promise((r) => setTimeout(r, 200));
+    return [...SAVED];
   },
   async feel(postId, on) {
     const r = reactionsOf(postId);

@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCore, getNews, getReactions, getSession, type News } from "@/lib/data";
+import { getCore, getNews, getReactions, getSaved, getSession, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
-import type { Core, Friend, Note, Post, Profile, Reactions } from "@/lib/types";
+import type { Core, Friend, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
 import { INVITE_COOKIE, cleanInvite } from "@/lib/invite";
 import { accessToken, spotifyApi } from "@/lib/spotify";
@@ -304,6 +304,22 @@ export async function feelSong(postId: string, on: boolean): Promise<{ error?: s
     ? await supabase.from("feels").insert({ post_id: postId })
     : await supabase.from("feels").delete().eq("post_id", postId).eq("user_id", userId);
   return error && error.code !== "23505" ? { error: "Couldn't do that. Try again." } : {};
+}
+
+// Save someone's song to your core, or take it back out.
+export async function saveSong(postId: string, on: boolean): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return { error: "Sign in to save songs." };
+  const { error } = on
+    ? await supabase.from("saves").insert({ post_id: postId })
+    : await supabase.from("saves").delete().eq("post_id", postId).eq("user_id", userId);
+  return error && error.code !== "23505" ? { error: "Couldn't do that. Try again." } : {};
+}
+
+export async function loadSaved(): Promise<SavedSong[]> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return [];
+  return getSaved(supabase);
 }
 
 export async function addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }> {

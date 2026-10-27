@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type Ref } from "react";
+import { useEffect, useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
 import { Magma } from "./Magma";
@@ -81,6 +81,34 @@ export function Feature({
     const res = await api.feel(post.id, on);
     if (res.error) setR(before);
   };
+  // save it to your core, or take it back out, the same way
+  const save = async () => {
+    if (!r || mine) return;
+    setTip(false);
+    const on = !r.saved;
+    const before = r;
+    setR({ ...r, saved: on });
+    const res = await api.save(post.id, on);
+    if (res.error) setR(before);
+  };
+
+  // the first song you open that isn't yours explains the core button, once
+  const [tip, setTip] = useState(false);
+  useEffect(() => {
+    if (mine) return;
+    try {
+      if (localStorage.getItem(TIP_KEY)) return;
+    } catch {
+      return;
+    }
+    const t = setTimeout(() => {
+      setTip(true);
+      try {
+        localStorage.setItem(TIP_KEY, "1");
+      } catch {}
+    }, 900);
+    return () => clearTimeout(t);
+  }, [mine]);
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
@@ -217,7 +245,8 @@ export function Feature({
             <div className="display text-[26px] leading-tight text-card-ink">{post.title}</div>
             <div className="text-[15px] text-muted">{[post.artist, post.album].filter(Boolean).join(" · ")}</div>
           </div>
-          <ReactionButtons r={r} mine={mine} meId={me.id} onFeel={feel} onNotes={() => setNotesOpen(true)} />
+          <ReactionButtons r={r} mine={mine} meId={me.id} onFeel={feel} onNotes={() => setNotesOpen(true)} onSave={save} />
+          {tip && <SaveTip onDone={() => setTip(false)} />}
         </div>
         <div className="relative">
           <SongPlayer
@@ -251,6 +280,27 @@ export function Feature({
       {sharing && (
         <ShareSheet post={post} name={me.display_name} username={me.username} of={story} initialSky={sharing} onClose={() => setSharing(null)} />
       )}
+    </div>
+  );
+}
+
+const TIP_KEY = "sotd-save-tip";
+
+// A bubble over the core button, the first time: what saving does.
+function SaveTip({ onDone }: { onDone(): void }) {
+  return (
+    <div
+      role="status"
+      className="rise-in absolute bottom-full right-0 z-10 mb-2.5 flex w-[250px] flex-col gap-2 rounded-[18px] bg-card-ink px-4 py-3 text-white shadow-[0_14px_34px_-12px_rgba(13,42,63,0.6)]"
+    >
+      <div className="text-[13px] leading-snug">
+        <b className="font-semibold">Save it to your core.</b> Tap the little core to keep this song in your core, so you can
+        find it again anytime.
+      </div>
+      <button type="button" onClick={onDone} className="self-end text-xs font-semibold text-white/80 hover:text-white">
+        Got it
+      </button>
+      <span aria-hidden className="absolute -bottom-1.5 right-[112px] h-3 w-3 rotate-45 bg-card-ink" />
     </div>
   );
 }

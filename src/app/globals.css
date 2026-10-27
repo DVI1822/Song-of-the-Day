@@ -85,16 +85,16 @@ body {
   animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
-/* liking a song: the thumbs up pops */
-@keyframes like-pop {
+/* saving a song to your core: the little core pops */
+@keyframes core-pop {
   0% {
-    transform: scale(0.7) rotate(-12deg);
+    transform: scale(0.7);
   }
   55% {
-    transform: scale(1.25) rotate(-6deg);
+    transform: scale(1.25);
   }
   100% {
-    transform: scale(1) rotate(0);
+    transform: scale(1);
   }
 }
 

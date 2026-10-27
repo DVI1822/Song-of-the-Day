@@ -10,6 +10,8 @@ import {
   loadNews,
   loadReactions,
   feelSong,
+  saveSong,
+  loadSaved,
   addNote,
   deleteNote,
   matchContacts,
@@ -31,7 +33,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, Message, Note, Post, Profile, Reactions } from "@/lib/types";
+import type { Core, Friend, Message, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -48,6 +50,9 @@ export type GlobeApi = {
   hideSongs(profileId: string, hide: boolean): Promise<{ error?: string }>;
   reactions(postId: string): Promise<Reactions | null>;
   feel(postId: string, on: boolean): Promise<{ error?: string }>;
+  // save someone's song to your core, and the ones you've saved
+  save(postId: string, on: boolean): Promise<{ error?: string }>;
+  saved(): Promise<SavedSong[]>;
   addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }>;
   deleteNote(noteId: string): Promise<{ error?: string }>;
   chat: ChatApi;
@@ -155,6 +160,8 @@ export const serverApi: GlobeApi = {
   news: loadNews,
   reactions: loadReactions,
   feel: feelSong,
+  save: saveSong,
+  saved: loadSaved,
   addNote,
   deleteNote,
   chat: supabaseChat,

@@ -7,7 +7,7 @@ import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
 import { Magma } from "./Magma";
 import { SongPlayer } from "./Preview";
-import { ThumbIcon } from "./Reactions";
+import { LevelsIcon } from "./Reactions";
 import { Cover, SearchIcon, coverRadius } from "./ui";
 
 const Kicker = ({ children }: { children: React.ReactNode }) => (
@@ -167,7 +167,7 @@ function OnYourSong({ activity, isNew, onMine }: { activity: Activity[]; isNew(a
             <Avatar name={a.user.display_name} />
             {a.kind === "feel" && (
               <span className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-accent shadow-[0_1px_3px_rgba(13,42,63,0.25)]">
-                <ThumbIcon on size={11} />
+                <LevelsIcon on size={11} />
               </span>
             )}
           </span>
