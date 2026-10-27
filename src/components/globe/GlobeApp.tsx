@@ -95,6 +95,10 @@ const seenStore = {
   },
 };
 
+// how long a new song takes to fall in, and when you last had the Globe open
+const FALL = 0.85;
+const OPEN_KEY = "sotd-last-open";
+
 // Per-frame easing written for 60fps, made frame-rate independent.
 const ease = (k: number, dt: number) => 1 - Math.pow(1 - k, dt * 60);
 
@@ -151,6 +155,11 @@ function newMotion(posted: boolean) {
     myLanded: posted,
     myLock: null as null | number,
     born: new Map<number, number>(),
+    // songs posted since your last visit fall in from above, one by one:
+    // when each starts falling, and the posts already seen this visit
+    drops: new Map<number, number>(),
+    dropNext: 0,
+    dropSeen: new Set<string>(),
     drag: null as null | { x: number; y: number; lx: number; yaw: number; pitch: number },
     pointers: new Map<number, { x: number; y: number }>(),
     // two fingers down: no spinning, and no zooming either
@@ -299,6 +308,35 @@ function Globe({
 
   // your core grows from your songs; the stream to what's playing matches it
   const look = useCoreLook(mySongs, me.timezone);
+
+  // Songs posted since you last had the Globe open fall in from above, one
+  // after another, and splash into the water. The first visit drops none.
+  const lastOpen = useRef<number | null>(null);
+  useEffect(() => {
+    if (lastOpen.current === null) {
+      let at = NaN;
+      try {
+        at = Date.parse(localStorage.getItem(OPEN_KEY) ?? "");
+      } catch {}
+      lastOpen.current = Number.isFinite(at) ? at : Date.now();
+    }
+    const s = m.current,
+      since = lastOpen.current;
+    const fresh = friends.flatMap((f, k) => {
+      if (!f.post || f.hidden || s.dropSeen.has(f.post.id)) return [];
+      s.dropSeen.add(f.post.id);
+      return Date.parse(f.post.created_at) > since ? [k] : [];
+    });
+    // a long list falls in faster
+    const gap = Math.min(0.45, 5 / Math.max(1, fresh.length));
+    for (const k of fresh) {
+      s.dropNext = Math.max(s.dropNext + gap, s.t + 1.2);
+      s.drops.set(k, s.dropNext);
+    }
+    try {
+      localStorage.setItem(OPEN_KEY, new Date().toISOString());
+    } catch {}
+  }, [friends]);
 
   // Everything the frame loop needs from the latest render.
   const live = useRef<Live>({ keys, half, Rb, L, zFeat, friends, beam, look });
@@ -1297,6 +1335,22 @@ sim: TileSim,
     const lockAt = k === ME ? s.myLock : null;
     const lockAge = wait || lockAt === null ? 99 : s.t - lockAt;
     const grow = 1 - Math.pow(1 - Math.min(1, (b === undefined ? 99 : s.t - b) / 0.9), 3);
+    // falling in from above the screen, quicker and quicker, until it splashes
+    let fall = "";
+    const d0 = s.drops.get(k);
+    if (d0 !== undefined) {
+      const u = (s.t - d0) / FALL;
+      if (u >= 1) {
+        s.drops.delete(k);
+        sim.splash(k, keys);
+      } else {
+        const up = ((u < 0 ? 1 : 1 - u * u) * 1.1 * L.h) / s.zoom;
+        fall =
+          `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) ` +
+          `rotateZ(${(-cam.roll).toFixed(4)}rad) translateY(${(-up).toFixed(1)}px) rotateZ(${cam.roll.toFixed(4)}rad) ` +
+          `rotateX(${s.pitch.toFixed(4)}rad) rotateZ(${TILT.toFixed(4)}rad) rotateY(${s.yaw.toFixed(4)}rad) `;
+      }
+    }
     const lockE = 1 - Math.pow(1 - Math.min(1, lockAge / 0.7), 3);
     const sla = Math.sin(lat),
       cla = Math.cos(lat),
@@ -1309,6 +1363,7 @@ sim: TileSim,
     // riding the water: up and down, and rocked a little
     const fl = sim.float(k);
     te.box.style.transform =
+      fall +
       `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h).toFixed(2)}px) ` +
       `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`;
     if (nearFade <= 0 || ez[2] < visibleZ) continue; // facing away: nothing to light
@@ -1785,18 +1840,18 @@ const outline = (dark: boolean): React.CSSProperties =>
     ? { color: "rgba(230,240,255,0.06)", WebkitTextStroke: "1.5px rgba(230,240,255,0.6)", textShadow: "0 0 18px rgba(180,210,255,0.25)" }
     : { color: "rgba(13,42,63,0.04)", WebkitTextStroke: "1.5px rgba(13,42,63,0.45)", textShadow: "0 6px 14px rgba(13,42,63,0.12)" };
 
-// How many songs are on your globe today.
+// How many songs are on your globe right now, ready to shuffle.
 function SongCount({ n, dark }: { n: number; dark: boolean }) {
   return (
     <div
-      aria-label={`${n} ${n === 1 ? "song" : "songs"} on your globe today`}
+      aria-label={`${n} ${n === 1 ? "song" : "songs"} on your globe`}
       className="flex items-baseline gap-1.5 font-bubble font-semibold leading-none tracking-[0.05em] tabular-nums transition-colors duration-500"
     >
       <span className="text-[26px]" style={outline(dark)}>
         {n}
       </span>
       <span className="text-[11px] tracking-[0.12em]" style={{ color: dark ? "rgba(230,240,255,0.6)" : "rgba(13,42,63,0.5)" }}>
-        {n === 1 ? "SONG TODAY" : "SONGS TODAY"}
+        {n === 1 ? "SONG" : "SONGS"}
       </span>
     </div>
   );

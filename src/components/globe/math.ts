@@ -149,6 +149,30 @@ export class TileSim {
     return this.bodies.get(k)!.f;
   }
 
+  // Landed from a fall: a big dip, tipped a little, and a ring of ripples
+  // that rocks the songs around it.
+  splash(k: number, keys: number[]) {
+    const f = this.float(k),
+      p = this.pos(k);
+    f.hv -= 300;
+    f.av += (Math.random() - 0.5) * 2.4;
+    f.bv += (Math.random() - 0.5) * 2.4;
+    for (const j of keys) {
+      if (j === k) continue;
+      const o = this.bodies.get(j);
+      if (!o) continue;
+      const ang = Math.acos(Math.max(-1, Math.min(1, dot(p, o.p))));
+      if (ang > 0.6) continue;
+      const near = 1 - ang / 0.6,
+        F = frame(o.p);
+      // tipped away from where it landed
+      const away: V3 = [o.p[0] - p[0], o.p[1] - p[1], o.p[2] - p[2]];
+      o.f.hv -= 90 * near;
+      o.f.bv += dot(away, F.e) * 6 * near;
+      o.f.av -= dot(away, F.d) * 6 * near;
+    }
+  }
+
   // Tapped: it dips into the water, then bobs back up.
   dip(k: number) {
     this.float(k).hv -= 150;
