@@ -424,7 +424,11 @@ function Globe({
       if (m.current.moved) return;
       if (k === ME && wait) openCompose();
       else if (wait) spinTo(k);
-      else fly(k);
+      else {
+        // it dips into the water first, then the camera flies in
+        sim.current.dip(k);
+        setTimeout(() => fly(k), 220);
+      }
     },
     [fly, openCompose, spinTo],
   );
@@ -643,6 +647,7 @@ function Globe({
         }
       }
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
+      sim.current.water(keys, Math.min(dt, 0.1));
       draw(s, R.current, els.current, sim.current, live.current);
       drawBeam(s, R.current.beam, sim.current, live.current, dt);
       const w = wx.current,
@@ -1348,7 +1353,11 @@ sim: TileSim,
     const camZ = s.zoom * Rb * ez[2];
     const nearFade = clamp01((880 - camZ) / 220);
     te.box.style.visibility = nearFade <= 0 ? "hidden" : "";
-    te.box.style.transform = `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${Rb}px) scale(${grow.toFixed(3)})`;
+    // riding the water: up and down, and rocked a little
+    const fl = sim.float(k);
+    te.box.style.transform =
+      `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h).toFixed(2)}px) ` +
+      `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`;
     if (nearFade <= 0 || ez[2] < visibleZ) continue; // facing away: nothing to light
 
     const ex = camV([clo, 0, -slo], cam),

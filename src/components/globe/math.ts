@@ -112,7 +112,11 @@ export function starField(n: number, seed: number, size: number, alpha: number, 
 // The collision shape is exactly the drawn rounded square.
 // ---------------------------------------------------------------------------
 
-type Body = { p: V3; v: V3; sp: number };
+// Each song floats like a little raft on water nobody can see: h is how far
+// it rides above (or dips below) its spot, a and b how far it's rocked
+// front-to-back and side-to-side, each with its own speed.
+type Float = { h: number; hv: number; a: number; av: number; b: number; bv: number };
+type Body = { p: V3; v: V3; sp: number; f: Float };
 
 const dot = (u: V3, v: V3) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
 const norm = (v: V3) => {
@@ -137,6 +141,47 @@ const segPt = (px: number, py: number, ax: number, ay: number, bx: number, by: n
 
 export class TileSim {
   bodies = new Map<number, Body>();
+  t = 0;
+
+  // How each song is floating right now.
+  float(k: number): Float {
+    this.pos(k);
+    return this.bodies.get(k)!.f;
+  }
+
+  // Tapped: it dips into the water, then bobs back up.
+  dip(k: number) {
+    this.float(k).hv -= 150;
+  }
+
+  // The water moves on even while the songs hold still (flying to one).
+  water(keys: number[], dt: number) {
+    if (dt <= 0) return;
+    this.t += dt;
+    // small steps keep the springs steady on a slow frame
+    const n = Math.ceil(dt / 0.02);
+    for (const k of keys) {
+      this.pos(k);
+      const o = this.bodies.get(k)!;
+      for (let j = 0; j < n; j++) this.bob(k, o, dt / n);
+    }
+  }
+
+  // Water: every raft bobs and sways a little on its own, and settles back
+  // from a dip or a bump with a few slowing wobbles.
+  private bob(k: number, o: Body, dt: number) {
+    const f = o.f,
+      t = this.t,
+      w = 7, // how fast it bobs
+      z = 0.22; // how quickly the wobbles die down
+    const spring = (x: number, v: number, goal: number) => v + (-(w * w) * (x - goal) - 2 * z * w * v) * dt;
+    f.hv = spring(f.h, f.hv, 2 * Math.sin(t * 1.3 + k));
+    f.av = spring(f.a, f.av, 0.05 * Math.sin(t * 0.9 + k * 1.7));
+    f.bv = spring(f.b, f.bv, 0.05 * Math.sin(t * 1.1 + k * 2.3));
+    f.h += f.hv * dt;
+    f.a += f.av * dt;
+    f.b += f.bv * dt;
+  }
 
   // Each slot starts at a fixed spot spread evenly over the sphere, so a new
   // friend never shuffles everyone else.
@@ -155,6 +200,7 @@ export class TileSim {
       const east = [Math.cos(lon), 0, -Math.sin(lon)];
       const north = [-Math.sin(lat) * Math.sin(lon), Math.cos(lat), -Math.sin(lat) * Math.cos(lon)];
       o = {
+        f: { h: 0, hv: 0, a: 0, av: 0, b: 0, bv: 0 },
         sp,
         p: [Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)],
         v: [0, 1, 2].map((i) => (east[i] * Math.cos(a) + north[i] * Math.sin(a)) * sp) as V3,
@@ -301,11 +347,23 @@ export class TileSim {
           norm(A.p);
           norm(B.p);
           const rel = dot(B.v, n3) - dot(A.v, n3);
-          if (rel < 0)
+          if (rel < 0) {
             for (let x = 0; x < 3; x++) {
               A.v[x] += n3[x] * rel;
               B.v[x] -= n3[x] * rel;
             }
+            // a bump rocks both rafts: the side that was hit dips, and they bob
+            const kick = Math.min(2.2, -rel * 0.12);
+            for (const [o, sg] of [
+              [A, 1],
+              [B, -1],
+            ] as const) {
+              const F = frame(o.p);
+              o.f.bv += sg * dot(n3, F.e) * kick;
+              o.f.av -= sg * dot(n3, F.d) * kick;
+              o.f.hv -= kick * 12;
+            }
+          }
         }
       if (!any) break;
     }
