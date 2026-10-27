@@ -252,10 +252,10 @@ function Globe({
 
   const L = layoutFor(size?.w ?? 390, size?.h ?? 844);
   const keys = useMemo(() => [...friends.flatMap((f, i) => (f.hidden ? [] : [i])), ME], [friends]);
-  // Tiles share the globe: a few songs get big tiles (up to 112px on a phone)
+  // Tiles share the globe: a few songs get big tiles (up to 140px on a phone)
   // so it never feels empty, shrinking as more arrive, down to 64px, and only
   // past ~30 songs smaller still.
-  const roomy = Math.min(112 * L.s, 64 * L.s * Math.sqrt(16 / keys.length));
+  const roomy = Math.min(140 * L.s, 64 * L.s * Math.pow(16 / keys.length, 0.75));
   const packed = Math.max(38 * L.s, Math.min(64 * L.s, L.R * Math.sqrt((4 * Math.PI) / Math.max(keys.length, 12)) * 0.6));
   const half = Math.round(Math.max(roomy, packed)) / 2;
   const Rb = L.R + 6;
@@ -1677,10 +1677,29 @@ const TileLayer = memo(function TileLayer({
         className="preserve-3d absolute"
         style={{ left: -half, top: -half, width: W, height: W, transformOrigin: `${half}px ${half}px` }}
       >
-        <div
-          className="backface-hidden absolute inset-0 opacity-60"
-          style={{ transform: "rotateY(180deg)", background: "rgba(13,42,63,0.05)", borderRadius: "26%" }}
-        />
+        {/* the far side: the album seen through the globe, glazed like frosted glass */}
+        {wait ? (
+          <div
+            className="backface-hidden absolute inset-0 opacity-60"
+            style={{ transform: "rotateY(180deg)", background: "rgba(13,42,63,0.05)", borderRadius: "26%" }}
+          />
+        ) : (
+          <div
+            className="backface-hidden absolute inset-0 overflow-hidden"
+            style={{ transform: "rotateY(180deg) scaleX(-1)", borderRadius: r0, opacity: 0.5 }}
+          >
+            <div className="absolute inset-0" style={{ backgroundImage: art, backgroundSize: "cover", filter: "saturate(0.8)" }} />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(155deg, rgba(255,255,255,0.62) 0%, rgba(235,245,255,0.38) 45%, rgba(210,230,250,0.5) 100%)",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.55)",
+                borderRadius: r0,
+              }}
+            />
+          </div>
+        )}
         {focus === k && (
           <div
             className="pointer-events-none absolute inset-0"
