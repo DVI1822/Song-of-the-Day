@@ -991,7 +991,8 @@ function Globe({
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
       >
-        <div className="absolute inset-x-0 bottom-full flex justify-center pb-1">
+        <div className="absolute inset-x-0 bottom-full flex flex-col items-center gap-2 pb-1">
+          {shuffleSongs.length > 0 && <SongCount n={shuffleSongs.length} dark={darkOn} />}
           <Shuffle songs={shuffleSongs} />
         </div>
         {!posted && !launching && (
@@ -1778,6 +1779,29 @@ function Clock({ color }: { color: string }) {
 }
 
 // Time left until midnight where you live, when the next song opens up.
+// The countdown's hollow bubble lettering.
+const outline = (dark: boolean): React.CSSProperties =>
+  dark
+    ? { color: "rgba(230,240,255,0.06)", WebkitTextStroke: "1.5px rgba(230,240,255,0.6)", textShadow: "0 0 18px rgba(180,210,255,0.25)" }
+    : { color: "rgba(13,42,63,0.04)", WebkitTextStroke: "1.5px rgba(13,42,63,0.45)", textShadow: "0 6px 14px rgba(13,42,63,0.12)" };
+
+// How many songs are on your globe today.
+function SongCount({ n, dark }: { n: number; dark: boolean }) {
+  return (
+    <div
+      aria-label={`${n} ${n === 1 ? "song" : "songs"} on your globe today`}
+      className="flex items-baseline gap-1.5 font-bubble font-semibold leading-none tracking-[0.05em] tabular-nums transition-colors duration-500"
+    >
+      <span className="text-[26px]" style={outline(dark)}>
+        {n}
+      </span>
+      <span className="text-[11px] tracking-[0.12em]" style={{ color: dark ? "rgba(230,240,255,0.6)" : "rgba(13,42,63,0.5)" }}>
+        {n === 1 ? "SONG TODAY" : "SONGS TODAY"}
+      </span>
+    </div>
+  );
+}
+
 function Countdown({ dark, timeZone }: { dark: boolean; timeZone: string }) {
   const now = useNow();
   if (!now) return null;
@@ -1802,11 +1826,7 @@ function Countdown({ dark, timeZone }: { dark: boolean; timeZone: string }) {
       role="timer"
       aria-label={`${hh} hours ${mm} minutes until the next song`}
       className="font-bubble text-[50px] font-semibold leading-none tracking-[0.05em] tabular-nums transition-colors duration-500"
-      style={
-        dark
-          ? { color: "rgba(230,240,255,0.06)", WebkitTextStroke: "1.5px rgba(230,240,255,0.6)", textShadow: "0 0 18px rgba(180,210,255,0.25)" }
-          : { color: "rgba(13,42,63,0.04)", WebkitTextStroke: "1.5px rgba(13,42,63,0.45)", textShadow: "0 6px 14px rgba(13,42,63,0.12)" }
-      }
+      style={outline(dark)}
     >
       {two(hh)}:{two(mm)}:{two(ss)}
     </div>
