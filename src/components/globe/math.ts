@@ -164,6 +164,22 @@ export class TileSim {
     return o.p;
   }
 
+  // Draw these songs towards one spot on the sphere, slowing them as they
+  // come; the bumping in step() keeps them from piling up.
+  pull(keys: number[], to: V3, dt: number) {
+    const f = 1 - Math.exp(-dt * 2.4),
+      calm = Math.exp(-dt * 4);
+    for (const k of keys) {
+      const o = this.bodies.get(k);
+      if (!o) continue;
+      for (let i = 0; i < 3; i++) {
+        o.p[i] += (to[i] - o.p[i]) * f;
+        o.v[i] *= calm;
+      }
+      norm(o.p);
+    }
+  }
+
   step(keys: number[], half: number, Rb: number, dt: number) {
     const h = half,
       rr = 0.26 * 2 * h,

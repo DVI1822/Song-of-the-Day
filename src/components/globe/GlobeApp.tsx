@@ -23,6 +23,7 @@ import {
   TILT,
   TileSim,
   aim,
+  camInv,
   camV,
   coverBackground,
   guessGeo,
@@ -165,6 +166,8 @@ function newMotion(posted: boolean) {
     // screen = content * k + (x, y). Nothing in the scene moves for it.
     mag: { k: 1, x: 0, y: 0, home: false },
     moved: false,
+    // recenter: posted songs gather at the front until this time
+    gather: 0,
     sun: null as null | Sun,
     sunAt: 0,
     geo: { lat: 40, lon: -90 },
@@ -609,6 +612,13 @@ function Globe({
         if (g.k < 1.002) Object.assign(g, { k: 1, x: 0, y: 0, home: false });
       }
       if (R.current.lensEl) R.current.lensEl.style.transform = g.k === 1 ? "" : `translate(${g.x.toFixed(2)}px,${g.y.toFixed(2)}px) scale(${g.k.toFixed(4)})`;
+      if (s.gather > s.t && s.featFly === null) {
+        // the spot on the globe facing you, in the globe's own frame
+        const f = camInv([0, 0, 1], { yaw: s.yaw, pitch: s.pitch, roll: 0 });
+        const fr = live.current.friends;
+        const posted = keys.filter((k) => (k === ME ? s.myLanded : !!fr[k]?.post));
+        sim.current.pull(posted, [f[0], -f[1], f[2]], dt);
+      }
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
       draw(s, R.current, els.current, sim.current, live.current);
       drawBeam(s, R.current.beam, sim.current, live.current, dt);
@@ -675,6 +685,7 @@ function Globe({
     }
     s.drag = { x: e.clientX, y: e.clientY, lx: e.clientX, yaw: s.yaw, pitch: s.pitch };
     s.moved = false;
+    s.gather = 0;
     if (s.featFly !== null) {
       s.featFly = null;
       s.zoomTarget = 1;
@@ -1018,6 +1029,27 @@ function Globe({
         )}
         {posted && !launching && <Countdown dark={darkOn} timeZone={me.timezone} />}
       </div>
+
+      {/* recenter: bring every posted song round to the front for a while */}
+      <button
+        ref={(el) => void (R.current.chrome[4] = el)}
+        type="button"
+        onClick={() => {
+          const s = m.current;
+          s.gather = s.t + 10;
+          setFocus(null);
+        }}
+        aria-label="Bring the songs to the front"
+        title="Bring the songs to the front"
+        className="absolute z-[6] flex h-10 w-10 items-center justify-center rounded-full"
+        style={{ left: L.cx + L.R * 0.8 - 20, top: L.cy + L.R * 0.8 - 20, ...glass(darkOn) }}
+      >
+        <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="6.5" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+        </svg>
+      </button>
 
       {/* left tabs */}
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
@@ -1677,29 +1709,10 @@ const TileLayer = memo(function TileLayer({
         className="preserve-3d absolute"
         style={{ left: -half, top: -half, width: W, height: W, transformOrigin: `${half}px ${half}px` }}
       >
-        {/* the far side: the album seen through the globe, glazed like frosted glass */}
-        {wait ? (
-          <div
-            className="backface-hidden absolute inset-0 opacity-60"
-            style={{ transform: "rotateY(180deg)", background: "rgba(13,42,63,0.05)", borderRadius: "26%" }}
-          />
-        ) : (
-          <div
-            className="backface-hidden absolute inset-0 overflow-hidden"
-            style={{ transform: "rotateY(180deg) scaleX(-1)", borderRadius: r0, opacity: 0.5 }}
-          >
-            <div className="absolute inset-0" style={{ backgroundImage: art, backgroundSize: "cover", filter: "saturate(0.8)" }} />
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(155deg, rgba(255,255,255,0.62) 0%, rgba(235,245,255,0.38) 45%, rgba(210,230,250,0.5) 100%)",
-                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.55)",
-                borderRadius: r0,
-              }}
-            />
-          </div>
-        )}
+        <div
+          className="backface-hidden absolute inset-0 opacity-60"
+          style={{ transform: "rotateY(180deg)", background: "rgba(13,42,63,0.05)", borderRadius: "26%" }}
+        />
         {focus === k && (
           <div
             className="pointer-events-none absolute inset-0"
