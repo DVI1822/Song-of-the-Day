@@ -255,7 +255,7 @@ function Globe({
   // Tiles share the globe: a few songs get big tiles (up to 140px on a phone)
   // so it never feels empty, shrinking as more arrive, down to 64px, and only
   // past ~30 songs smaller still.
-  const roomy = Math.min(140 * L.s, 64 * L.s * Math.pow(16 / keys.length, 0.75));
+  const roomy = Math.min(140 * L.s, (64 * L.s * 16) / keys.length);
   const packed = Math.max(38 * L.s, Math.min(64 * L.s, L.R * Math.sqrt((4 * Math.PI) / Math.max(keys.length, 12)) * 0.6));
   const half = Math.round(Math.max(roomy, packed)) / 2;
   const Rb = L.R + 6;
