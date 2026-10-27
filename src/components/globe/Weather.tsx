@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { PRESETS, type Weather, type WeatherKind, type WeatherReply } from "@/lib/weather";
 import type { Season } from "./scene";
+import { weatherSky } from "./sky";
 
 // The real weather where you are, laid over the day and night skies. This
 // file finds it and greys the sky behind the Globe; the clouds, rain, snow,
 // mist and lightning live in the Globe's 3D space, in scene.ts.
 //
 // Try any of it with ?weather=rain (or drizzle, storm, snow, cloudy, partly,
-// fog, clear). Seasonal things come along more often in that mode.
+// fog, clear), and any time of day with ?hour=7 (sky.ts). Seasonal things come
+// along more often in that mode.
 
 const REFRESH = 15 * 60_000;
 
@@ -23,6 +25,16 @@ export function seasonOverride(): Season | null {
   const q = new URLSearchParams(window.location.search).get("season");
   return q === "spring" || q === "summer" || q === "autumn" || q === "winter" ? q : null;
 }
+// ?hour=18.5 shows the sky at that time of day, today.
+export function clockNow(): Date {
+  const d = new Date();
+  const q = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("hour");
+  const h = q === null || q === "" ? NaN : Number(q);
+  if (!Number.isFinite(h)) return d;
+  d.setHours(Math.floor(h), Math.round((h % 1) * 60), 0, 0);
+  return d;
+}
+
 export function tempOverride(): number | null {
   const q = new URLSearchParams(window.location.search).get("temp");
   return q !== null && q !== "" && Number.isFinite(Number(q)) ? Number(q) : null;
@@ -88,28 +100,17 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
 // Behind the Globe: a greyer sky, drifting clouds, fog
 // ---------------------------------------------------------------------------
 
-// The sky greys over with cloud and rain. The clouds themselves, and
-// everything else, are drawn in the Globe's 3D space (scene.ts).
-export function WeatherSky({ weather, dark }: { weather: Weather | null; dark: boolean }) {
-  if (!weather || weather.kind === "clear") return null;
-  const storm = weather.kind === "storm";
-  const wet = weather.intensity > 0 || weather.kind === "fog";
-  const grey = storm ? 1 : wet ? 0.8 : Math.max(0, weather.cloud - 0.4) * 1.2;
-  if (grey <= 0) return null;
+// The sky greys over with cloud and rain (its colours are in sky.ts). The
+// clouds themselves, and everything else, are drawn in the Globe's 3D space
+// (scene.ts).
+export function WeatherSky({ weather, dark, warm }: { weather: Weather | null; dark: boolean; warm: number }) {
+  const sky = weatherSky(weather, dark ? 1 : 0, warm);
+  if (!sky) return null;
   return (
     <div
-      className="pointer-events-none absolute inset-0 transition-opacity duration-[3000ms]"
+      className="pointer-events-none absolute inset-0 transition-[opacity,background] duration-[3000ms]"
       aria-hidden
-      style={{
-        opacity: Math.min(1, grey) * (dark ? 0.7 : 0.75),
-        background: storm
-          ? dark
-            ? "linear-gradient(180deg, #10141E 0%, #0B0E16 60%, #07090F 100%)"
-            : "linear-gradient(180deg, #7C8894 0%, #9AA5AF 45%, #BEC6CD 100%)"
-          : dark
-            ? "linear-gradient(180deg, #1B2130 0%, #121722 60%, #0B0F18 100%)"
-            : "linear-gradient(180deg, #B3BEC8 0%, #CCD4DB 45%, #E4E8EB 100%)",
-      }}
+      style={{ opacity: sky.opacity, background: sky.bg }}
     />
   );
 }
