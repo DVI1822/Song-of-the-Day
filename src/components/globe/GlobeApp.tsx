@@ -20,7 +20,6 @@ import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
 import { beatOf, pulseAt, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass } from "./ui";
-import { type BitEl, FloaterLayer, drawFloaters, floatersFor, monthOverride } from "./Floaters";
 import {
   PERSPECTIVE,
   TILT,
@@ -314,18 +313,6 @@ function Globe({
 
   // your core grows from your songs; the stream to what's playing matches it
   const look = useCoreLook(mySongs, me.timezone);
-
-  // this month's few floating things, riding the water with the songs
-  const month = useSyncExternalStore(
-    noSub,
-    () => monthOverride() ?? new Date().getMonth(),
-    () => null,
-  );
-  const floaters = useMemo(() => (month === null ? [] : floatersFor(month, half)), [month, half]);
-  const bitEls = useRef<BitEl[]>([]);
-  useEffect(() => {
-    sim.current.setBits(floaters.map((f) => f.r));
-  }, [floaters]);
 
   // Everything the frame loop needs from the latest render.
   const live = useRef<Live>({ keys, half, Rb, L, zFeat, friends, beam, look });
@@ -660,17 +647,8 @@ function Globe({
         }
       }
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
-      sim.current.stepBits(keys, half, Rb, s.featFly !== null ? 0 : dt);
       sim.current.water(keys, Math.min(dt, 0.1));
       draw(s, R.current, els.current, sim.current, live.current);
-      drawFloaters(sim.current.bits, bitEls.current, {
-        Rb,
-        cam: s.cam,
-        zoom: s.zoom,
-        L: s.sun!.L,
-        day: s.sun!.day,
-        hide: s.lens !== null || s.coreOn,
-      });
       drawBeam(s, R.current.beam, sim.current, live.current, dt);
       const w = wx.current,
         el = R.current;
@@ -1047,7 +1025,6 @@ function Globe({
           >
             <Magma full look={coreWho ? theirLook : look} className="h-full w-full" />
           </button>
-          <FloaterLayer items={floaters} els={bitEls} />
         </div>
         {/* the weather and seasons nearer than the globe's middle */}
         <canvas ref={(el) => void (R.current.wxFront = el)} className="pointer-events-none absolute inset-0 z-[2] h-full w-full" />
@@ -1828,8 +1805,6 @@ const subscribeSeconds = (cb: () => void) => {
   const id = setInterval(cb, 1000);
   return () => clearInterval(id);
 };
-
-const noSub = () => () => {};
 
 function useNow() {
   const sec = useSyncExternalStore(
