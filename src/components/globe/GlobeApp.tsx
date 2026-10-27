@@ -551,7 +551,7 @@ function Globe({
         s.darkOn = s.dk > 0.5;
         setDarkOn(s.darkOn);
       }
-      s.profP = s.coreOn ? Math.min(1, s.profP + dt * 2.5) : 0;
+      s.profP = s.coreOn ? Math.min(1, s.profP + dt * 1.6) : 0;
 
       if (s.featOn) {
         const goal = s.featOpen ? 1 : 0;
@@ -588,17 +588,18 @@ function Globe({
         s.vel += ((0.14 * dt) / Math.sqrt(Math.max(1, s.zoom)) - s.vel) * ease(0.05, dt);
         s.yaw += s.vel;
       }
-      if (s.zoomTarget !== null && !s.coreOn) {
+      if (s.zoomTarget !== null) {
         const dz = s.zoomTarget - s.zoom;
+        // the core's sheet starts rising while the camera settles, not after
+        if (s.pendingCore && Math.abs(dz) < 0.9) {
+          s.pendingCore = false;
+          s.coreOn = true;
+          setCoreOpen(true);
+        }
         if (Math.abs(dz) > 0.01) s.zoom += dz * ease(0.07, dt);
         else {
           s.zoom = s.zoomTarget;
           s.zoomTarget = null;
-          if (s.pendingCore) {
-            s.pendingCore = false;
-            s.coreOn = true;
-            setCoreOpen(true);
-          }
           if (s.featFly !== null) {
             s.featOn = true;
             s.featOpen = true;
@@ -1459,8 +1460,9 @@ sim: TileSim,
     r.featBack.style.setProperty("-webkit-backdrop-filter", blur);
   }
   if (r.featCard) r.featCard.style.opacity = (1 - Math.pow(1 - s.fp, 3)).toFixed(3);
-  if (r.prof) r.prof.style.opacity = s.profP.toFixed(3);
-  if (r.profSheet) r.profSheet.style.transform = `translateY(${(Math.pow(1 - s.profP, 3) * 50).toFixed(1)}px)`;
+  // the core's page fades in while its sheet glides up from below the screen
+  if (r.prof) r.prof.style.opacity = Math.min(1, s.profP * 2.2).toFixed(3);
+  if (r.profSheet) r.profSheet.style.transform = `translateY(${(Math.pow(1 - s.profP, 4) * 70).toFixed(2)}vh)`;
 
   // your song dropping into the globe
   if (r.launch) {
