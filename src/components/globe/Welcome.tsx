@@ -49,7 +49,9 @@ export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
         <h2 className="display text-[26px] leading-tight">Song of the Day</h2>
         <p className="text-[15px] leading-relaxed">
           <b>Share and discover music.</b> Each day, post the one song that hit you hardest. Your friends do the same,
-          so you feel their energy and your globe fills with top quality tunes.
+          so you feel their energy and your globe fills with top quality tunes. Your world follows the real one, its
+          weather, seasons and time of day, so relax and explore. Post what you really feel, good mood or bad, happy or
+          sad. This is your world.
         </p>
         <p className="text-[15px] leading-relaxed">
           <b>How.</b> Spotify only for now. In Spotify, copy your song&apos;s link, tap + here and paste it. You get one
