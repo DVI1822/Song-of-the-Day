@@ -43,15 +43,14 @@ export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
       <div
         role="dialog"
         aria-label="Welcome to Song of the Day"
-        className="rise-in relative flex w-full max-w-[380px] flex-col gap-3.5 rounded-[28px] border border-white/60 bg-white/[0.94] p-6 text-card-ink backdrop-blur-2xl"
+        className="rise-in relative flex w-full max-w-[380px] flex-col gap-3.5 text-center rounded-[28px] border border-white/60 bg-white/[0.94] p-6 text-card-ink backdrop-blur-2xl"
         style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.55)" }}
       >
         <h2 className="display text-[26px] leading-tight">Song of the Day</h2>
         <p className="text-[15px] leading-relaxed">
-          <b>Share and discover music.</b> Each day, post the one song that hit you hardest. Your friends do the same,
-          so you feel their energy and your globe fills with top quality tunes. Your world follows the real one, its
-          weather, seasons and time of day, so relax and explore. Post what you really feel, good mood or bad, happy or
-          sad. This is your world.
+          <b>Share and discover music.</b> Post the song that hit you hardest today, and feel your friends&apos; energy
+          in theirs. Your world follows the real weather, seasons and time of day. Relax, explore, and post what you
+          really feel.
         </p>
         <p className="text-[15px] leading-relaxed">
           <b>How.</b> Spotify only for now. In Spotify, copy your song&apos;s link, tap + here and paste it. You get one
