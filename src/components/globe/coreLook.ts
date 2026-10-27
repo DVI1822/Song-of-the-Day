@@ -118,7 +118,7 @@ function readImage(src: string, cors: boolean): Promise<string[]> {
 // A cover's colours. Read straight from Spotify's image server; if the browser
 // won't let us read it, through the site's own image resizer; failing both,
 // from the title like a painted cover.
-async function coverColors(post: Post): Promise<string[]> {
+export async function coverColors(post: Post): Promise<string[]> {
   const url = post.artwork_url;
   if (!url) return painted(post.title);
   const known = cache()[url];
@@ -220,6 +220,24 @@ export function useCoreLook(posts: Post[] | null | undefined, timeZone: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids, timeZone]);
   return look?.ids === ids ? look.look : null;
+}
+
+// The two main colours of each of these songs' covers, by artwork address,
+// filled in as they're read.
+export function useCoverColors(posts: Post[]) {
+  const withArt = posts.filter((p) => p.artwork_url);
+  const key = withArt.map((p) => p.artwork_url).join("|");
+  const [found, setFound] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    let live = true;
+    for (const p of withArt)
+      coverColors(p).then((c) => live && setFound((f) => (f[p.artwork_url!] ? f : { ...f, [p.artwork_url!]: c })));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return found;
 }
 
 // A colour at some opacity.

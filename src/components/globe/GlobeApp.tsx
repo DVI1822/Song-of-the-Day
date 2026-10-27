@@ -14,7 +14,7 @@ import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
-import { type CoreLook, alpha, drift, useCoreLook } from "./coreLook";
+import { type CoreLook, alpha, drift, useCoreLook, useCoverColors } from "./coreLook";
 import { Magma, MagmaFilters } from "./Magma";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
@@ -60,7 +60,9 @@ export function GlobeApp(props: Props) {
 
 const ME = 99; // your own tile's slot; friends take 0..89
 type PanelName = "friends" | "find" | "songs";
-type TileInfo = { k: number; wait: boolean; art: string; label: string };
+// frame: the colours around a real album cover, so the whole square shows
+// inside the tile's rounded corners
+type TileInfo = { k: number; wait: boolean; art: string; frame: string | null; label: string };
 type TileEls = {
   box: HTMLDivElement | null;
   facets: (HTMLDivElement | null)[];
@@ -817,28 +819,41 @@ function Globe({
   // Render
   // -------------------------------------------------------------------------
 
-  const tiles = useMemo<TileInfo[]>(
-    () =>
-      keys.map((k) => {
-        if (k === ME) {
-          const wait = !landed || !myPost;
-          return {
-            k,
-            wait,
-            art: myPost ? coverBackground(myPost.artwork_url, myPost.title) : "",
-            label: wait ? "Your spot. Add today's song" : `Your song, ${myPost!.title}. Open`,
-          };
-        }
-        const f = friends[k];
+  const onGlobe = useMemo(
+    () => [...(myPost ? [myPost] : []), ...friends.flatMap((f) => (f.post ? [f.post] : []))],
+    [friends, myPost],
+  );
+  const coverColors = useCoverColors(onGlobe);
+  const tiles = useMemo<TileInfo[]>(() => {
+    const frame = (post: Post | null | undefined) => {
+      const url = post?.artwork_url;
+      if (!url) return null;
+      // a soft glassy frame until the cover's colours are read
+      const c = coverColors[url] ?? ["#C9D6E2", "#8FA3B5"];
+      // two layers: a sheen over the cover's colours
+      return `radial-gradient(circle at 28% 18%, rgba(255,255,255,0.35), rgba(255,255,255,0) 55%), linear-gradient(145deg, ${drift([c[0]], 0, 0.12)}, ${drift([c[c.length - 1]], 0, 0)})`;
+    };
+    return keys.map((k) => {
+      if (k === ME) {
+        const wait = !landed || !myPost;
         return {
           k,
-          wait: !f.post,
-          art: f.post ? coverBackground(f.post.artwork_url, f.post.title) : "",
-          label: f.post ? `${f.display_name}, ${f.post.title}. Open` : `${f.display_name} hasn't posted yet`,
+          wait,
+          art: myPost ? coverBackground(myPost.artwork_url, myPost.title) : "",
+          frame: frame(myPost),
+          label: wait ? "Your spot. Add today's song" : `Your song, ${myPost!.title}. Open`,
         };
-      }),
-    [keys, friends, myPost, landed],
-  );
+      }
+      const f = friends[k];
+      return {
+        k,
+        wait: !f.post,
+        art: f.post ? coverBackground(f.post.artwork_url, f.post.title) : "",
+        frame: frame(f.post),
+        label: f.post ? `${f.display_name}, ${f.post.title}. Open` : `${f.display_name} hasn't posted yet`,
+      };
+    });
+  }, [keys, friends, myPost, landed, coverColors]);
 
   const featPost = feat === null ? null : feat === ME ? myPost : friends[feat]?.post ?? null;
   const featWho = feat === ME ? "You" : feat !== null ? friends[feat]?.display_name ?? "" : "";
@@ -1664,7 +1679,12 @@ const TileLayer = memo(function TileLayer({
   const W = half * 2,
     fs = W / 3,
     r0 = Math.round(0.26 * W);
-  return tiles.map(({ k, wait, art, label }) => {
+  // a real cover sits inset, square, far enough in that the rounded corners
+  // never clip it
+  const d = Math.round(0.09 * W),
+    A = W - 2 * d,
+    rim = "linear-gradient(rgba(13,42,63,0.35), rgba(13,42,63,0.35))"; // a hairline round the cover
+  return tiles.map(({ k, wait, art, frame, label }) => {
     if (!els.current.has(k)) els.current.set(k, { box: null, facets: [], shades: [], coats: [] });
     const te = els.current.get(k)!;
     const facets = [];
@@ -1698,11 +1718,18 @@ const TileLayer = memo(function TileLayer({
                   borderRight: col === 2 ? edge : undefined,
                   borderColor: "transparent",
                 }
-              : {
-                  backgroundImage: art,
-                  backgroundSize: `${W}px ${W}px`,
-                  backgroundPosition: `${-l0}px ${-t0}px`,
-                }),
+              : frame
+                ? {
+                    backgroundImage: `${art}, ${rim}, ${frame}`,
+                    backgroundSize: `${A}px ${A}px, ${A + 2}px ${A + 2}px, ${W}px ${W}px, ${W}px ${W}px`,
+                    backgroundPosition: `${d - l0}px ${d - t0}px, ${d - 1 - l0}px ${d - 1 - t0}px, ${-l0}px ${-t0}px, ${-l0}px ${-t0}px`,
+                    backgroundRepeat: "no-repeat",
+                  }
+                : {
+                    backgroundImage: art,
+                    backgroundSize: `${W}px ${W}px`,
+                    backgroundPosition: `${-l0}px ${-t0}px`,
+                  }),
           }}
         >
           {!wait && (
