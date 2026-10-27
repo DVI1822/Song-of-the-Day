@@ -35,6 +35,7 @@ function cover(i: number) {
 const A = ["Silver", "Hollow", "Amber", "Velvet", "Northern", "Quiet", "Wild", "Cedar", "Lunar", "Salt", "Ember", "Willow", "Slow", "Open", "Coral"];
 const B = ["Rivers", "Static", "Hours", "Signal", "Garden", "Tides", "Season", "Echo", "Lanterns", "Valley", "Motel", "Fields", "Satellite", "Rain", "Arcade"];
 const C = ["Club", "Union", "Choir", "Parade", "Society", "Radio"];
+const PLACES = ["Austin, TX", "Brooklyn, NY", "Portland, OR", "Denver, CO", "Lisbon, Portugal", "Chicago, IL", "Oakland, CA", "Nashville, TN", "Toronto, Canada"];
 const CAPS = [
   "windows down on the coast road, fog finally lifting",
   "first coffee on the porch and this one stopped me mid-sip",
@@ -91,6 +92,7 @@ function song(i: number, user: string, day: string, hoursAgo: number): Post {
     photo_url: null,
     platform_links: {},
     caption: CAPS[i % CAPS.length],
+    place: PLACES[i % PLACES.length],
     created_at: new Date(now.getTime() - hoursAgo * 3600e3).toISOString(),
   };
 }

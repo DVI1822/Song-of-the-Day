@@ -22,6 +22,7 @@ export type Post = {
   photo_url: string | null;
   platform_links: PlatformLinks;
   caption: string;
+  place?: string | null; // roughly where it was posted from: a city
   created_at: string;
 };
 

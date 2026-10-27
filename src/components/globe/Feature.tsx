@@ -95,8 +95,9 @@ export function Feature({
           style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.45)" }}
         />
         <div className="relative flex h-7 items-center justify-between">
-          <div className="text-xs text-muted">
+          <div className="min-w-0 truncate text-xs text-muted">
             {time} · {who}
+            {post.place && ` · ${post.place}`}
           </div>
           <div className="-mr-2.5 flex">
             {mine && (
@@ -200,6 +201,7 @@ export function Feature({
                     <div className="display text-[25px] leading-snug text-card-ink">{post.caption}</div>
                     <div className="text-xs text-card-muted">
                       {who} · {time}
+                      {post.place && ` · ${post.place}`}
                     </div>
                   </div>
                 )}

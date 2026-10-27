@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCore, getNews, getReactions, getSession, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
@@ -176,29 +176,49 @@ export async function createPost(input: NewPost): Promise<{ post?: Post; error?:
   const photo = input.photoUrl && input.photoUrl.startsWith(photoBase) ? input.photoUrl : null;
 
   const https = (v: string | null) => (v && v.startsWith("https://") ? v : null);
-  const { data, error } = await supabase
-    .from("posts")
-    .insert({
-      song_url: input.songUrl,
-      page_url: https(input.pageUrl),
-      title: title.slice(0, 200),
-      artist: input.artist.trim().slice(0, 200),
-      album: input.album.trim().slice(0, 200) || null,
-      artwork_url: https(input.artworkUrl),
-      preview_url: https(input.previewUrl),
-      photo_url: photo,
-      platform_links: cleanLinks(input.links),
-      caption,
-    })
-    .select()
-    .single<Post>();
+  const song = {
+    song_url: input.songUrl,
+    page_url: https(input.pageUrl),
+    title: title.slice(0, 200),
+    artist: input.artist.trim().slice(0, 200),
+    album: input.album.trim().slice(0, 200) || null,
+    artwork_url: https(input.artworkUrl),
+    preview_url: https(input.previewUrl),
+    photo_url: photo,
+    platform_links: cleanLinks(input.links),
+    caption,
+  };
+  const place = await postedFrom();
+  const add = (row: typeof song & { place?: string }) => supabase.from("posts").insert(row).select().single<Post>();
+  let { data, error } = await add(place ? { ...song, place } : song);
+  // before the place column exists, songs still post without it
+  if (error?.code === "PGRST204" && place) ({ data, error } = await add(song));
 
   if (error) {
     if (error.code === "23505") return { error: "You've already shared today's song." };
     return { error: error.message };
   }
   revalidatePath("/", "layout");
-  return { post: data };
+  return { post: data ?? undefined };
+}
+
+// Roughly where a song was posted from: the city their connection is in, as
+// Vercel sees it (the same guess the weather uses, so nobody is asked).
+async function postedFrom() {
+  const h = await headers();
+  const city = decodeURIComponent(h.get("x-vercel-ip-city") ?? "").trim();
+  if (!city) return undefined;
+  const country = h.get("x-vercel-ip-country") ?? "",
+    region = h.get("x-vercel-ip-country-region") ?? "";
+  let where = region;
+  if (country && country !== "US") {
+    try {
+      where = new Intl.DisplayNames(["en"], { type: "region" }).of(country) ?? country;
+    } catch {
+      where = country;
+    }
+  }
+  return (where ? `${city}, ${where}` : city).slice(0, 80);
 }
 
 // Take back today's song so you can post another. One redo per day; the

@@ -22,6 +22,8 @@ import { beatOf, pulseAt, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass } from "./ui";
 import {
   PERSPECTIVE,
+  RIPPLE_LIFE,
+  RIPPLE_SPEED,
   TILT,
   TileSim,
   aim,
@@ -34,6 +36,7 @@ import {
   sunLight,
   type Camera,
   type Sun,
+  type V3,
 } from "./math";
 
 type Props = {
@@ -95,6 +98,11 @@ const seenStore = {
   },
 };
 
+// how long a new song takes to fall in, and when you last had the Globe open
+const FALL = 0.85,
+  DROP_HEIGHT = 520;
+const OPEN_KEY = "sotd-last-open";
+
 // Per-frame easing written for 60fps, made frame-rate independent.
 const ease = (k: number, dt: number) => 1 - Math.pow(1 - k, dt * 60);
 
@@ -151,6 +159,11 @@ function newMotion(posted: boolean) {
     myLanded: posted,
     myLock: null as null | number,
     born: new Map<number, number>(),
+    // songs posted since your last visit fall in from above, one by one:
+    // when each starts falling, and the posts already seen this visit
+    drops: new Map<number, number>(),
+    dropNext: 0,
+    dropSeen: new Set<string>(),
     drag: null as null | { x: number; y: number; lx: number; yaw: number; pitch: number },
     pointers: new Map<number, { x: number; y: number }>(),
     // two fingers down: no spinning, and no zooming either
@@ -185,6 +198,7 @@ function newEls() {
     floor: null as HTMLDivElement | null,
     sphere: null as HTMLDivElement | null,
     beam: null as HTMLCanvasElement | null,
+    ripples: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
     featBack: null as HTMLDivElement | null,
@@ -299,6 +313,35 @@ function Globe({
 
   // your core grows from your songs; the stream to what's playing matches it
   const look = useCoreLook(mySongs, me.timezone);
+
+  // Songs posted since you last had the Globe open fall in from above, one
+  // after another, and splash into the water. The first visit drops none.
+  const lastOpen = useRef<number | null>(null);
+  useEffect(() => {
+    if (lastOpen.current === null) {
+      let at = NaN;
+      try {
+        at = Date.parse(localStorage.getItem(OPEN_KEY) ?? "");
+      } catch {}
+      lastOpen.current = Number.isFinite(at) ? at : Date.now();
+    }
+    const s = m.current,
+      since = lastOpen.current;
+    const fresh = friends.flatMap((f, k) => {
+      if (!f.post || f.hidden || s.dropSeen.has(f.post.id)) return [];
+      s.dropSeen.add(f.post.id);
+      return Date.parse(f.post.created_at) > since ? [k] : [];
+    });
+    // a long list falls in faster
+    const gap = Math.min(0.45, 5 / Math.max(1, fresh.length));
+    for (const k of fresh) {
+      s.dropNext = Math.max(s.dropNext + gap, s.t + 1.2);
+      s.drops.set(k, s.dropNext);
+    }
+    try {
+      localStorage.setItem(OPEN_KEY, new Date().toISOString());
+    } catch {}
+  }, [friends]);
 
   // Everything the frame loop needs from the latest render.
   const live = useRef<Live>({ keys, half, Rb, L, zFeat, friends, beam, look });
@@ -553,6 +596,7 @@ function Globe({
           s.launch = null;
           s.myLanded = true;
           s.myLock = s.t;
+          sim.current.splash(ME, live.current.keys);
           setLanded(true);
           setLaunching(false);
         }
@@ -611,6 +655,7 @@ function Globe({
       sim.current.water(keys, Math.min(dt, 0.1));
       draw(s, R.current, els.current, sim.current, live.current);
       drawBeam(s, R.current.beam, sim.current, live.current, dt);
+      drawRipples(s, R.current.ripples, sim.current, live.current);
       const w = wx.current,
         el = R.current;
       if (!w.scene && !w.failed && el.wxSky && el.wxBack && el.wxFront)
@@ -962,6 +1007,7 @@ function Globe({
           }}
         />
         <canvas ref={(el) => void (R.current.beam = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <canvas ref={(el) => void (R.current.ripples = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div
           ref={(el) => void (R.current.world = el)}
           className="preserve-3d absolute z-[1] h-0 w-0"
@@ -991,7 +1037,8 @@ function Globe({
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
       >
-        <div className="absolute inset-x-0 bottom-full flex justify-center pb-1">
+        <div className="absolute inset-x-0 bottom-full flex flex-col items-center gap-2 pb-1">
+          {shuffleSongs.length > 0 && <SongCount n={shuffleSongs.length} dark={darkOn} />}
           <Shuffle songs={shuffleSongs} />
         </div>
         {!posted && !launching && (
@@ -1296,6 +1343,19 @@ sim: TileSim,
     const lockAt = k === ME ? s.myLock : null;
     const lockAge = wait || lockAt === null ? 99 : s.t - lockAt;
     const grow = 1 - Math.pow(1 - Math.min(1, (b === undefined ? 99 : s.t - b) / 0.9), 3);
+    // falling straight down onto its spot from high above the water, so it
+    // comes in from wherever on screen that is, quicker and quicker, and splashes
+    let lift = 0,
+      unborn = false;
+    const d0 = s.drops.get(k);
+    if (d0 !== undefined) {
+      const u = (s.t - d0) / FALL;
+      if (u >= 1) {
+        s.drops.delete(k);
+        sim.splash(k, keys);
+      } else if (u < 0) unborn = true;
+      else lift = (1 - u * u) * DROP_HEIGHT;
+    }
     const lockE = 1 - Math.pow(1 - Math.min(1, lockAge / 0.7), 3);
     const sla = Math.sin(lat),
       cla = Math.cos(lat),
@@ -1304,11 +1364,11 @@ sim: TileSim,
     const ez = camV([cla * slo, -sla, cla * clo], cam);
     const camZ = s.zoom * Rb * ez[2];
     const nearFade = clamp01((880 - camZ) / 220);
-    te.box.style.visibility = nearFade <= 0 ? "hidden" : "";
+    te.box.style.visibility = nearFade <= 0 || unborn ? "hidden" : "";
     // riding the water: up and down, and rocked a little
     const fl = sim.float(k);
     te.box.style.transform =
-      `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h).toFixed(2)}px) ` +
+      `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h + lift).toFixed(2)}px) ` +
       `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`;
     if (nearFade <= 0 || ez[2] < visibleZ) continue; // facing away: nothing to light
 
@@ -1474,6 +1534,80 @@ sim: TileSim,
 // The magma stream: from the back of the playing song's tile into the core,
 // flowing inwards and swelling on the song's hits. Drawn on a canvas just
 // behind the globe, so the tile covers its end and the core its start.
+const cross = (u: V3, v: V3): V3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+const norm3 = (v: V3): V3 => {
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / n, v[1] / n, v[2] / n];
+};
+
+// The ripples of energy from songs landing: a quick, thin woosh of light
+// sweeping out over the globe in the core's colours, gone in under a second.
+function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb, L, look }: Live) {
+  if (!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.round(L.w * dpr),
+    H = Math.round(L.h * dpr);
+  if (cv.width !== W || cv.height !== H) {
+    cv.width = W;
+    cv.height = H;
+  }
+  const ctx = cv.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!sim.ripples.length || !s.cam || s.lens !== null || s.coreOn) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineCap = "butt";
+  const night = s.dk > 0.5;
+  for (const r of sim.ripples) {
+    const age = sim.t - r.t,
+      th = age * RIPPLE_SPEED,
+      u = age / RIPPLE_LIFE,
+      fade = (1 - u) * (1 - u);
+    if (th < 0.02) continue;
+    // a frame round the landing spot
+    const p = r.p,
+      a = norm3(Math.abs(p[1]) < 0.9 ? cross([0, 1, 0], p) : cross([1, 0, 0], p)),
+      b = cross(p, a);
+    const color = look ? drift(look.colors, s.t * 0.3 + r.t, night ? 0.35 : 0.15) : night ? "rgb(190,225,255)" : "rgb(255,255,255)";
+    ctx.strokeStyle = color;
+    const ring = (back: number) => {
+      const t = Math.max(0.01, th - back),
+        pts: [number, number, number][] = [];
+      for (let i = 0; i <= 72; i++) {
+        const f = (i / 72) * Math.PI * 2;
+        const q: V3 = [0, 1, 2].map((j) => p[j] * Math.cos(t) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(t)) as V3;
+        const { lat, lon } = latLon(q);
+        const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam!);
+        const z = v[2] * Rb * s.zoom,
+          kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
+        pts.push([L.cx + v[0] * Rb * kz, L.cy + v[1] * Rb * kz, v[2]]);
+      }
+      return pts;
+    };
+    // a faint wake trailing behind a thin bright edge, near side only
+    const passes: [number, number, number][] = [
+      [0.12, 7, 0.07],
+      [0.05, 3.5, 0.12],
+      [0, 1.1, 0.45],
+    ];
+    for (const [back, width, alpha] of passes) {
+      const pts = ring(back);
+      ctx.lineWidth = width * L.s;
+      for (let i = 1; i < pts.length; i++) {
+        const z = (pts[i - 1][2] + pts[i][2]) / 2;
+        if (z < -0.05) continue;
+        ctx.globalAlpha = alpha * fade * Math.min(1, th * 4) * clamp01(z * 2 + 0.1);
+        ctx.beginPath();
+        ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+        ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam, look }: Live, dt: number) {
   if (!cv) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1778,6 +1912,29 @@ function Clock({ color }: { color: string }) {
 }
 
 // Time left until midnight where you live, when the next song opens up.
+// The countdown's hollow bubble lettering.
+const outline = (dark: boolean): React.CSSProperties =>
+  dark
+    ? { color: "rgba(230,240,255,0.06)", WebkitTextStroke: "1.5px rgba(230,240,255,0.6)", textShadow: "0 0 18px rgba(180,210,255,0.25)" }
+    : { color: "rgba(13,42,63,0.04)", WebkitTextStroke: "1.5px rgba(13,42,63,0.45)", textShadow: "0 6px 14px rgba(13,42,63,0.12)" };
+
+// How many songs are on your globe right now, ready to shuffle.
+function SongCount({ n, dark }: { n: number; dark: boolean }) {
+  return (
+    <div
+      aria-label={`${n} ${n === 1 ? "song" : "songs"} on your globe`}
+      className="flex items-baseline gap-1.5 font-bubble font-semibold leading-none tracking-[0.05em] tabular-nums transition-colors duration-500"
+    >
+      <span className="text-[26px]" style={outline(dark)}>
+        {n}
+      </span>
+      <span className="text-[11px] tracking-[0.12em]" style={{ color: dark ? "rgba(230,240,255,0.6)" : "rgba(13,42,63,0.5)" }}>
+        {n === 1 ? "SONG" : "SONGS"}
+      </span>
+    </div>
+  );
+}
+
 function Countdown({ dark, timeZone }: { dark: boolean; timeZone: string }) {
   const now = useNow();
   if (!now) return null;
@@ -1802,11 +1959,7 @@ function Countdown({ dark, timeZone }: { dark: boolean; timeZone: string }) {
       role="timer"
       aria-label={`${hh} hours ${mm} minutes until the next song`}
       className="font-bubble text-[50px] font-semibold leading-none tracking-[0.05em] tabular-nums transition-colors duration-500"
-      style={
-        dark
-          ? { color: "rgba(230,240,255,0.06)", WebkitTextStroke: "1.5px rgba(230,240,255,0.6)", textShadow: "0 0 18px rgba(180,210,255,0.25)" }
-          : { color: "rgba(13,42,63,0.04)", WebkitTextStroke: "1.5px rgba(13,42,63,0.45)", textShadow: "0 6px 14px rgba(13,42,63,0.12)" }
-      }
+      style={outline(dark)}
     >
       {two(hh)}:{two(mm)}:{two(ss)}
     </div>
