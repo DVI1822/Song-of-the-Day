@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Ref } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
 import { Magma } from "./Magma";
@@ -92,6 +92,40 @@ export function Feature({
     if (res.error) setR(before);
   };
 
+  // the title shrinks until it fits on two lines, so the card never runs off
+  // the bottom of the screen however long the song's name is
+  const titleRef = useRef<HTMLDivElement>(null);
+  const [titleSize, setTitleSize] = useState(26);
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    let size = 26;
+    el.style.fontSize = `${size}px`;
+    el.style.webkitLineClamp = "unset";
+    while (size > 17 && el.scrollHeight > size * 1.25 * 2 + 2) {
+      size -= 1;
+      el.style.fontSize = `${size}px`;
+    }
+    el.style.webkitLineClamp = "";
+    setTitleSize(size);
+  }, [post.title, cover]);
+
+  // on a short screen the card slides up just enough to keep its bottom on
+  // screen, never past the top
+  const card = useRef<HTMLDivElement>(null); // everything under the cover
+  const [lift, setLift] = useState(0);
+  useLayoutEffect(() => {
+    const el = card.current;
+    if (!el) return;
+    // the cover, its header and the gaps above are fixed; this part grows
+    const fit = () =>
+      setLift(Math.max(0, Math.min(top - 12, top + 42 + cover + 14 + el.offsetHeight + 24 - window.innerHeight)));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [top, cover]);
+
   // the first song you open that isn't yours explains the core button, once
   const [tip, setTip] = useState(false);
   useEffect(() => {
@@ -119,7 +153,7 @@ export function Feature({
         aria-label="Back to the globe"
         className="absolute inset-0 cursor-default"
       />
-      <div ref={cardRef} className="absolute flex flex-col gap-3.5" style={{ left, top, width: cover, opacity: 0 }}>
+      <div ref={cardRef} className="absolute flex flex-col gap-3.5" style={{ left, top: top - lift, width: cover, opacity: 0 }}>
         <div
           aria-hidden
           className={`absolute -inset-x-3.5 -bottom-4 -top-2 rounded-[30px] border border-white/50 backdrop-blur-2xl ${dark ? "bg-white/85" : "bg-white/60"}`}
@@ -229,7 +263,12 @@ export function Feature({
                     <svg aria-hidden width="30" height="30" viewBox="0 0 24 24" fill="#D7262B">
                       <path d="M4 18v-5c0-4 2-7 6-8l1 2c-2 1-3 2.5-3 4h3v7zm9 0v-5c0-4 2-7 6-8l1 2c-2 1-3 2.5-3 4h3v7z" />
                     </svg>
-                    <div className="display text-[25px] leading-snug text-card-ink">{post.caption}</div>
+                    <div
+                      className="display min-h-0 overflow-hidden leading-snug text-card-ink"
+                      style={{ fontSize: captionSize(post.caption, cover) }}
+                    >
+                      {post.caption}
+                    </div>
                     <div className="text-xs text-card-muted">
                       {who} · {time}
                       {post.place && ` · ${post.place}`}
@@ -240,29 +279,39 @@ export function Feature({
             </div>
           </button>
         )}
-        <div className="relative flex items-start gap-2">
-          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-            <div className="display text-[26px] leading-tight text-card-ink">{post.title}</div>
-            <div className="text-[15px] text-muted">{[post.artist, post.album].filter(Boolean).join(" · ")}</div>
+        <div ref={card} className="flex flex-col gap-3.5">
+          <div className="relative flex flex-col gap-[3px]">
+            <div
+              ref={titleRef}
+              className="display line-clamp-2 break-words leading-tight text-card-ink"
+              style={{ fontSize: titleSize }}
+            >
+              {post.title}
+            </div>
+            <div className="relative flex items-center gap-2">
+              <div className="min-w-0 flex-1 truncate text-[15px] text-muted">
+                {[post.artist, post.album].filter(Boolean).join(" · ")}
+              </div>
+              <ReactionButtons r={r} mine={mine} meId={me.id} onFeel={feel} onNotes={() => setNotesOpen(true)} onSave={save} />
+              {tip && <SaveTip onDone={() => setTip(false)} />}
+            </div>
           </div>
-          <ReactionButtons r={r} mine={mine} meId={me.id} onFeel={feel} onNotes={() => setNotesOpen(true)} onSave={save} />
-          {tip && <SaveTip onDone={() => setTip(false)} />}
-        </div>
-        <div className="relative">
-          <SongPlayer
-            post={post}
-            big
-            extra={
-              <button
-                type="button"
-                onClick={onCore}
-                aria-label={who === "You" ? "View your core" : `View ${who}'s core`}
-                className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-full border border-card-ink/20"
-              >
-                <Magma className="h-5 w-5 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
-              </button>
-            }
-          />
+          <div className="relative">
+            <SongPlayer
+              post={post}
+              big
+              extra={
+                <button
+                  type="button"
+                  onClick={onCore}
+                  aria-label={who === "You" ? "View your core" : `View ${who}'s core`}
+                  className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-full border border-card-ink/20"
+                >
+                  <Magma className="h-5 w-5 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+                </button>
+              }
+            />
+          </div>
         </div>
       </div>
       {notesOpen && (
@@ -285,6 +334,11 @@ export function Feature({
 }
 
 const TIP_KEY = "sotd-save-tip";
+
+// The caption on the back of the cover: smaller as it gets longer, and on a
+// smaller cover, so all 100 characters fit inside the square.
+const captionSize = (text: string, cover: number) =>
+  Math.round((text.length > 70 ? 18 : text.length > 40 ? 21 : 25) * Math.min(1, cover / 320));
 
 // A bubble over the core button, the first time: what saving does.
 function SaveTip({ onDone }: { onDone(): void }) {
