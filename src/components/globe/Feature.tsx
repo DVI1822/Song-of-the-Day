@@ -9,7 +9,7 @@ import { SongPlayer } from "./Preview";
 import { ShareIcon, ShareSheet, useStory } from "./ShareStory";
 import { NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
-import { Cover, CloseIcon, coverRadius } from "./ui";
+import { Cover, CloseIcon } from "./ui";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
@@ -55,7 +55,9 @@ export function Feature({
   cardRef: Ref<HTMLDivElement>;
 }) {
   const time = formatTime(post.created_at, timeZone);
-  const radius = coverRadius(cover);
+  // big enough to see the whole cover: only a slight rounding, so no corner
+  // of the artwork is cut off
+  const radius = Math.round(0.03 * cover);
   const face = "absolute inset-0 overflow-hidden backface-hidden";
   const [flagging, setFlagging] = useState(false);
   const mine = who === "You";
@@ -135,6 +137,7 @@ export function Feature({
               seed={post.title}
               size={cover}
               className="absolute inset-0 scale-110 blur-md"
+              style={{ borderRadius: radius }}
             />
             <div className="absolute inset-0 bg-white/[0.9]" />
             <div className="absolute inset-x-[22px] bottom-[30px] top-[20px]">
@@ -168,10 +171,16 @@ export function Feature({
                   boxShadow: "0 40px 90px -30px rgba(13,42,63,0.55), 0 0 60px -10px rgba(217,255,248,0.33)",
                 }}
               >
-                <Cover src={post.artwork_url} seed={post.title} size={cover} />
+                <Cover src={post.artwork_url} seed={post.title} size={cover} style={{ borderRadius: radius }} />
               </div>
               <div className={face} style={{ borderRadius: radius, transform: "rotateY(180deg)" }}>
-                <Cover src={post.artwork_url} seed={post.title} size={cover} className="absolute inset-0" />
+                <Cover
+                  src={post.artwork_url}
+                  seed={post.title}
+                  size={cover}
+                  className="absolute inset-0"
+                  style={{ borderRadius: radius }}
+                />
                 <div className="absolute inset-0 bg-white/[0.88]" />
                 {post.photo_url ? (
                   <div className="absolute inset-[18px] flex flex-col gap-3.5 text-left">
