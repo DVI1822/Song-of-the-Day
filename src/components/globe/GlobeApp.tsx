@@ -15,6 +15,7 @@ import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { type CoreLook, alpha, drift, useCoreLook } from "./coreLook";
+import { skyNow } from "./storyVideo";
 import { Magma, MagmaFilters } from "./Magma";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
@@ -1237,6 +1238,7 @@ function Globe({
           api={api}
           onBlocked={() => window.location.reload()}
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
+          story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
           rootRef={(el) => void (R.current.feat = el)}
           backdropRef={(el) => void (R.current.featBack = el)}
           cardRef={(el) => void (R.current.featCard = el)}
