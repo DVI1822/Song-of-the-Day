@@ -347,11 +347,13 @@ export function FindPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Only someone's exact username finds them; nobody gets a list of who's here.
   useEffect(() => {
     let live = true;
     const t = setTimeout(() => {
-      api.searchPeople(q).then((r) => live && setFound(r));
-    }, q ? 250 : 0);
+      if (!q.trim()) setFound(null);
+      else api.searchPeople(q).then((r) => live && setFound(r));
+    }, q ? 300 : 0);
     return () => {
       live = false;
       clearTimeout(t);
@@ -376,8 +378,8 @@ export function FindPanel({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="username"
-            aria-label="Search by username"
+            placeholder="their exact username"
+            aria-label="Find someone by their exact username"
             autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}
@@ -441,7 +443,9 @@ export function FindPanel({
           );
         })}
         {found && !found.length && q.trim() && (
-          <div className="px-2.5 py-[18px] text-[13px] text-muted">No one by that name yet</div>
+          <div className="px-2.5 py-[18px] text-[13px] leading-snug text-muted">
+            No one with that exact username. Ask them for it, or send them your invite link.
+          </div>
         )}
       </div>
     </>

@@ -222,14 +222,11 @@ export async function deleteTodayPost(postId: string): Promise<FormState> {
 export async function searchPeople(q: string): Promise<(Profile & { following: boolean })[]> {
   const { supabase, userId } = await getSession();
   if (!userId) return [];
-  // Strip characters that mean something to PostgREST filters.
-  const term = q.trim().replace(/^@/, "").replace(/[%_,()*\\]/g, "").slice(0, 40);
-  let query = supabase.from("profiles").select("*").neq("id", userId).limit(30);
-  query = term
-    ? query.or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
-    : query.order("created_at", { ascending: false });
+  // Only an exact username finds someone, so nobody can browse who's here.
+  const term = q.trim().replace(/^@/, "").toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(term)) return [];
   const [{ data }, { data: follows }] = await Promise.all([
-    query,
+    supabase.from("profiles").select("*").eq("username", term).neq("id", userId).limit(1),
     supabase.from("follows").select("following_id").eq("follower_id", userId),
   ]);
   const followed = new Set((follows ?? []).map((f) => f.following_id as string));

@@ -206,9 +206,7 @@ const demoApi: GlobeApi = {
   },
   async searchPeople(q) {
     const term = q.trim().replace(/^@/, "").toLowerCase();
-    return POOL.map((name, j) => ({ ...profile(100 + j, name), following: false })).filter(
-      (p) => !term || p.username.includes(term) || p.display_name.toLowerCase().includes(term),
-    );
+    return POOL.map((name, j) => ({ ...profile(100 + j, name), following: false })).filter((p) => p.username === term);
   },
   async follow(id) {
     const j = Number(id.slice(1)) - 100;
