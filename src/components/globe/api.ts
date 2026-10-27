@@ -51,6 +51,8 @@ export type GlobeApi = {
   addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }>;
   deleteNote(noteId: string): Promise<{ error?: string }>;
   chat: ChatApi;
+  // keep this browser's push subscription for the noon and 9 PM nudges
+  savePush?(sub: { endpoint: string; p256dh: string; auth: string }): Promise<void>;
   // what's new since the Globe opened; the demo has nothing new
   news?(): Promise<News | null>;
   // Spotify Connect, for people who linked Spotify. The demo has none.
@@ -156,6 +158,9 @@ export const serverApi: GlobeApi = {
   addNote,
   deleteNote,
   chat: supabaseChat,
+  async savePush(sub) {
+    await createClient().rpc("save_push", { sub_endpoint: sub.endpoint, sub_p256dh: sub.p256dh, sub_auth: sub.auth });
+  },
   spotify: { play: spotifyPlay, playAll: spotifyPlayAll, next: spotifyNext, pause: spotifyPause, resume: spotifyResume, now: spotifyNow },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();

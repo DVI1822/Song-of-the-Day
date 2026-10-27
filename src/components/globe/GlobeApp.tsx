@@ -11,6 +11,7 @@ import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
 import { Chat } from "./Chat";
+import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { Magma, MagmaFilters } from "./Magma";
@@ -241,6 +242,10 @@ function Globe({
   const [panel, setPanel] = useState<PanelName | null>(null);
   const [panelOn, setPanelOn] = useState(false);
   const [chatOn, setChatOn] = useState(false);
+  const welcomeSeen = useWelcomeSeen();
+  const [help, setHelp] = useState(false);
+  // a browser that already allowed nudges keeps its subscription fresh
+  useEffect(() => void enablePush(api, false), [api]);
   const [dmWith, setDmWith] = useState<{ p: Profile; n: number } | null>(null);
   const [feat, setFeat] = useState<number | null>(null);
   const [flipped, setFlipped] = useState(false);
@@ -1050,6 +1055,10 @@ function Globe({
           <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
         </svg>
       </button>
+
+      {/* what this is, any time */}
+      <HelpButton dark={darkOn} onClick={() => setHelp(true)} buttonRef={(el) => void (R.current.chrome[5] = el)} />
+      {(!welcomeSeen || help) && <Welcome api={api} onClose={() => setHelp(false)} />}
 
       {/* left tabs */}
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
