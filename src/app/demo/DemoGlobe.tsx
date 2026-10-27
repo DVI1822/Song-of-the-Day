@@ -295,7 +295,7 @@ const ADDED_ME: AddedMe[] = [0, 1].map((j) => ({
   added_at: new Date(Date.now() - (j + 1) * 3_600_000).toISOString(),
 }));
 
-// Someone felt your song and someone left a note, for "On your song".
+// Someone liked your song and someone left a note, for "On your song".
 const ACTIVITY: Activity[] = [
   { kind: "note", id: "a1", at: new Date(now.getTime() - 600_000).toISOString(), user: FRIENDS[4], body: "this is exactly my monday" },
   { kind: "feel", id: "a2", at: new Date(now.getTime() - 1_200_000).toISOString(), user: FRIENDS[9] },

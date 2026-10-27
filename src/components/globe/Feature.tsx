@@ -14,7 +14,7 @@ import { Cover, CloseIcon } from "./ui";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
-// a place to report the song or block them. Beside the title: feel it, and
+// a place to report the song or block them. Beside the title: like it, and
 // the notes people left.
 export function Feature({
   post,
@@ -69,7 +69,7 @@ export function Feature({
   // the sky the Story starts on: the one outside when you tap share
   const [sharing, setSharing] = useState<StorySky | null>(null);
 
-  // feel it, or take it back, straight away; undone if it doesn't stick
+  // like it, or take it back, straight away; undone if it doesn't stick
   const feel = async () => {
     if (!r || mine) return;
     const on = !r.feels.some((f) => f.user.id === me.id);

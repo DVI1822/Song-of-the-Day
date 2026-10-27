@@ -299,7 +299,7 @@ export async function loadReactions(postId: string): Promise<Reactions | null> {
 
 export async function feelSong(postId: string, on: boolean): Promise<{ error?: string }> {
   const { supabase, userId } = await getSession();
-  if (!userId) return { error: "Sign in to feel songs." };
+  if (!userId) return { error: "Sign in to like songs." };
   const { error } = on
     ? await supabase.from("feels").insert({ post_id: postId })
     : await supabase.from("feels").delete().eq("post_id", postId).eq("user_id", userId);

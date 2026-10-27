@@ -7,6 +7,7 @@ import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
 import { Magma } from "./Magma";
 import { SongPlayer } from "./Preview";
+import { ThumbIcon } from "./Reactions";
 import { Cover, SearchIcon, coverRadius } from "./ui";
 
 const Kicker = ({ children }: { children: React.ReactNode }) => (
@@ -145,14 +146,14 @@ export function FriendsPanel({
   );
 }
 
-// Feels and notes on your song today, newest first.
+// Likes and notes on your song today, newest first.
 function OnYourSong({ activity, isNew, onMine }: { activity: Activity[]; isNew(at: string): boolean; onMine(): void }) {
   const feels = activity.filter((a) => a.kind === "feel").length,
     notes = activity.length - feels;
   return (
     <div className="pb-2.5">
       <Kicker>
-        On your song · {feels} {feels === 1 ? "feel" : "feels"}
+        On your song · {feels} {feels === 1 ? "like" : "likes"}
         {notes > 0 && `, ${notes} ${notes === 1 ? "note" : "notes"}`}
       </Kicker>
       {activity.slice(0, 12).map((a) => (
@@ -165,15 +166,15 @@ function OnYourSong({ activity, isNew, onMine }: { activity: Activity[]; isNew(a
           <span className="relative flex-none">
             <Avatar name={a.user.display_name} />
             {a.kind === "feel" && (
-              <span className="absolute -bottom-1 -right-1 h-[15px] w-[15px]">
-                <Magma className="h-full w-full" />
+              <span className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-accent shadow-[0_1px_3px_rgba(13,42,63,0.25)]">
+                <ThumbIcon on size={11} />
               </span>
             )}
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-px">
             <div className="truncate text-sm">
               <span className="font-semibold">{a.user.display_name}</span>
-              {a.kind === "feel" ? " felt it" : " left a note"}
+              {a.kind === "feel" ? " liked it" : " left a note"}
             </div>
             {a.body && <div className="line-clamp-2 text-[12px] leading-snug text-muted">“{a.body}”</div>}
           </div>

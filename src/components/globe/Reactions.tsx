@@ -4,12 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { formatTime, initials } from "@/lib/day";
 import type { Note, Post, Reactions } from "@/lib/types";
 import type { GlobeApi } from "./api";
-import { Magma } from "./Magma";
 import { CloseIcon } from "./ui";
 
-// Feeling a song (the like) and the notes people leave on it. The feel is
-// a drop that fills with the core's magma; notes open in a sheet under the
-// song.
+// Liking a song and the notes people leave on it. The like is a thumbs up
+// that lights up when tapped, with the count beside it; notes open in a
+// sheet under the song. (The likes are "feels" in the data.)
 
 export function useReactions(api: GlobeApi, postId: string) {
   const [r, setR] = useState<Reactions | null>(null);
@@ -23,9 +22,14 @@ export function useReactions(api: GlobeApi, postId: string) {
   return [r, setR] as const;
 }
 
-const DropIcon = () => (
-  <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-    <path d="M12 3.2c3.6 4.3 6 7.7 6 10.6a6 6 0 0 1-12 0c0-2.9 2.4-6.3 6-10.6z" />
+export const ThumbIcon = ({ on, size = 22 }: { on?: boolean; size?: number }) => (
+  <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path
+      d="M7 10v11.5M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 8a2 2 0 0 1-1.9 1.4H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9z"
+      fill={on ? "currentColor" : "none"}
+      fillOpacity={on ? 0.9 : 0}
+    />
+    {on && <path d="M7 10v11.5" stroke="white" strokeOpacity="0.55" />}
   </svg>
 );
 const NoteIcon = () => (
@@ -34,7 +38,7 @@ const NoteIcon = () => (
   </svg>
 );
 
-// The two buttons beside a song's title.
+// The two buttons beside a song's title, each with its count beside it.
 export function ReactionButtons({
   r,
   mine,
@@ -48,59 +52,45 @@ export function ReactionButtons({
   onFeel(): void;
   onNotes(): void;
 }) {
-  const felt = Boolean(r?.feels.some((f) => f.user.id === meId));
-  const [burst, setBurst] = useState(0);
-  const feels = r?.feels.length ?? 0,
+  const liked = Boolean(r?.feels.some((f) => f.user.id === meId));
+  const [pop, setPop] = useState(0);
+  const likes = r?.feels.length ?? 0,
     notes = r?.notes.length ?? 0;
-  const count = "min-w-[1ch] text-[11px] font-semibold tabular-nums leading-none text-muted";
+  const count = "min-w-[1ch] text-[12px] font-semibold tabular-nums leading-none";
   return (
-    <div className="-mr-1.5 flex flex-none items-start">
+    <div className="-mr-1 flex flex-none items-center gap-0.5 pt-0.5">
       <button
         type="button"
         onClick={() => {
           if (mine) return onNotes();
-          if (!felt) setBurst((b) => b + 1);
+          if (!liked) setPop((b) => b + 1);
           onFeel();
         }}
-        aria-label={mine ? `${feels} felt your song` : felt ? "Felt it. Tap to take it back" : "Feel it"}
-        aria-pressed={mine ? undefined : felt}
-        className="flex w-11 flex-col items-center gap-1 pt-0.5 text-card-ink"
+        aria-label={
+          mine ? `${likes} ${likes === 1 ? "like" : "likes"} on your song` : liked ? "Liked. Tap to take it back" : "Like"
+        }
+        aria-pressed={mine ? undefined : liked}
+        className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors ${liked ? "text-accent" : "text-card-ink"}`}
       >
-        <span className="relative flex h-7 w-7 items-center justify-center">
-          {felt || (mine && feels > 0) ? (
-            <span key={burst} className="block h-[22px] w-[22px]" style={{ animation: burst ? "feel-pop .5s cubic-bezier(.2,.75,.25,1)" : undefined }}>
-              <Magma className="h-full w-full drop-shadow-[0_1px_5px_rgba(60,90,110,0.5)]" />
-            </span>
-          ) : (
-            <DropIcon />
-          )}
-          {burst > 0 && (
-            <span
-              key={`r${burst}`}
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-full border-2 border-accent/60"
-              style={{ animation: "feel-ring .7s ease-out forwards" }}
-            />
-          )}
+        <span key={pop} className="flex" style={{ animation: pop ? "like-pop .45s cubic-bezier(.2,.75,.25,1)" : undefined }}>
+          <ThumbIcon on={liked} />
         </span>
-        <span className={count}>{feels || ""}</span>
+        <span className={`${count} ${liked ? "" : "text-muted"}`}>{likes || ""}</span>
       </button>
       <button
         type="button"
         onClick={onNotes}
         aria-label={notes ? `${notes} ${notes === 1 ? "note" : "notes"}` : "Leave a note"}
-        className="flex w-11 flex-col items-center gap-1 pt-0.5 text-card-ink"
+        className="flex h-10 items-center gap-1.5 rounded-full px-2 text-card-ink"
       >
-        <span className="flex h-7 w-7 items-center justify-center">
-          <NoteIcon />
-        </span>
-        <span className={count}>{notes || ""}</span>
+        <NoteIcon />
+        <span className={`${count} text-muted`}>{notes || ""}</span>
       </button>
     </div>
   );
 }
 
-// Who felt the song, its notes, and a place to leave one.
+// Who liked the song, its notes, and a place to leave one.
 export function NotesSheet({
   api,
   post,
@@ -155,14 +145,14 @@ export function NotesSheet({
   };
 
   const names = feels.map((f) => (f.user.id === meId ? "You" : f.user.display_name.split(" ")[0]));
-  const feltLine =
+  const likedLine =
     names.length === 0
       ? mine
-        ? "No one's felt it yet"
-        : `Be the first to feel ${first}'s song`
+        ? "No likes yet"
+        : `Be the first to like ${first}'s song`
       : names.length <= 3
-        ? `${names.slice(0, -1).join(", ")}${names.length > 1 ? " and " : ""}${names[names.length - 1]} felt it`
-        : `${names.slice(0, 2).join(", ")} and ${names.length - 2} others felt it`;
+        ? `${names.slice(0, -1).join(", ")}${names.length > 1 ? " and " : ""}${names[names.length - 1]} liked it`
+        : `${names.slice(0, 2).join(", ")} and ${names.length - 2} others liked it`;
 
   return (
     <div className="fixed inset-0 z-[490] flex flex-col justify-end">
@@ -195,8 +185,12 @@ export function NotesSheet({
               </span>
             ))}
           </div>
-          {feels.length > 0 && <Magma className="h-4 w-4 flex-none" />}
-          <div className="min-w-0 flex-1 text-[13px] text-muted">{feltLine}</div>
+          {feels.length > 0 && (
+            <span className="flex-none text-accent">
+              <ThumbIcon on size={16} />
+            </span>
+          )}
+          <div className="min-w-0 flex-1 text-[13px] text-muted">{likedLine}</div>
         </div>
 
         <div ref={list} className="flex min-h-[90px] flex-1 flex-col gap-3 overflow-y-auto border-t border-card-ink/[0.07] px-5 py-3">
