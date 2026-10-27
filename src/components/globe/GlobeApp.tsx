@@ -10,6 +10,7 @@ import { Shuffle } from "./Shuffle";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
+import { Chat } from "./Chat";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { Magma, MagmaFilters } from "./Magma";
@@ -236,6 +237,8 @@ function Globe({
   const [launching, setLaunching] = useState(false);
   const [panel, setPanel] = useState<PanelName | null>(null);
   const [panelOn, setPanelOn] = useState(false);
+  const [chatOn, setChatOn] = useState(false);
+  const [dmWith, setDmWith] = useState<{ p: Profile; n: number } | null>(null);
   const [feat, setFeat] = useState<number | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [compose, setCompose] = useState(false);
@@ -504,7 +507,10 @@ function Globe({
       if (compose) setCompose(false);
       else if (m.current.featOpen) closeFeat();
       else if (m.current.coreOn) closeCore();
-      else closePanel();
+      else {
+        closePanel();
+        setChatOn(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -805,6 +811,7 @@ function Globe({
 
   const openTab = (name: PanelName) => {
     if (panel === name && panelOn) return closePanel();
+    setChatOn(false);
     if (name === "friends") {
       setSeenBefore(seenAt);
       seenStore.set(new Date().toISOString());
@@ -1124,6 +1131,31 @@ function Globe({
         </div>
       )}
 
+      {/* the globe chat, pulled out from the right */}
+      <Chat
+        api={api}
+        me={me}
+        friends={friends}
+        addedMe={addedMe}
+        dark={darkOn}
+        open={chatOn}
+        onOpen={() => {
+          closePanel();
+          setChatOn(true);
+        }}
+        onClose={() => setChatOn(false)}
+        dmWith={dmWith}
+        onCore={(p) => {
+          setChatOn(false);
+          openCore(null, p);
+        }}
+        tabTop={tabTop}
+        top={Math.max(90, tabTop - 50)}
+        width={Math.min(320, L.w - 96)}
+        height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}
+        tabRef={(el) => void (R.current.chrome[3] = el)}
+      />
+
       {feat !== null && featPost && (
         <Feature
           key={featPost.id}
@@ -1174,6 +1206,16 @@ function Globe({
           onClose={closeCore}
           onOpenToday={!coreWho ? () => fly(ME) : coreFor?.k != null ? () => fly(coreFor.k!) : undefined}
           onAdd={coreAdded ? undefined : addFromCore}
+          onMessage={
+            coreWho && (coreAdded || addedMe.some((p) => p.id === coreWho.id))
+              ? () => {
+                  closeCore();
+                  closePanel();
+                  setDmWith({ p: coreWho, n: Date.now() });
+                  setChatOn(true);
+                }
+              : undefined
+          }
           api={api}
           onBlocked={() => window.location.reload()}
           rootRef={(el) => void (R.current.prof = el)}

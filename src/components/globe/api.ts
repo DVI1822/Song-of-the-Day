@@ -31,7 +31,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, Note, Post, Profile, Reactions } from "@/lib/types";
+import type { Core, Friend, Message, Note, Post, Profile, Reactions } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -50,6 +50,7 @@ export type GlobeApi = {
   feel(postId: string, on: boolean): Promise<{ error?: string }>;
   addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }>;
   deleteNote(noteId: string): Promise<{ error?: string }>;
+  chat: ChatApi;
   // what's new since the Globe opened; the demo has nothing new
   news?(): Promise<News | null>;
   // Spotify Connect, for people who linked Spotify. The demo has none.
@@ -63,6 +64,79 @@ export type SpotifyConnect = {
   pause(): Promise<void>;
   resume(): Promise<SpotifyPlay>;
   now(): Promise<SpotifyNow>;
+};
+
+// The globe chat and messages to one person. These go straight to the
+// database from the browser (its rules decide who sees what), and new ones
+// arrive live.
+export type ChatApi = {
+  load(): Promise<Message[]>;
+  send(body: string, toId: string | null): Promise<{ message?: Message; error?: string }>;
+  remove(id: string): Promise<{ error?: string }>;
+  markRead(fromId: string): Promise<void>;
+  people(ids: string[]): Promise<Profile[]>;
+  listen(on: { add(m: Message): void; gone(id: string): void }): () => void;
+};
+
+const MSG = "id, user_id, to_id, body, created_at, read_at";
+
+const supabaseChat: ChatApi = {
+  async load() {
+    const supabase = createClient();
+    const [globe, direct] = await Promise.all([
+      supabase.from("messages").select(MSG).is("to_id", null).order("created_at", { ascending: false }).limit(150),
+      supabase.from("messages").select(MSG).not("to_id", "is", null).order("created_at", { ascending: false }).limit(400),
+    ]);
+    return [...(globe.data ?? []), ...(direct.data ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
+  async send(body, toId) {
+    const text = body.trim().slice(0, 500);
+    if (!text) return { error: "Say something first." };
+    const { data, error } = await createClient().from("messages").insert({ body: text, to_id: toId }).select(MSG).single();
+    if (error || !data) return { error: toId ? "Couldn't send that. Try again." : "Couldn't post that. Try again." };
+    return { message: data };
+  },
+  async remove(id) {
+    const { error } = await createClient().from("messages").delete().eq("id", id);
+    return error ? { error: "Couldn't delete that. Try again." } : {};
+  },
+  async markRead(fromId) {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return;
+    await supabase
+      .from("messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", fromId)
+      .eq("to_id", data.user.id)
+      .is("read_at", null);
+  },
+  async people(ids) {
+    if (!ids.length) return [];
+    const { data } = await createClient().from("profiles").select("id, username, display_name, timezone, created_at").in("id", ids);
+    return data ?? [];
+  },
+  listen(on) {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let live = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!live) return;
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+      channel = supabase
+        .channel(`chat-${crypto.randomUUID()}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => on.add(p.new as Message))
+        .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, (p) => {
+          const id = (p.old as { id?: string }).id;
+          if (id) on.gone(id);
+        })
+        .subscribe();
+    });
+    return () => {
+      live = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  },
 };
 
 export const serverApi: GlobeApi = {
@@ -81,6 +155,7 @@ export const serverApi: GlobeApi = {
   feel: feelSong,
   addNote,
   deleteNote,
+  chat: supabaseChat,
   spotify: { play: spotifyPlay, playAll: spotifyPlayAll, next: spotifyNext, pause: spotifyPause, resume: spotifyResume, now: spotifyNow },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();

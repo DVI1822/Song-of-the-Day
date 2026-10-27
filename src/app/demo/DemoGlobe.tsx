@@ -3,7 +3,7 @@
 import type { GlobeApi } from "@/components/globe/api";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { addDays, todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Note, Post, Profile, Reactions } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Message, Note, Post, Profile, Reactions } from "@/lib/types";
 
 // The Globe with made-up friends. Works without signing in; nothing is saved.
 
@@ -142,6 +142,31 @@ function reactionsOf(postId: string): Reactions {
   return r;
 }
 
+// The globe chat: some chatter from friends, a message waiting for you, and
+// one more that turns up live a few seconds in.
+const ago = (min: number) => new Date(now.getTime() - min * 60_000).toISOString();
+const say = (id: string, from: Profile, body: string, min: number, to: Profile | null = null, read = true): Message => ({
+  id,
+  user_id: from.id,
+  to_id: to?.id ?? null,
+  body,
+  created_at: ago(min),
+  read_at: to && read ? ago(min) : null,
+});
+const CHAT: Message[] = [
+  say("c1", FRIENDS[2], "who else woke up to rain and put on something sad", 190),
+  say("c2", FRIENDS[5], "guilty. it's that kind of tuesday", 186),
+  say("c3", ME, "posted mine already, not sorry", 120),
+  say("c4", FRIENDS[0], "the globe is so full today 🌍", 64),
+  say("c5", FRIENDS[8], "whoever posted the jazz one, more of that please", 38),
+  say("c6", FRIENDS[4], "that was me!! glad it landed", 35),
+  say("c7", FRIENDS[11 % FRIENDS.length], "midnight countdown at 3 hours, get your songs in", 9),
+  say("d1", FRIENDS[3], "your song yesterday was perfect for my drive", 300, ME),
+  say("d2", ME, "right?? that chorus", 290, FRIENDS[3]),
+  say("d3", FRIENDS[3], "send me the whole album", 22, ME, false),
+  say("d4", ME, "you have to hear the live version", 1500, FRIENDS[6]),
+];
+
 const demoApi: GlobeApi = {
   async previewSong() {
     await new Promise((r) => setTimeout(r, 1100));
@@ -226,6 +251,32 @@ const demoApi: GlobeApi = {
   async deleteNote(noteId) {
     for (const r of reactions.values()) r.notes = r.notes.filter((n) => n.id !== noteId);
     return {};
+  },
+  chat: {
+    async load() {
+      await new Promise((r) => setTimeout(r, 300));
+      return [...CHAT];
+    },
+    async send(body, toId) {
+      const m: Message = { id: `m${Date.now()}`, user_id: ME.id, to_id: toId, body: body.trim(), created_at: new Date().toISOString(), read_at: null };
+      CHAT.push(m);
+      return { message: m };
+    },
+    async remove(id) {
+      const i = CHAT.findIndex((m) => m.id === id);
+      if (i >= 0) CHAT.splice(i, 1);
+      return {};
+    },
+    async markRead(fromId) {
+      for (const m of CHAT) if (m.user_id === fromId && m.to_id === ME.id) m.read_at ??= new Date().toISOString();
+    },
+    async people() {
+      return [];
+    },
+    listen(on) {
+      const t = setTimeout(() => on.add({ ...say(`live${Date.now()}`, FRIENDS[1], "ok who's listening to the same thing right now", 0) }), 6000);
+      return () => clearTimeout(t);
+    },
   },
   async loadCore(id) {
     const f = FRIENDS.find((x) => x.id === id);

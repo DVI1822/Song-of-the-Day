@@ -5,6 +5,7 @@ import { useRef, useState, type Ref } from "react";
 import { formatDay, formatTime, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
+import { ChatIcon } from "./Chat";
 import { SongPlayer } from "./Preview";
 import { Safety } from "./Safety";
 import { Cover, CloseIcon, glass, glassThin } from "./ui";
@@ -19,6 +20,7 @@ export function CoreView({
   onClose,
   onOpenToday,
   onAdd,
+  onMessage,
   api,
   onBlocked,
   rootRef,
@@ -32,6 +34,7 @@ export function CoreView({
   onClose(): void;
   onOpenToday?: () => void; // their tile on the globe; without one, today opens here
   onAdd?: () => Promise<string | null>; // for someone not on your globe yet
+  onMessage?: () => void; // for someone you can message
   api: GlobeApi;
   onBlocked(): void;
   rootRef: Ref<HTMLDivElement>;
@@ -77,6 +80,7 @@ export function CoreView({
           </div>
         </div>
         {onAdd && <AddPill name={first ?? ""} onAdd={onAdd} />}
+        {onMessage && <MessagePill name={first ?? ""} onMessage={onMessage} />}
         <button
           type="button"
           onClick={onClose}
@@ -122,6 +126,7 @@ export function CoreView({
                 <div className="truncate text-xs text-muted">@{profile?.username}</div>
               </div>
               {onAdd && <AddPill name={first ?? ""} onAdd={onAdd} />}
+              {onMessage && <MessagePill name={first ?? ""} onMessage={onMessage} />}
               <button
                 type="button"
                 onClick={onClose}
@@ -285,6 +290,21 @@ function AddPill({ name, onAdd }: { name: string; onAdd(): Promise<string | null
         <path d="M12 5v14M5 12h14" />
       </svg>
       {error ? "Try again" : "Add"}
+    </button>
+  );
+}
+
+// Message someone from their core; the conversation opens in the globe chat.
+function MessagePill({ name, onMessage }: { name: string; onMessage(): void }) {
+  return (
+    <button
+      type="button"
+      onClick={onMessage}
+      aria-label={`Message ${name}`}
+      className="mr-1.5 flex h-[34px] flex-none items-center gap-1.5 self-center rounded-[17px] bg-card-ink px-3.5 text-xs font-semibold text-white"
+    >
+      <ChatIcon size={13} />
+      Message
     </button>
   );
 }

@@ -206,8 +206,12 @@ export async function createPost(input: NewPost): Promise<{ post?: Post; error?:
 export async function deleteTodayPost(postId: string): Promise<FormState> {
   const { supabase, userId } = await getSession();
   if (!userId) redirect("/login");
+  const { data: post } = await supabase.from("posts").select("photo_url").eq("id", postId).maybeSingle();
   const { error } = await supabase.from("posts").delete().eq("id", postId);
   if (error) return { error: error.code === "P0001" ? "You've already used today's redo." : error.message };
+  // the old song's photo goes with it
+  const file = post?.photo_url?.split("/photos/").pop();
+  if (file?.startsWith(`${userId}/`)) await supabase.storage.from("photos").remove([file]);
   revalidatePath("/", "layout");
 }
 

@@ -512,7 +512,8 @@ export function SongsPanel({
                     {date} at {formatTime(p.created_at, me.timezone)}
                   </div>
                 </div>
-                {p.photo_url && (
+                {/* photos last one day */}
+                {isToday && p.photo_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={p.photo_url} alt="" className="h-[150px] w-full rounded-2xl object-cover" loading="lazy" />
                 )}
