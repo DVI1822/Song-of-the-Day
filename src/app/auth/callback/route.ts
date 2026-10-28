@@ -13,5 +13,7 @@ export async function GET(request: Request) {
     if (!error) return NextResponse.redirect(`${origin}/`);
     return NextResponse.redirect(`${origin}/login?error=link`);
   }
-  return NextResponse.redirect(`${origin}/auth/done`);
+  // the waiting screen's id, if the link came from one (see lib/handoff)
+  const h = searchParams.get("h");
+  return NextResponse.redirect(`${origin}/auth/done${h && /^[0-9a-f-]{36}$/.test(h) ? `?h=${h}` : ""}`);
 }

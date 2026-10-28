@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, buttonClass, inputClass } from "@/components/Shell";
+import { clearHandoff, newHandoff, waitingHandoff } from "@/lib/handoff";
 import { createClient, createLinkClient } from "@/lib/supabase/client";
 
 // Email only. Spotify sign-in is off while the Spotify app is in development
@@ -20,6 +21,38 @@ export function LoginForm({ initialError }: { initialError?: string }) {
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
   const router = useRouter();
+
+  // The link may open in another browser (on a phone, always, for the app on
+  // the home screen): it hands the sign-in back here, so keep checking.
+  useEffect(() => {
+    if (state !== "sent") return;
+    const id = waitingHandoff();
+    if (!id) return;
+    let done = false;
+    const check = async () => {
+      if (done || document.visibilityState === "hidden") return;
+      const supabase = createClient();
+      const { data } = await supabase.rpc("claim_handoff", { handoff: id });
+      if (done || typeof data !== "string" || !data) return;
+      done = true;
+      clearHandoff();
+      const { error } = await supabase.auth.refreshSession({ refresh_token: data });
+      if (error) {
+        done = false;
+        setError("That sign-in didn't come through. Send a new link.");
+        return;
+      }
+      router.replace("/");
+      router.refresh();
+    };
+    const t = setInterval(check, 2500);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      done = true;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [state, router]);
 
   // The same email carries a code, for when the link would open in another
   // browser (like a home-screen app on a phone): type it here instead.
@@ -43,7 +76,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     setError(undefined);
     const { error } = await createLinkClient().auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?h=${newHandoff()}` },
     });
     if (error) {
       setError(error.message);
@@ -58,9 +91,11 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       <Card className="rise-in">
         <h2 className="display text-xl">Check your email</h2>
         <p className="mt-2 text-sm text-card-muted">
-          We sent a sign-in link to <strong className="text-card-ink">{email}</strong>. Open it on this device
-          {withCode ? ", or type the code from the email here." : " and you're in."}
+          We sent a sign-in link to <strong className="text-card-ink">{email}</strong>. Tap it on this phone or
+          computer and this screen signs you in, even if the link opens somewhere else
+          {withCode ? ". Or type the code from the email here." : "."}
         </p>
+        {!withCode && error && <p className="mt-3 text-sm text-accent-deep">{error}</p>}
         {withCode && (
           <form onSubmit={verify} className="mt-5 flex flex-col gap-3">
             <input
