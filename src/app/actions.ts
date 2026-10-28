@@ -244,15 +244,15 @@ export async function searchPeople(q: string): Promise<(Profile & { following: b
   if (!userId) return [];
   // Strip characters that mean something to PostgREST filters.
   const term = q.trim().replace(/^@/, "").replace(/[%_,()*\\]/g, "").slice(0, 40);
+  // People already on your globe don't show here, so the 30 slots go to new faces.
+  const { data: follows } = await supabase.from("follows").select("following_id").eq("follower_id", userId);
+  const followed = new Set((follows ?? []).map((f) => f.following_id as string));
   let query = supabase.from("profiles").select("*").neq("id", userId).limit(30);
+  if (followed.size) query = query.not("id", "in", `(${[...followed].join(",")})`);
   query = term
     ? query.or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
     : query.order("created_at", { ascending: false });
-  const [{ data }, { data: follows }] = await Promise.all([
-    query,
-    supabase.from("follows").select("following_id").eq("follower_id", userId),
-  ]);
-  const followed = new Set((follows ?? []).map((f) => f.following_id as string));
+  const { data } = await query;
   return ((data ?? []) as Profile[]).map((p) => ({ ...p, following: followed.has(p.id) }));
 }
 
