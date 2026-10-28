@@ -74,6 +74,8 @@ type TileEls = {
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+// an angle brought into -π..π
+const wrapPi = (a: number) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 
 // When you last looked at who added you, so the My friends tab can show a
 // badge for anyone new. Kept on this device only.
@@ -138,6 +140,7 @@ function newMotion(posted: boolean) {
     pitch: -0.3,
     zoom: 1,
     vel: 0.0008,
+    pvel: 0, // the tumble a flick leaves, up or down
     t: 0,
     mt: 0,
     last: 0,
@@ -166,7 +169,11 @@ function newMotion(posted: boolean) {
     drops: new Map<number, number>(),
     dropNext: 0,
     dropSeen: new Set<string>(),
-    drag: null as null | { x: number; y: number; lx: number; yaw: number; pitch: number },
+    // a drag: where it began, the last point, and which way sideways turns
+    // the globe (reversed once it's been tipped upside down)
+    drag: null as null | { x: number; y: number; lx: number; ly: number; yaw: number; pitch: number; side: number },
+    // when the last drag let go: the playing song eases back after it
+    freed: 0,
     pointers: new Map<number, { x: number; y: number }>(),
     // two fingers down: no spinning, and no zooming either
     pinch: false,
@@ -625,7 +632,7 @@ function Globe({
       const t = s.target;
       if (!s.drag && t) {
         const dy = t.yaw - s.yaw,
-          dp = t.pitch - s.pitch;
+          dp = wrapPi(t.pitch - s.pitch);
         if (Math.abs(dy) + Math.abs(dp) > 0.001) {
           const f = ease(0.1, dt);
           s.yaw += dy * f;
@@ -633,8 +640,12 @@ function Globe({
         } else if (s.featFly === null && s.launch === null) s.target = null; // arrived: let the spin carry on
       } else if (!s.drag && !s.pinch) {
         s.vel += ((0.14 * dt) / Math.sqrt(Math.max(1, s.zoom)) - s.vel) * ease(0.05, dt);
-        s.yaw += s.vel;
+        s.yaw += s.vel * (Math.cos(s.pitch) < 0 ? -1 : 1);
+        s.pitch += s.pvel;
+        s.pvel *= Math.exp(-dt * 2.5);
       }
+      // the globe turns freely all the way over; keep the angle in one lap
+      if (!s.drag) s.pitch = wrapPi(s.pitch);
       if (s.zoomTarget !== null) {
         const dz = s.zoomTarget - s.zoom;
         // the core's sheet starts rising while the camera settles, not after
@@ -665,10 +676,13 @@ function Globe({
       } else if (s.featFly === null && s.lens === null && !s.coreOn) {
         // the stream holds the playing song at the front while the rest spin,
         // a little below the core so you can see it reach out
+        // a drag carries it along with everything else; let go and it's
+        // slowly drawn back
         const b = live.current.beam;
-        if (b && !b.paused) {
+        if (b && !b.paused && !s.drag) {
           const f = camInv([0, 0.42, 0.91], { yaw: s.yaw, pitch: s.pitch, roll: 0 });
-          sim.current.pull([b.k], [f[0], -f[1], f[2]], dt);
+          const back = clamp01((s.t - s.freed - 0.3) / 1.5);
+          sim.current.pull([b.k], [f[0], -f[1], f[2]], dt, 0.15 + 0.75 * back * back);
         }
       }
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
@@ -739,7 +753,16 @@ function Globe({
       s.drag = null;
       return;
     }
-    s.drag = { x: e.clientX, y: e.clientY, lx: e.clientX, yaw: s.yaw, pitch: s.pitch };
+    s.drag = {
+      x: e.clientX,
+      y: e.clientY,
+      lx: e.clientX,
+      ly: e.clientY,
+      yaw: s.yaw,
+      pitch: s.pitch,
+      side: Math.cos(s.pitch) < 0 ? -1 : 1,
+    };
+    s.pvel = 0;
     s.moved = false;
     s.gather = 0;
     if (s.featFly !== null) {
@@ -762,15 +785,21 @@ function Globe({
     const dx = e.clientX - d.x,
       dy = e.clientY - d.y;
     if (Math.abs(dx) + Math.abs(dy) > 6) s.moved = true;
+    // sideways spins it on its axis, up and down tumbles it, all the way over
     s.vel = Math.max(-0.08, Math.min(0.08, (e.clientX - d.lx) * 0.01));
+    s.pvel = Math.max(-0.08, Math.min(0.08, -(e.clientY - d.ly) * 0.01));
     d.lx = e.clientX;
-    s.yaw = d.yaw + dx * 0.01;
-    s.pitch = Math.max(-1.3, Math.min(1.3, d.pitch - dy * 0.01));
+    d.ly = e.clientY;
+    s.yaw = d.yaw + dx * 0.01 * d.side;
+    s.pitch = d.pitch - dy * 0.01;
   };
   const onUp = (e: React.PointerEvent) => {
     const s = m.current;
     s.pointers.delete(e.pointerId);
-    if (!s.pointers.size) s.drag = null;
+    if (!s.pointers.size) {
+      if (s.drag) s.freed = s.t;
+      s.drag = null;
+    }
   };
 
 
@@ -1091,6 +1120,9 @@ function Globe({
         onClick={() => {
           const s = m.current;
           s.gather = s.t + 10;
+          // and stand the globe back upright, so every cover faces you
+          s.pvel = 0;
+          s.target = { yaw: s.yaw, pitch: -0.3 };
           setFocus(null);
         }}
         aria-label="Bring the songs to the front"
