@@ -1490,7 +1490,7 @@ sim: TileSim,
           if (glint > 0.004) layers += `linear-gradient(rgba(255,255,255,${glint.toFixed(3)}),rgba(255,255,255,${glint.toFixed(3)})), `;
         }
         // the core's light on the tiles, strongest on the song it's playing
-        const flash = coreLight.flash.get(k) ?? 0;
+        const flash = coreLight.wave;
         if (coreLight.a + coreLight.play + flash > 0.003) {
           const wv = coreLight.a * (0.35 + 0.65 * (1 - Math.max(0, nn[2]))) + (k === s.beamK ? coreLight.play : 0) + flash;
           const c = `rgba(${coreLight.rgb.map(Math.round).join(",")},${clamp01(wv).toFixed(3)})`;
