@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
-import { Magma } from "./Magma";
+import { SignalCore } from "./SignalCore";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
@@ -316,7 +316,7 @@ export function Feature({
                   aria-label={who === "You" ? "View your core" : `View ${who}'s core`}
                   className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-full border border-card-ink/20"
                 >
-                  <Magma className="h-5 w-5 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+                  <SignalCore className="h-5 w-5 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
                 </button>
               }
             />

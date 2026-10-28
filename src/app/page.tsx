@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { GlobeApp } from "@/components/globe/GlobeApp";
-import { Magma, MagmaFilters } from "@/components/globe/Magma";
+import { SignalCore } from "@/components/globe/SignalCore";
 import { LegalLinks } from "@/components/Legal";
 import { Shell, buttonClass } from "@/components/Shell";
 import { getGlobe, getSession, sweepPhotos } from "@/lib/data";
@@ -39,8 +39,7 @@ function Landing() {
   return (
     <Shell>
       <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-        <MagmaFilters />
-        <Magma full className="mb-6 h-28 w-28" />
+        <SignalCore className="mb-6 h-28 w-28" />
         <h1 className="display text-5xl">Song of the Day</h1>
         <p className="max-w-xs text-lg text-muted">
           One song a day. The one that hit hardest. See what everyone you follow is feeling.

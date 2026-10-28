@@ -13,7 +13,7 @@
 import type { Weather } from "@/lib/weather";
 import { pulseAt } from "./beat";
 import type { Live, Motion } from "./GlobeApp";
-import { PERSPECTIVE, TILT, camV, latLon, type TileSim, type V3 } from "./math";
+import { PERSPECTIVE, TILT, camV, latLon, type Camera, type TileSim, type V3 } from "./math";
 
 const NEON: V3[] = ["#5ef2ff", "#9b8cff", "#ff5fd2", "#b4ff5e"].map(hex);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -71,8 +71,8 @@ const css = (c: V3, white: number, a: number) =>
 // what the tiles read to take on the core's light
 export const coreLight = { rgb: [255, 255, 255] as V3, a: 0, play: 0 };
 
-function fit(cv: HTMLCanvasElement, w: number, h: number) {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+function fit(cv: HTMLCanvasElement, w: number, h: number, zoom = 1) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1) * zoom;
   const W = Math.round(w * dpr),
     H = Math.round(h * dpr);
   if (cv.width !== W || cv.height !== H) {
@@ -114,6 +114,27 @@ const flicker = (e: Env, t: number) => (e.storm ? 0.85 + 0.15 * Math.sin(t * 23)
 const wave = (th: number, i: number, t: number) =>
   0.55 * Math.sin(th * 3 + t * 1.3 + i) * Math.sin(t * 0.7 + i * 0.7) + 0.35 * Math.sin(th * 7 - t * 2.1 + i * 1.3) + 0.22 * Math.sin(th * 13 + t * 3.1 - i);
 
+// The core's rings: slices of a sphere of radius Rc, each pushed in and out
+// by its waveform, seen through the camera. x, y in pixels; z for near or far.
+export function corePoints(n: number, Rc: number, cam: Camera, t: number, amp: number, steps = 140) {
+  const rings: [number, number, number][][] = [];
+  for (let i = 0; i < n; i++) {
+    const lat = -Math.PI / 2 + (Math.PI * (i + 0.5)) / n;
+    const pts: [number, number, number][] = [];
+    for (let k = 0; k <= steps; k++) {
+      const th = (k / steps) * TAU;
+      const r = 1 + amp * wave(th, i * (13 / n), t) * Math.cos(lat);
+      const v = camV([Math.cos(lat) * Math.sin(th) * r, -Math.sin(lat), Math.cos(lat) * Math.cos(th) * r], cam);
+      pts.push([v[0] * Rc, v[1] * Rc, v[2]]);
+    }
+    rings.push(pts);
+  }
+  return rings;
+}
+export const coreColor = (i: number, white: number, a: number) => css(tone(i, CALM), white, a);
+const CALM: Env = { night: 0, warm: 0, warmC: [1, 1, 1], wet: 0, fog: 0, snow: 0, storm: 0, cloud: 0 };
+export { runs as nearFar };
+
 // The core, on its own canvas in the globe's middle so the tiles in front
 // cover it and the ones behind don't.
 export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: Live, weather: Weather | null) {
@@ -121,7 +142,9 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
   const e = envOf(s, weather);
   const Rc = 50 * L.s,
     size = Rc * 3.2;
-  const dpr = fit(cv, size, size);
+  // the globe scales the core up as you zoom in; draw it at that size so it
+  // stays sharp (in half steps, so it isn't resized every frame)
+  const dpr = fit(cv, size, size, Math.min(4, Math.max(1, Math.ceil(s.zoom * 2) / 2)));
   cv.style.width = cv.style.height = `${size}px`;
   cv.style.left = cv.style.top = `${-size / 2}px`;
   // undo the globe's turn so the canvas always faces you; the rings turn instead
@@ -150,20 +173,7 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
   ctx.fill();
   // rings are slices of a sphere in the globe's own frame, so they tumble
   // with it, each pushed in and out by its waveform; a hit makes them jump
-  const N = 13,
-    amp = 0.13 * (1 + 0.8 * lvl);
-  const rings: [number, number, number][][] = [];
-  for (let i = 0; i < N; i++) {
-    const lat = -Math.PI / 2 + (Math.PI * (i + 0.5)) / N;
-    const pts: [number, number, number][] = [];
-    for (let k = 0; k <= 140; k++) {
-      const th = (k / 140) * TAU;
-      const r = 1 + amp * wave(th, i, t) * Math.cos(lat);
-      const v = camV([Math.cos(lat) * Math.sin(th) * r, -Math.sin(lat), Math.cos(lat) * Math.cos(th) * r], s.cam);
-      pts.push([v[0] * Rc, v[1] * Rc, v[2]]);
-    }
-    rings.push(pts);
-  }
+  const rings = corePoints(13, Rc, s.cam, t, 0.13 * (1 + 0.8 * lvl));
   const glow = (night ? 1 : 0.55) * (1 + 0.8 * e.fog + 0.4 * e.wet);
   for (const front of [false, true])
     rings.forEach((pts, i) => {

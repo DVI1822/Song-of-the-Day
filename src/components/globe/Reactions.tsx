@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type Ref } from "react";
 import { formatTime, initials } from "@/lib/day";
 import type { Note, Post, Reactions } from "@/lib/types";
 import type { GlobeApi } from "./api";
-import { Magma } from "./Magma";
+import { SignalCore } from "./SignalCore";
 import { CloseIcon } from "./ui";
 
 // Liking a song and the notes people leave on it. The like is a set of level
@@ -115,7 +115,7 @@ export function ReactionButtons({
               animation: savePop ? "core-pop .45s cubic-bezier(.2,.75,.25,1)" : undefined,
             }}
           >
-            <Magma className="h-full w-full drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+            <SignalCore className="h-full w-full drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
           </span>
           <span
             aria-hidden

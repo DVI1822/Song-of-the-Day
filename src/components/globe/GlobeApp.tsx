@@ -17,7 +17,7 @@ import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
-import { Magma, MagmaFilters } from "./Magma";
+import { SignalCore } from "./SignalCore";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
@@ -982,7 +982,6 @@ function Globe({
       className="fixed inset-0 select-none overflow-hidden bg-white text-card-ink"
       style={{ opacity: size ? 1 : 0, transition: "opacity .4s" }}
     >
-      <MagmaFilters />
 
       <div
         ref={(el) => void (R.current.chrome[0] = el)}
@@ -1181,7 +1180,7 @@ function Globe({
           className="box-border flex h-[84px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
           style={glass(darkOn)}
         >
-          <Magma look={look} className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+          <SignalCore className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
             Core
           </span>

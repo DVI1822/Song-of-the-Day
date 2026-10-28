@@ -5,7 +5,7 @@ import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
-import { Magma } from "./Magma";
+import { SignalCore } from "./SignalCore";
 import { SongPlayer } from "./Preview";
 import { LevelsIcon } from "./Reactions";
 import { Cover, SearchIcon, coverRadius } from "./ui";
@@ -258,7 +258,7 @@ const CoreButton = ({ name, onClick }: { name: string; onClick(): void }) => (
     aria-label={`Open ${name}'s core`}
     className="flex h-11 w-11 flex-none items-center justify-center rounded-full"
   >
-    <Magma className="h-[18px] w-[18px] drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+    <SignalCore className="h-[18px] w-[18px] drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
   </button>
 );
 
