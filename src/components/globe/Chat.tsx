@@ -10,6 +10,8 @@ import { BackIcon, CloseIcon, glass } from "./ui";
 // your mutual friends: people you've added who have added you back. Only they
 // see what you say, and you see only what they say. Messages to one person
 // start from their core (mutual friends only) and live here too, under Messages.
+// The globe chat starts fresh every midnight, like the songs; messages to one
+// person stay.
 
 type View = { kind: "globe" } | { kind: "inbox" } | { kind: "dm"; with: Profile };
 
@@ -125,7 +127,8 @@ export function Chat({
     if (dmWith) setView({ kind: "dm", with: dmWith.p });
   }
 
-  const globe = useMemo(() => msgs.filter((m) => m.to_id === null), [msgs]);
+  const since = useMidnight();
+  const globe = useMemo(() => msgs.filter((m) => m.to_id === null && Date.parse(m.created_at) >= since), [msgs, since]);
   const globeNew = globe.filter((m) => m.user_id !== me.id && m.created_at > seen).length;
   const dmNew = msgs.filter((m) => m.to_id === me.id && !m.read_at).length;
   const count = globeNew + dmNew;
@@ -281,7 +284,7 @@ export function Chat({
               loaded={loaded}
               empty={
                 view.kind === "globe"
-                  ? "Say hi to your globe. Only people you've added who added you back will see it."
+                  ? "Say hi to your globe. Only people you've added who added you back will see it, and it starts fresh at midnight."
                   : `Start a conversation with ${view.with.display_name.split(" ")[0]}.`
               }
               onCore={onCore}
@@ -542,3 +545,14 @@ export const ChatIcon = ({ size = 18 }: { size?: number }) => (
     <path d="M8.5 12h.01M12 12h.01M15.5 12h.01" strokeWidth="2.6" />
   </svg>
 );
+
+// The start of today on this device, moving on when midnight passes.
+function useMidnight() {
+  const start = () => new Date().setHours(0, 0, 0, 0);
+  const [at, setAt] = useState(start);
+  useEffect(() => {
+    const id = setInterval(() => setAt(start()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return at;
+}
