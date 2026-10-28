@@ -15,12 +15,13 @@ import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
-import { type CoreLook, alpha, drift, useCoreLook } from "./coreLook";
+import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
 import { Magma, MagmaFilters } from "./Magma";
+import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
-import { beatOf, pulseAt, type Beat } from "./beat";
+import { beatOf, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass } from "./ui";
 import {
   PERSPECTIVE,
@@ -119,7 +120,7 @@ function layoutFor(w: number, h: number) {
   return { w, h, R, s, cx, cy, cover };
 }
 
-type Live = {
+export type Live = {
   keys: number[];
   half: number;
   Rb: number;
@@ -130,8 +131,8 @@ type Live = {
   look: CoreLook | null;
 };
 // what's playing, for the energy streak: its tile, and how to find its beat
-type Beam = { k: number; paused: boolean; beat: Beat | null; clipTime: () => number | null } | null;
-type Motion = ReturnType<typeof newMotion>;
+export type Beam = { k: number; paused: boolean; beat: Beat | null; clipTime: () => number | null } | null;
+export type Motion = ReturnType<typeof newMotion>;
 type Els = ReturnType<typeof newEls>;
 
 function newMotion(posted: boolean) {
@@ -210,6 +211,7 @@ function newEls() {
     sphere: null as HTMLDivElement | null,
     beam: null as HTMLCanvasElement | null,
     ripples: null as HTMLCanvasElement | null,
+    sigCore: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
     featBack: null as HTMLDivElement | null,
@@ -303,9 +305,9 @@ function Globe({
     wx.current.dark = darkOn;
   });
 
-  // The song that's playing gets a stream of magma from the core. It pulses
-  // on the song's hits only while the site can hear it (its preview; see
-  // beat.ts); a whole song on Spotify can't be heard, so it just flows.
+  // The song that's playing gets a stream from the core (signal.ts). It
+  // bursts on the song's hits only while the site can hear it (its preview;
+  // see beat.ts); a whole song on Spotify can't be heard, so it just flows.
   const playingPost = pv.shuffle?.now ?? pv.track?.post ?? null;
   const playingPaused = pv.shuffle ? pv.shuffle.paused : Boolean(pv.track?.paused);
   const [beat, setBeat] = useState<{ url: string; b: Beat | null } | null>(null);
@@ -324,7 +326,7 @@ function Globe({
       ? null
       : { k: beamK, paused: playingPaused, beat: beat?.url === beatUrl ? beat.b : null, clipTime: pv.clipTime };
 
-  // your core grows from your songs; the stream to what's playing matches it
+  // your core's colours, from your songs: the little core icon and the ripples
   const look = useCoreLook(mySongs, me.timezone);
 
   // Songs posted since you last had the Globe open fall in from above, one
@@ -503,8 +505,6 @@ function Globe({
     };
   }, [ownCore, api]);
   // flying into someone else's core, the core in the middle becomes theirs
-  const theirSongs = coreWho && friendCore?.id === coreWho.id ? friendCore.posts : null;
-  const theirLook = useCoreLook(theirSongs, coreWho?.timezone ?? "UTC");
 
   // Add someone from inside their core; their tile joins the globe behind.
   const addFromCore = async () => {
@@ -688,7 +688,8 @@ function Globe({
       sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
       sim.current.water(keys, Math.min(dt, 0.1));
       draw(s, R.current, els.current, sim.current, live.current);
-      drawBeam(s, R.current.beam, sim.current, live.current, dt);
+      drawSignalStream(s, R.current.beam, sim.current, live.current, wx.current.weather, dt);
+      drawSignalCore(s, R.current.sigCore, live.current, wx.current.weather);
       drawRipples(s, R.current.ripples, sim.current, live.current);
       const w = wx.current,
         el = R.current;
@@ -1070,6 +1071,7 @@ function Globe({
           style={{ left: L.cx, top: L.cy }}
         >
           <TileLayer tiles={tiles} half={half} Rb={Rb} focus={focus} els={els} onPick={pick} />
+          <canvas ref={(el) => void (R.current.sigCore = el)} className="pointer-events-none absolute" />
           <button
             ref={(el) => void (R.current.core = el)}
             type="button"
@@ -1077,7 +1079,6 @@ function Globe({
             aria-label="Your core. Open profile"
             className="absolute -left-[60px] -top-[60px] h-[120px] w-[120px]"
           >
-            <Magma full look={coreWho ? theirLook : look} className="h-full w-full" />
           </button>
         </div>
         {/* the weather and seasons nearer than the globe's middle */}
@@ -1489,6 +1490,12 @@ sim: TileSim,
           const glint = lk.wet * (0.4 * Math.pow(Math.max(0, nh), 60) * day * direct + 0.1 * Math.pow(clamp01(-ry), 2) * (0.3 + 0.7 * day));
           if (glint > 0.004) layers += `linear-gradient(rgba(255,255,255,${glint.toFixed(3)}),rgba(255,255,255,${glint.toFixed(3)})), `;
         }
+        // the core's light on the tiles, strongest on the song it's playing
+        if (coreLight.a + coreLight.play > 0.003) {
+          const wv = coreLight.a * (0.35 + 0.65 * (1 - Math.max(0, nn[2]))) + (k === s.beamK ? coreLight.play : 0);
+          const c = `rgba(${coreLight.rgb.map(Math.round).join(",")},${clamp01(wv).toFixed(3)})`;
+          layers += `linear-gradient(${c},${c}), `;
+        }
         const sh = te.shades[i];
         if (sh) sh.style.background = layers + amb;
         // frost rims the covers in winter and when it's freezing; the sun melts it back
@@ -1599,9 +1606,6 @@ sim: TileSim,
   }
 }
 
-// The magma stream: from the back of the playing song's tile into the core,
-// flowing inwards and swelling on the song's hits. Drawn on a canvas just
-// behind the globe, so the tile covers its end and the core its start.
 const cross = (u: V3, v: V3): V3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
 const norm3 = (v: V3): V3 => {
   const n = Math.hypot(v[0], v[1], v[2]) || 1;
@@ -1674,173 +1678,6 @@ function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb
     }
   }
   ctx.globalAlpha = 1;
-}
-
-function drawBeam(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam, look }: Live, dt: number) {
-  if (!cv) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const W = Math.round(L.w * dpr),
-    H = Math.round(L.h * dpr);
-  if (cv.width !== W || cv.height !== H) {
-    cv.width = W;
-    cv.height = H;
-  }
-  const ctx = cv.getContext("2d");
-  if (!ctx) return;
-
-  // fades in when a song starts, out when it's paused or stopped
-  const on = beam !== null && !beam.paused && s.lens === null && !s.coreOn;
-  if (beam) s.beamK = beam.k;
-  s.beamA += ((on ? 1 : 0) - s.beamA) * Math.min(1, dt * (on ? 2.5 : 4));
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-  if (s.beamA < 0.01 || s.beamK < 0 || !s.cam) return;
-
-  // the song's hits while the site can hear it; otherwise an even flow. Each
-  // new hit sends a swell of magma down the stream into the core.
-  const ct = beam?.beat ? beam.clipTime() : null;
-  const hit = beam?.beat && ct !== null ? pulseAt(beam.beat, ct) : 0;
-  if (hit > s.beamLvl + 0.25 && hit > 0.45) s.beamSwells.push({ u: 0, a: hit });
-  s.beamLvl += (hit - s.beamLvl) * Math.min(1, dt * (hit > s.beamLvl ? 40 : 9));
-  const lvl = s.beamLvl;
-  for (const w of s.beamSwells) w.u += dt * 1.5;
-  s.beamSwells = s.beamSwells.filter((w) => w.u < 1.1).slice(-4);
-
-  const { lat, lon } = latLon(sim.pos(s.beamK));
-  const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam);
-  const z = v[2] * Rb * s.zoom;
-  const kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
-  const tx = L.cx + v[0] * Rb * kz,
-    ty = L.cy + v[1] * Rb * kz;
-  const night = s.dk > 0.5;
-  // round the back of the globe it dims, passing behind the core
-  const A = s.beamA * (0.35 + 0.65 * clamp01((v[2] + 0.35) / 0.7)) * (night ? 0.7 : 0.85);
-  const dx = L.cx - tx,
-    dy = L.cy - ty,
-    len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len,
-    ny = dx / len;
-  const wTile = half * kz * 0.42,
-    wCore = 7 * L.s;
-
-  // the stream sways a little as it flows, like something thick and warm
-  const sway = len * 0.07 * Math.sin(s.mt * 0.6);
-  const mx = tx + dx * 0.5 + nx * sway,
-    my = ty + dy * 0.5 + ny * sway;
-  const at = (u: number): [number, number] => {
-    const a = (1 - u) * (1 - u),
-      b = 2 * u * (1 - u),
-      c = u * u;
-    return [a * tx + b * mx + c * L.cx, a * ty + b * my + c * L.cy];
-  };
-  const width = (u: number) => {
-    let k = 1 + 0.16 * Math.sin(u * 11 - s.mt * 3.2) + 0.07 * Math.sin(u * 23 + s.mt * 1.7);
-    for (const w of s.beamSwells) k += 0.45 * w.a * Math.exp(-(((u - w.u) / 0.09) ** 2));
-    return (wTile + (wCore - wTile) * u) * k;
-  };
-
-  // the core's own colours, slowly shifting: your songs' colours once your
-  // core has them, the original light magma before
-  const hue = (s.mt * 14) % 360;
-  const mag = look
-    ? (dh: number, _sat: number, l: number, a: number) =>
-        drift(look.colors, s.mt * 0.12 + dh / 60, clamp01((l - (night ? 70 : 74)) / 50), clamp01(a))
-    : (dh: number, sat: number, l: number, a: number) =>
-        `hsla(${((hue + dh) % 360).toFixed(0)},${sat}%,${night ? l : l - 6}%,${clamp01(a).toFixed(3)})`;
-  const style = look?.style;
-
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.globalCompositeOperation = night ? "screen" : "source-over";
-  const N = 30;
-  // dh: the colour at the song's end and at the core's, from the core's palette
-  const stream = (scale: number, a: number, blur: number, dh0: number, dh1: number, l: number) => {
-    const side: [number, number][] = [];
-    for (let i = 0; i <= N; i++) {
-      const u = i / N,
-        [x, y] = at(u),
-        w = width(u) * scale;
-      side.push([x + nx * w, y + ny * w]);
-      side.unshift([x - nx * w, y - ny * w]);
-    }
-    const g = ctx.createLinearGradient(tx, ty, L.cx, L.cy);
-    g.addColorStop(0, mag(dh0, 95, l, a * 0.75));
-    g.addColorStop(1, mag(dh1, 100, l + 6, a));
-    ctx.fillStyle = g;
-    ctx.shadowColor = mag(dh1, 100, l, a);
-    ctx.shadowBlur = blur;
-    ctx.beginPath();
-    side.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.closePath();
-    ctx.fill();
-  };
-  // a soft haze, the flowing body, and its bright heart; matte cores don't
-  // glow, hazy ones glow wider, electric ones have a hot wire down the middle
-  const hazy = style === "hazy";
-  if (style !== "matte") stream(hazy ? 2.2 : 1.7, A * (0.16 + 0.12 * lvl), (hazy ? 24 : 16) * L.s, 70, 40, 78);
-  stream(0.85, A * (0.5 + 0.2 * lvl), (style === "matte" ? 0 : 6) * L.s, 60, 25, 76);
-  ctx.shadowBlur = 0;
-  stream(0.3, A * (0.55 + 0.3 * lvl), 0, 20, 0, 88);
-  if (style === "electric") {
-    ctx.shadowBlur = 8 * L.s;
-    stream(0.08, A * (0.7 + 0.3 * Math.abs(Math.sin(s.mt * 3.1))), 8 * L.s, 0, 30, 100);
-    ctx.shadowBlur = 0;
-  }
-
-  // gooey globs riding in from the song to the core, hot at their hearts,
-  // with a few darker cooling patches between them
-  const flow = s.mt * 0.2 * (look ? Math.max(0.6, look.speed / 0.8) : 1);
-  const glob = (u: number, r: number, inner: string, outer: string) => {
-    const [x, y] = at(u);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, inner);
-    g.addColorStop(1, outer);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  };
-  for (let i = 0; i < 16; i++) {
-    const u = (((i * 0.6180339 + flow) % 1) + 1) % 1;
-    const fade = Math.sqrt(Math.sin(Math.PI * u));
-    const r = width(u) * (0.55 + 0.25 * Math.sin(i * 3.1 + s.mt * 2));
-    glob(u, r, mag(10, 100, night ? 94 : 84, A * 0.6 * fade), mag(30, 100, 80, 0));
-  }
-  ctx.globalCompositeOperation = night ? "source-over" : "multiply";
-  for (let i = 0; i < 5; i++) {
-    const u = (((i * 0.381966 + 0.13 + flow * 0.8) % 1) + 1) % 1;
-    const a = A * 0.22 * Math.sin(Math.PI * u);
-    if (look) glob(u, width(u) * 0.55, alpha(look.base, clamp01(a * 1.4)), alpha(look.base, 0));
-    else glob(u, width(u) * 0.55, mag(110, 55, 52, a), mag(110, 55, 52, 0));
-  }
-  // a night owl's stream carries a few stars down with it
-  if (look?.stars) {
-    ctx.globalCompositeOperation = "source-over";
-    for (let i = 0; i < 9; i++) {
-      const u = (((i * 0.7548 + flow * 1.3) % 1) + 1) % 1,
-        [x, y] = at(u),
-        off = Math.sin(i * 5.3) * width(u) * 0.6;
-      const tw = 0.4 + 0.6 * Math.abs(Math.sin(s.mt * 2 + i));
-      ctx.fillStyle = `rgba(255,255,255,${(A * Math.sin(Math.PI * u) * tw).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(x + nx * off, y + ny * off, 1.1 * L.s, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // where it meets the song and where it pours into the core
-  ctx.globalCompositeOperation = night ? "screen" : "source-over";
-  const halo = (x: number, y: number, r: number, a: number, dh: number) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, mag(dh, 100, 86, a));
-    g.addColorStop(1, mag(dh, 100, 86, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  };
-  halo(tx, ty, half * kz * (1.1 + 0.15 * lvl), A * (0.1 + 0.25 * lvl), 55);
-  halo(L.cx, L.cy, (26 + 14 * lvl) * L.s, A * (0.14 + 0.3 * lvl), 25);
-  ctx.globalCompositeOperation = "source-over";
 }
 
 // ---------------------------------------------------------------------------
