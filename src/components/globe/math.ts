@@ -146,7 +146,7 @@ export const RIPPLE_SPEED = 3.4, // radians of the globe a second
 export class TileSim {
   bodies = new Map<number, Body>();
   t = 0;
-  ripples: { p: V3; t: number }[] = [];
+  ripples: { p: V3; t: number; k: number }[] = [];
 
   // How each song is floating right now.
   float(k: number): Float {
@@ -159,7 +159,7 @@ export class TileSim {
   splash(k: number, keys: number[]) {
     const f = this.float(k),
       p = this.pos(k);
-    this.ripples.push({ p: [p[0], p[1], p[2]], t: this.t });
+    this.ripples.push({ p: [p[0], p[1], p[2]], t: this.t, k });
     f.hv -= 300;
     f.av += (Math.random() - 0.5) * 2.4;
     f.bv += (Math.random() - 0.5) * 2.4;
