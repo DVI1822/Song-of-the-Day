@@ -5,7 +5,7 @@ import type { V3 } from "./math";
 // blue twilight, a rosy sunrise, golden hour, a bright blue day, an orange
 // and pink sunset, then space. Each stop is a top, middle and horizon colour,
 // keyed to the sun's height in degrees; mornings run a little cooler and
-// pinker, evenings warmer and more orange.
+// pinker, evenings warmer and more orange. A clear day is a deep, true blue.
 
 type Stop = [number, string, string, string];
 
@@ -15,8 +15,9 @@ const MORNING: Stop[] = [
   [-1, "#3A5697", "#8A88B0", "#F4C7B4"],
   [3, "#40609F", "#9A98BC", "#FEE2C0"],
   [8, "#4170B4", "#A9B2CF", "#FCE7C6"],
-  [18, "#4F88CF", "#9CC3E6", "#EAF1EE"],
-  [32, "#6AA6E2", "#8DBFE8", "#D6ECFA"],
+  [18, "#2F74D0", "#5E9FE6", "#CFE4F2"],
+  [32, "#1F6FDB", "#4C97EC", "#B5D9F7"],
+  [50, "#1966D5", "#4590EA", "#ADD4F6"],
 ];
 const EVENING: Stop[] = [
   [-10, "#0B1330", "#1B2150", "#2E2C5E"],
@@ -24,8 +25,9 @@ const EVENING: Stop[] = [
   [-1, "#34508F", "#9A7899", "#F59A6C"],
   [3, "#38589C", "#8F7D8E", "#FCB86E"],
   [8, "#3D66AA", "#A39AAE", "#FED687"],
-  [18, "#4F88CF", "#A4C3E0", "#F3E6CB"],
-  [32, "#6AA6E2", "#8DBFE8", "#D6ECFA"],
+  [18, "#2F74D0", "#67A3E3", "#E6E4D4"],
+  [32, "#1F6FDB", "#4C97EC", "#B5D9F7"],
+  [50, "#1966D5", "#4590EA", "#ADD4F6"],
 ];
 
 const hex = (h: string): V3 => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
