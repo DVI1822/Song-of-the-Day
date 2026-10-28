@@ -69,7 +69,34 @@ const css = (c: V3, white: number, a: number) =>
   `rgba(${c.map((v) => Math.round(v + (255 - v) * white)).join(",")},${clamp01(a).toFixed(3)})`;
 
 // what the tiles read to take on the core's light
-export const coreLight = { rgb: [255, 255, 255] as V3, a: 0, play: 0 };
+export const coreLight = { rgb: [255, 255, 255] as V3, a: 0, play: 0, wave: 0 };
+
+// ---------------------------------------------------------------------------
+// A song landing: the core kicks and one wave of signal rings out of it to
+// just inside the globe's glass.
+// ---------------------------------------------------------------------------
+
+const WAVE_TIME = 1.1, // seconds the wave takes to reach the glass
+  KICK_LIFE = 1.2; // seconds a landing's effects last
+type Kick = { t: number };
+let kicks: Kick[] = [];
+const seen = new WeakSet<object>();
+let flareNow = 0; // how hard the core is kicking right now
+let kickAges: number[] = [];
+
+function trackKicks(sim: TileSim) {
+  for (const r of sim.ripples)
+    if (!seen.has(r)) {
+      seen.add(r);
+      // songs landing together share one wave, so it stays a single clean ring
+      if (!kicks.length || r.t - kicks[kicks.length - 1].t > 0.6) kicks.push({ t: r.t });
+    }
+  kicks = kicks.filter((q) => sim.t - q.t < KICK_LIFE);
+  kickAges = kicks.map((q) => sim.t - q.t);
+  // a sharp hit that rings down
+  flareNow = kickAges.reduce((f, a) => f + Math.min(1, a / 0.05) * Math.exp(-a / 0.32), 0);
+}
+const easeOut = (x: number) => 1 - Math.pow(1 - clamp01(x), 3);
 
 function fit(cv: HTMLCanvasElement, w: number, h: number, zoom = 1) {
   const dpr = Math.min(2, window.devicePixelRatio || 1) * zoom;
@@ -161,11 +188,12 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
   ctx.lineJoin = "round";
   const t = s.mt,
     lvl = s.beamLvl * s.beamA,
-    flick = flicker(e, t);
+    flick = flicker(e, t),
+    fl = Math.min(1.5, flareNow);
   // the inner body of light, blooming in fog
   const bodyR = Rc * (1.15 + 0.35 * e.fog);
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, bodyR);
-  g.addColorStop(0, css(tone(t * 0.1, e), 0.5, (night ? 0.22 : 0.14) * (1 + 0.6 * lvl) * flick));
+  g.addColorStop(0, css(tone(t * 0.1, e), 0.5, (night ? 0.22 : 0.14) * (1 + 0.6 * lvl + 2.5 * fl) * flick));
   g.addColorStop(1, css(tone(t * 0.1, e), 0, 0));
   ctx.fillStyle = g;
   ctx.beginPath();
@@ -173,13 +201,13 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
   ctx.fill();
   // rings are slices of a sphere in the globe's own frame, so they tumble
   // with it, each pushed in and out by its waveform; a hit makes them jump
-  const rings = corePoints(13, Rc, s.cam, t, 0.13 * (1 + 0.8 * lvl));
+  const rings = corePoints(13, Rc, s.cam, t, 0.13 * (1 + 0.8 * lvl + 1.6 * fl));
   const glow = (night ? 1 : 0.55) * (1 + 0.8 * e.fog + 0.4 * e.wet);
   for (const front of [false, true])
     rings.forEach((pts, i) => {
       const c = tone(i * 0.28 + t * 0.08, e);
       for (const run of runs(pts, front))
-        glowLine(ctx, run, (w, a) => css(c, w, a), front ? 1.1 : 0.7, (front ? 0.9 : 0.3) * flick * (1 - 0.25 * e.fog), glow);
+        glowLine(ctx, run, (w, a) => css(c, Math.min(1, w + 0.25 * fl), a), (front ? 1.1 : 0.7) * (1 + 0.7 * fl), (front ? 0.9 : 0.3) * flick * (1 - 0.25 * e.fog) * (1 + 0.5 * fl), glow);
     });
   ctx.globalCompositeOperation = "source-over";
 }
@@ -188,6 +216,7 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
 // the tiles, so the song covers the stream's end.
 export function drawSignalStream(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { half, Rb, L, beam }: Live, weather: Weather | null, dt: number) {
   if (!cv) return;
+  trackKicks(sim);
   // fades in when a song starts, out when it's paused or stopped
   const on = beam !== null && !beam.paused && s.lens === null && !s.coreOn;
   if (beam) s.beamK = beam.k;
@@ -208,6 +237,7 @@ export function drawSignalStream(s: Motion, cv: HTMLCanvasElement | null, sim: T
   ctx.clearRect(0, 0, cv.width, cv.height);
   coreLight.a = 0;
   coreLight.play = 0;
+  coreLight.wave = 0;
   if (!s.cam || s.coreOn) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const e = envOf(s, weather);
@@ -282,7 +312,65 @@ export function drawSignalStream(s: Motion, cv: HTMLCanvasElement | null, sim: T
     }
   }
   coreLight.rgb = lightC;
-  coreLight.a = strength * 0.55;
+  coreLight.a = strength * 0.55 * (1 + 1.2 * Math.min(1.5, flareNow));
+
+  // each landing: one clean wave of signal rings out of the core, all the
+  // way round, and spreads to just inside the glass, lighting the songs as
+  // it passes under them
+  let wash = 0;
+  if (kickAges.length) {
+    const r0 = 50 * L.s * s.zoom,
+      r1 = R0 * 0.94;
+    ctx.globalCompositeOperation = night ? "lighter" : "source-over";
+    for (const age of kickAges) {
+      const u = age / WAVE_TIME;
+      if (u >= 1) continue;
+      const rf = r0 + (r1 - r0) * easeOut(u);
+      const fade = Math.min(1, u / 0.06) * Math.pow(1 - u, 1.3) * quiet * flick;
+      wash = Math.max(wash, fade * Math.exp(-(((rf / r1 - 0.9) / 0.18) ** 2)));
+      // a soft band of light just behind the front
+      const band = Math.max(4 * L.s, rf * 0.22);
+      const g = ctx.createRadialGradient(L.cx, L.cy, Math.max(0, rf - band), L.cx, L.cy, rf);
+      g.addColorStop(0, css(lightC, 0.3, 0));
+      g.addColorStop(1, css(lightC, 0.3, (night ? 0.16 : 0.1) * fade));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(L.cx, L.cy, rf, 0, TAU);
+      ctx.fill();
+      // the front itself: a ring of waveform with two fainter echoes behind it
+      let grad: CanvasGradient | string = css(lightC, 0.4, 1);
+      if (typeof ctx.createConicGradient === "function") {
+        grad = ctx.createConicGradient(t * 0.4, L.cx, L.cy);
+        for (let i = 0; i <= 4; i++) grad.addColorStop(i / 4, css(tone(i + t * 0.1, e), 0.35, 1));
+      }
+      ctx.strokeStyle = grad;
+      for (let echo = 0; echo < 3; echo++) {
+        const r = rf - echo * (7 + 10 * u) * L.s;
+        if (r <= r0 * 0.8) break;
+        const amp = (2.5 + 5 * (1 - u)) * L.s * (1 - echo * 0.3);
+        const ph = age * 9 + echo * 0.9;
+        ctx.beginPath();
+        for (let i = 0; i <= 240; i++) {
+          const th = (i / 240) * TAU;
+          const rr = r + amp * Math.sin(th * 36 + ph) * (0.6 + 0.4 * Math.sin(th * 4 - ph * 0.5));
+          const x = L.cx + Math.cos(th) * rr,
+            y = L.cy + Math.sin(th) * rr;
+          if (i) ctx.lineTo(x, y);
+          else ctx.moveTo(x, y);
+        }
+        const al = fade * (echo ? 0.45 / echo : 1);
+        ctx.globalAlpha = clamp01(al * 0.3);
+        ctx.lineWidth = (6 - 2 * echo) * L.s;
+        ctx.stroke();
+        ctx.globalAlpha = clamp01(al * (night ? 0.95 : 0.8));
+        ctx.lineWidth = (echo ? 1 : 1.8) * L.s;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+  coreLight.wave = 0.4 * wash;
 
   if (s.beamA < 0.01 || s.beamK < 0) return;
   const A = s.beamA * quiet,
