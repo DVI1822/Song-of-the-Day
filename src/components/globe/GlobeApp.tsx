@@ -240,14 +240,14 @@ function Globe({
   const [addedMe, setAddedMe] = useState(initialAddedMe);
   const [activity, setActivity] = useState(initialActivity);
   const seen = useSyncExternalStore(seenStore.subscribe, seenStore.get, seenStore.server);
-  // what's new since you last opened My friends: people who added you or
-  // added you back, new songs, and feels and notes on your song
+  // what's new since you last opened My friends: people who added you back,
+  // new songs, and feels and notes on your song. People who added you wait in
+  // Find a friend, counted on its tab.
   const seenAt = seen === "~" ? Infinity : Date.parse(seen) || 0;
   const [seenBefore, setSeenBefore] = useState(seenAt);
   const afterFeat = useRef<(() => void) | null>(null); // runs once the song view has closed
   const fresh = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenAt;
   const newCount =
-    addedMe.filter((p) => fresh(p.added_at)).length +
     activity.filter((a) => fresh(a.at)).length +
     friends.filter((f) => fresh(f.followed_back_at) || (!f.hidden && fresh(f.post?.created_at))).length;
   const [myPost, setMyPost] = useState(initialPost);
@@ -1162,12 +1162,12 @@ function Globe({
             style={{ height, ...glass(darkOn), ...activeTab(name) }}
           >
             <TabIcon name={name} />
-            {name === "friends" && newCount > 0 && (
+            {(name === "friends" ? newCount : name === "find" ? addedMe.length : 0) > 0 && (
               <span
-                aria-label={`${newCount} new`}
+                aria-label={name === "friends" ? `${newCount} new` : `${addedMe.length} added you`}
                 className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
               >
-                {newCount}
+                {name === "friends" ? newCount : addedMe.length}
               </span>
             )}
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
@@ -1215,18 +1215,12 @@ function Globe({
           {panel === "friends" && (
             <FriendsPanel
               friends={friends}
-              addedMe={addedMe}
               activity={activity}
               onMine={() => myPost && landed && fly(ME)}
               seenBefore={seenBefore}
-              onAddBack={onAddBack}
               onShow={(f) => setHidden(f, false)}
               onOpen={fly}
               onCore={(p) => openCore(null, p)}
-              onSpin={(k) => {
-                m.current.moved = false;
-                spinTo(k);
-              }}
               onFind={() => setPanel("find")}
             />
           )}
@@ -1235,12 +1229,11 @@ function Globe({
               api={api}
               me={me}
               friends={friends}
+              addedMe={addedMe}
+              seenBefore={seenBefore}
+              onAddBack={onAddBack}
               onFollowed={onFollowed}
               onCore={(p) => openCore(null, p)}
-              onSpin={(k) => {
-                m.current.moved = false;
-                spinTo(k);
-              }}
             />
           )}
           {panel === "songs" && (
