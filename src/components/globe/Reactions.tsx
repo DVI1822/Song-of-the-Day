@@ -71,6 +71,7 @@ export function ReactionButtons({
   mine,
   meId,
   onFeel,
+  onLikes,
   onNotes,
   onSave,
   saveRef,
@@ -79,6 +80,7 @@ export function ReactionButtons({
   mine: boolean;
   meId: string;
   onFeel(): void;
+  onLikes(): void; // who liked it
   onNotes(): void;
   onSave(): void;
   saveRef?: Ref<HTMLButtonElement>;
@@ -125,21 +127,29 @@ export function ReactionButtons({
           </span>
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => {
-          if (mine) return onNotes();
-          onFeel();
-        }}
-        aria-label={
-          mine ? `${likes} ${likes === 1 ? "like" : "likes"} on your song` : liked ? "Liked. Tap to take it back" : "Like"
-        }
-        aria-pressed={mine ? undefined : liked}
-        className={`flex h-10 items-center gap-1.5 rounded-full px-2 transition-colors ${liked ? "text-accent" : "text-card-ink"}`}
-      >
-        <LevelsIcon on={liked} />
-        <span className={`${count} ${liked ? "" : "text-muted"}`}>{likes || ""}</span>
-      </button>
+      {/* the bars like it (on your own song they show who did); the count beside
+          them always opens the list of who liked it */}
+      <div className={`flex h-10 items-center transition-colors ${liked ? "text-accent" : "text-card-ink"}`}>
+        <button
+          type="button"
+          onClick={() => (mine ? onLikes() : onFeel())}
+          aria-label={mine ? `${likes} ${likes === 1 ? "like" : "likes"} on your song` : liked ? "Liked. Tap to take it back" : "Like"}
+          aria-pressed={mine ? undefined : liked}
+          className={`flex h-10 items-center rounded-full pl-2 ${likes ? "pr-1" : "pr-2"}`}
+        >
+          <LevelsIcon on={liked} />
+        </button>
+        {likes > 0 && (
+          <button
+            type="button"
+            onClick={onLikes}
+            aria-label={`See who liked it (${likes})`}
+            className={`flex h-10 items-center rounded-full pl-1 pr-2 ${count} ${liked ? "" : "text-muted"}`}
+          >
+            {likes}
+          </button>
+        )}
+      </div>
       <button
         type="button"
         onClick={onNotes}
@@ -321,6 +331,56 @@ export function NotesSheet({
             </svg>
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// Everyone who liked a song, newest first.
+export function LikesSheet({ r, meId, title, onClose }: { r: Reactions | null; meId: string; title: string; onClose(): void }) {
+  const feels = [...(r?.feels ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return (
+    <div className="fixed inset-0 z-[490] flex flex-col justify-end">
+      <button type="button" aria-label="Close likes" onClick={onClose} className="absolute inset-0 cursor-default bg-[#0D2A3F]/20" />
+      <div
+        role="dialog"
+        aria-label="Likes"
+        className="rise-in relative mx-auto flex max-h-[72vh] w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-2xl"
+        style={{ boxShadow: "0 -20px 60px -30px rgba(13,42,63,0.45)", paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-center gap-2 px-5 pb-2 pt-4">
+          <span className="flex-none text-accent">
+            <LevelsIcon on size={20} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="display text-xl">
+              {feels.length} {feels.length === 1 ? "like" : "likes"}
+            </div>
+            <div className="truncate text-xs text-muted">on {title}</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-2 flex h-11 w-11 items-center justify-center">
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="flex flex-col overflow-y-auto border-t border-card-ink/[0.07] px-5 py-2">
+          {r === null && <div className="py-3 text-sm text-muted">Loading…</div>}
+          {feels.map((f) => (
+            <div key={f.user.id} className="flex items-center gap-3 py-2">
+              <span
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[11px] font-semibold"
+                style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
+              >
+                {initials(f.user.display_name)}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-semibold">{f.user.id === meId ? "You" : f.user.display_name}</span>
+                <span className="truncate text-xs text-muted">@{f.user.username}</span>
+              </div>
+              <span className="flex-none text-[11px] text-muted">{formatTime(f.created_at, tz)}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

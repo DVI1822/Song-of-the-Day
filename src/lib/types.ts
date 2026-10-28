@@ -27,9 +27,13 @@ export type Post = {
 };
 
 // Someone you follow, plus today's song if they've posted one. followed_back_at
-// is when they added you back, if they did after you added them; hidden means
+// is when they added you back, if they did after you added them; follows_me is
+// whether they have you on their globe too (only then can you chat); hidden means
 // you've hidden their songs from your globe.
-export type Friend = Profile & { post: Post | null; followed_at: string; followed_back_at: string | null; hidden: boolean };
+export type Friend = Profile & { post: Post | null; followed_at: string; followed_back_at: string | null;
+  follows_me: boolean;
+  hidden: boolean;
+};
 
 // Someone who added you that you haven't added back.
 export type AddedMe = Profile & { added_at: string };

@@ -8,7 +8,7 @@ import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
 import type { StorySky } from "./storyVideo";
-import { NotesSheet, ReactionButtons, useReactions } from "./Reactions";
+import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon } from "./ui";
 
@@ -66,6 +66,7 @@ export function Feature({
   const mine = who === "You";
   const [r, setR] = useReactions(api, post.id);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [likesOpen, setLikesOpen] = useState(false);
   // the sky the Story starts on: the one outside when you tap share
   const [sharing, setSharing] = useState<StorySky | null>(null);
 
@@ -292,7 +293,15 @@ export function Feature({
               <div className="min-w-0 flex-1 truncate text-[15px] text-muted">
                 {[post.artist, post.album].filter(Boolean).join(" · ")}
               </div>
-              <ReactionButtons r={r} mine={mine} meId={me.id} onFeel={feel} onNotes={() => setNotesOpen(true)} onSave={save} />
+              <ReactionButtons
+                r={r}
+                mine={mine}
+                meId={me.id}
+                onFeel={feel}
+                onLikes={() => setLikesOpen(true)}
+                onNotes={() => setNotesOpen(true)}
+                onSave={save}
+              />
               {tip && <SaveTip onDone={() => setTip(false)} />}
             </div>
           </div>
@@ -326,6 +335,7 @@ export function Feature({
           onClose={() => setNotesOpen(false)}
         />
       )}
+      {likesOpen && <LikesSheet r={r} meId={me.id} title={post.title} onClose={() => setLikesOpen(false)} />}
       {sharing && (
         <ShareSheet post={post} name={me.display_name} username={me.username} of={story} initialSky={sharing} onClose={() => setSharing(null)} />
       )}
