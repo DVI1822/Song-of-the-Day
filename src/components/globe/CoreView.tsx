@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type Ref } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { formatDay, formatTime, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
 import type { Post, Profile, SavedSong } from "@/lib/types";
 import type { GlobeApi } from "./api";
@@ -47,11 +47,61 @@ export function CoreView({
   const [month, setMonth] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [flagging, setFlagging] = useState(false);
-  // the sheet slides up to fill the screen: drag its handle, tap it, or scroll
+  // the sheet slides up to fill the screen: drag its handle, tap it, or scroll.
+  // Dragged down far enough, from the handle or from anywhere while it's
+  // scrolled to the top, it lets go of the core and you're back on the globe.
   const [full, setFull] = useState(false);
   const drag = useRef<number | null>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const low = `translateY(calc(${sheetTop}px - ${FULL_TOP}))`; // where it rests until pulled up
+  const live = useRef({ full, low, sheetTop, onClose });
+  useEffect(() => {
+    live.current = { full, low, sheetTop, onClose };
+  });
+  useEffect(() => {
+    const el = sheet.current;
+    if (!el) return;
+    let y0: number | null = null,
+      dy = 0;
+    const start = (e: TouchEvent) => {
+      // the handle has its own drag
+      const onHandle = (e.target as Element | null)?.closest?.("[data-handle]");
+      y0 = el.scrollTop <= 0 && !onHandle ? e.touches[0].clientY : null;
+      dy = 0;
+    };
+    const move = (e: TouchEvent) => {
+      if (y0 === null) return;
+      dy = e.touches[0].clientY - y0;
+      if (dy <= 0 || el.scrollTop > 0) {
+        if (dy < 0) y0 = null; // scrolling up through the songs as usual
+        return;
+      }
+      e.preventDefault();
+      const { full, sheetTop } = live.current;
+      const base = full ? "0px" : `(${sheetTop}px - ${FULL_TOP})`;
+      el.style.transition = "none";
+      el.style.transform = `translateY(calc(${base} + ${dy}px))`;
+    };
+    const end = () => {
+      if (y0 === null) return;
+      y0 = null;
+      el.style.transition = "";
+      const { full, low, onClose } = live.current;
+      if (dy > (full ? window.innerHeight * 0.3 : 70)) onClose();
+      else if (full && dy > 120) setFull(false);
+      else el.style.transform = full ? "none" : low;
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, []);
   const tz = profile?.timezone ?? "UTC";
   const today = todayIn(tz);
   const list = posts ?? [];
@@ -108,6 +158,7 @@ export function CoreView({
           style={{ top: FULL_TOP, transform: full ? "none" : low, ...glassThin(dark) }}
         >
           <div
+            data-handle
             className="sticky top-0 z-10 -mx-4 flex flex-none touch-none flex-col items-center px-4 pb-1 pt-2 backdrop-blur-xl"
             onPointerDown={(e) => {
               drag.current = e.clientY;
@@ -127,7 +178,9 @@ export function CoreView({
               drag.current = null;
               const el = sheet.current;
               if (el) el.style.transition = "";
-              if (dy < -24) setFull(true);
+              // pulled well down from where it rests: back out to the globe
+              if (dy > (full ? window.innerHeight * 0.45 : 70)) onClose();
+              else if (dy < -24) setFull(true);
               else if (dy > 24) setFull(false);
               else if (el) el.style.transform = full ? "none" : low;
             }}

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { deleteAccount } from "@/app/actions";
-import { Magma, MagmaFilters } from "@/components/globe/Magma";
+import { SignalCore } from "@/components/globe/SignalCore";
 import { inputClass } from "@/components/Shell";
 
 // Leaving: your core melts away while everything you made is erased.
@@ -14,10 +14,9 @@ export function DeleteAccount({ username }: { username: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <MagmaFilters />
       <div className="flex items-center gap-4">
         <div className={`h-14 w-14 flex-none ${pending ? "core-fade" : ""}`}>
-          <Magma className="h-full w-full" />
+          <SignalCore className="h-full w-full" />
         </div>
         <p className="text-sm leading-relaxed">
           Deleting your account erases your core: every song you&apos;ve shared, your photos, who you follow and who
