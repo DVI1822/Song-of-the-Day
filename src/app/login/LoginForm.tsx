@@ -9,10 +9,11 @@ import { createClient, createLinkClient } from "@/lib/supabase/client";
 // Email only. Spotify sign-in is off while the Spotify app is in development
 // mode, which lets in just 5 allowlisted accounts; Spotify is linked from
 // Settings instead.
-// The typed code needs {{ .Token }} in Supabase's Magic Link email, which
-// Supabase only lets you edit with your own email sender (SMTP). Turn it on
-// with NEXT_PUBLIC_EMAIL_CODE=on once the email shows the code.
-const withCode = process.env.NEXT_PUBLIC_EMAIL_CODE === "on";
+// The email carries a code ({{ .Token }} in Supabase's Magic Link and Confirm
+// signup emails) as well as the link. Typing the code signs in right here,
+// whichever app or browser this is, which is the sure way on a phone's home
+// screen app. NEXT_PUBLIC_EMAIL_CODE=off hides the code box.
+const withCode = process.env.NEXT_PUBLIC_EMAIL_CODE !== "off";
 
 export function LoginForm({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState("");
@@ -59,9 +60,8 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       <Card className="rise-in">
         <h2 className="display text-xl">Check your email</h2>
         <p className="mt-2 text-sm text-card-muted">
-          We sent a sign-in link to <strong className="text-card-ink">{email}</strong>. Tap it on this phone or
-          computer and this screen signs you in, even if the link opens somewhere else
-          {withCode ? ". Or type the code from the email here." : "."}
+          We sent an email to <strong className="text-card-ink">{email}</strong>.
+          {withCode ? " Type the code from it here." : " Tap the link in it and this screen signs you in."}
         </p>
         {withCode && (
           <form onSubmit={verify} className="mt-5 flex flex-col gap-3">
@@ -112,9 +112,9 @@ export function LoginForm({ initialError }: { initialError?: string }) {
         </label>
         {error && <p className="text-sm text-accent-deep">{error}</p>}
         <button className={buttonClass} disabled={state === "sending"}>
-          {state === "sending" ? "Sending…" : "Email me a sign-in link"}
+          {state === "sending" ? "Sending…" : "Email me a sign-in code"}
         </button>
-        <p className="text-xs text-card-muted">No password needed. New here? The same link creates your account.</p>
+        <p className="text-xs text-card-muted">No password needed. New here? The same code creates your account.</p>
       </form>
     </Card>
   );
