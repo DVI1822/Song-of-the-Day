@@ -956,10 +956,10 @@ function Globe({
     setFocus(shuffleK);
   }, [shuffleK]);
   // the title follows how dark the top of the sky is (sky.ts): the weather's
-  // sky when there's one, and dark lettering under the pale clouds of a fair day
+  // sky when there's one, and dark lettering once a fair day clouds over
   const wxSky = weatherSky(weather, darkOn ? 1 : 0, warm);
   const inkLight =
-    wxSky && wxSky.opacity > 0.5 ? wxSky.light : skyLight && (darkOn || !weather || weather.kind === "clear" || weather.cloud < 0.3);
+    wxSky && wxSky.opacity > 0.5 ? wxSky.light : skyLight && (darkOn || !weather || weather.kind === "clear" || weather.cloud < 0.6);
   const ink = inkLight ? "#EEF3F8" : "#0D2A3F";
   const muted = inkLight ? "#C2D0DE" : "#3E5566";
   const tabTop = Math.max(100, L.cy - 240);

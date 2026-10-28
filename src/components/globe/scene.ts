@@ -565,7 +565,8 @@ export class Scene {
         ? { lit: tint(dk, [0.94, 0.95, 0.96], [0.22, 0.25, 0.31]), shade: tint(dk, [0.74, 0.77, 0.81], [0.08, 0.09, 0.13]), alpha: dk > 0.5 ? 0.85 : 0.88 }
         : kind === "cloudy"
           ? { lit: tint(dk, [0.98, 0.98, 0.99], [0.24, 0.27, 0.34]), shade: tint(dk, [0.78, 0.81, 0.85], [0.09, 0.1, 0.14]), alpha: dk > 0.5 ? 0.85 : 0.9 }
-          : { lit: tint(dk, [1, 1, 1], [0.26, 0.29, 0.36]), shade: tint(dk, [0.8, 0.84, 0.89], [0.1, 0.11, 0.16]), alpha: dk > 0.5 ? 0.75 : 0.92 };
+          : // fair-weather clouds stay bright white, so the blue around them pops
+            { lit: tint(dk, [1, 1, 1], [0.26, 0.29, 0.36]), shade: tint(dk, [0.9, 0.93, 0.97], [0.1, 0.11, 0.16]), alpha: dk > 0.5 ? 0.75 : 0.95 };
     // a low sun lights the clouds gold and pink from below, less through thick cloud
     const gw = f.warm * (storm ? 0.15 : wet || snow || kind === "fog" ? 0.35 : kind === "cloudy" ? 0.55 : 1);
     for (let i = 0; i < 3; i++) {
