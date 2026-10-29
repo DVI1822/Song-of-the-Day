@@ -1,5 +1,6 @@
 // Song of the Day's service worker: shows the noon and 9 PM nudges and the
-// likes and notes on your song, and opens the globe when one is tapped.
+// likes and notes on your song, friends posting theirs, and opens the globe
+// when one is tapped.
 
 self.addEventListener("push", (event) => {
   let data = {};

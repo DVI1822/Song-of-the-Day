@@ -3,12 +3,13 @@ import webpush from "web-push";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 
 // The database calls this every hour with the people to nudge, and whenever
-// someone likes a song or leaves a note on it (see the push migrations). It's
+// someone likes a song or leaves a note on it, and when someone posts their
+// song for the friends who have them on their globe (see the push migrations). It's
 // signed with PUSH_SECRET, so nobody else can send anything.
 
 type Sub = { endpoint: string; p256dh: string; auth: string } & (
   | { kind: "noon" | "night" }
-  | { kind: "reaction"; title: string; body: string; tag: string }
+  | { kind: "reaction" | "post"; title: string; body: string; tag: string }
 );
 
 const NUDGE = {
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
         .sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify(
-            s.kind === "reaction"
+            s.kind === "reaction" || s.kind === "post"
               ? { title: s.title, body: s.body, tag: s.tag, url: "/" }
               : { ...(NUDGE[s.kind] ?? NUDGE.noon), url: "/" },
           ),

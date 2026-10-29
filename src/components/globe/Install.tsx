@@ -53,6 +53,9 @@ function kindNow(): Kind {
   return null;
 }
 
+// whether this card still has something to show (the notifications card waits for it)
+export const installPending = () => kindNow() !== null;
+
 const subscribe = (f: () => void) => {
   subs.add(f);
   return () => void subs.delete(f);
