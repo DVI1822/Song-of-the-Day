@@ -34,6 +34,7 @@ export const useWelcomeSeen = () => useSyncExternalStore(seen.sub, seen.get, () 
 export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
   const close = () => {
     seen.set();
+    notifyLater(3); // it's asking right now, so the notifications card holds off
     enablePush(api, true);
     onClose();
   };
@@ -83,6 +84,14 @@ export function HelpButton({ dark, onClick, buttonRef }: HelpProps) {
       ?
     </button>
   );
+}
+
+// When the notifications card (Notify.tsx) may next ask.
+export const LATER_KEY = "sotd-notify-later";
+export function notifyLater(days: number) {
+  try {
+    localStorage.setItem(LATER_KEY, String(Date.now() + days * 24 * 60 * 60 * 1000));
+  } catch {}
 }
 
 // Nudges at noon and 9 PM. With `ask`, a browser that hasn't been asked yet

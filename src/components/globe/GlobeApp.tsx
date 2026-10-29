@@ -14,6 +14,7 @@ import { Compose } from "./Compose";
 import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { InstallCard } from "./Install";
+import { NotifyCard } from "./Notify";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { type CoreLook, drift, useCoreLook } from "./coreLook";
@@ -1142,6 +1143,7 @@ function Globe({
       <HelpButton dark={darkOn} onClick={() => setHelp(true)} buttonRef={(el) => void (R.current.chrome[5] = el)} />
       {(!welcomeSeen || help) && <Welcome api={api} onClose={() => setHelp(false)} />}
       {welcomeSeen && !help && <InstallCard />}
+      {welcomeSeen && !help && <NotifyCard api={api} />}
 
       {/* left tabs */}
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
