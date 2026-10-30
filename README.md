@@ -1,4 +1,4 @@
-# Song of the Day
+# Fingerpick
 
 One song a day. The one that hit hardest.
 
