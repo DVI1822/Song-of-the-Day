@@ -178,7 +178,7 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
   cv.style.transform = `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) rotateZ(${(-s.cam.roll).toFixed(4)}rad)`;
   // flying into it, the inside view takes over (CoreInside.tsx) before this
   // canvas is blown up past its sharpness
-  cv.style.opacity = s.lens === null ? Math.max(0, Math.min(1, 1 - (s.zoom - 1.3) / 0.8)).toFixed(3) : "1";
+  cv.style.opacity = s.lens === null ? Math.max(0, Math.min(1, 1 - (s.zoom - 1.35) / 0.45)).toFixed(3) : "1";
   const ctx = cv.getContext("2d");
   if (!ctx) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);

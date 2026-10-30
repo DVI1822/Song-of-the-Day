@@ -156,6 +156,7 @@ function newMotion(posted: boolean) {
     cam: { yaw: 0, pitch: 0, roll: 0 } as Camera,
     target: null as null | { yaw: number; pitch: number },
     zoomTarget: null as null | number,
+    dive: null as null | { from: number; to: number; t: number; dur: number }, // into or out of a core
     featFly: null as null | number,
     featOn: false,
     featOpen: false,
@@ -453,6 +454,7 @@ function Globe({
     s.coreOn = false;
     s.pendingCore = false;
     s.zoomTarget = 1;
+    s.dive = { from: s.zoom, to: 1, t: 0, dur: 1.5 }; // the view shrinks back into the core
     s.target = { yaw: s.yaw, pitch: -0.3 }; // back level as you fly out
     setCoreOpen(false);
     setCoreFor(null);
@@ -523,7 +525,7 @@ function Globe({
   const inCore = Boolean(coreData);
   useEffect(() => {
     if (inCore) return;
-    const t = setTimeout(() => setInside(null), 450);
+    const t = setTimeout(() => setInside(null), 1700);
     return () => clearTimeout(t);
   }, [inCore]);
   const coreAdded = !coreWho || friends.some((f) => f.id === coreWho.id);
@@ -690,9 +692,19 @@ function Globe({
         }
         // into a core: rise over the top first, then drop down into it
         const rising = s.pendingCore && Math.abs(wrapPi(CORE_PITCH - s.pitch)) > 0.3;
+        if (s.dive && s.dive.to !== s.zoomTarget) s.dive = null;
+        if (!rising && !s.dive && s.pendingCore) s.dive = { from: s.zoom, to: s.zoomTarget, t: 0, dur: 1.9 };
         if (rising) s.zoom += (1.25 - s.zoom) * ease(0.07, dt);
-        else if (Math.abs(dz) > 0.01) s.zoom += dz * ease(0.07, dt);
+        else if (s.dive && s.dive.t < s.dive.dur) {
+          // one smooth dive, even in feel all the way: the core grows into the view
+          const d = s.dive;
+          d.t += dt;
+          const u = clamp01(d.t / d.dur),
+            k = u * u * (3 - 2 * u);
+          s.zoom = Math.exp(Math.log(d.from) + (Math.log(d.to) - Math.log(d.from)) * k);
+        } else if (!s.dive && Math.abs(dz) > 0.01) s.zoom += dz * ease(0.07, dt);
         else {
+          s.dive = null;
           s.zoom = s.zoomTarget;
           s.zoomTarget = null;
           if (s.featFly !== null) {
@@ -1360,6 +1372,7 @@ function Globe({
           timeZone={inside.profile.timezone}
           from={L.cy}
           cy={coreCenter ?? Math.round(L.h * 0.2)}
+          coreR={50 * L.s}
           zoom={coreZoom}
         />
       )}

@@ -4,9 +4,11 @@ import { useEffect, useRef } from "react";
 import type { Post } from "@/lib/types";
 import { alpha, drift, useCoreLook } from "./coreLook";
 
-// Inside someone's core. Flying in, its rings of signal rush out past you;
-// then you're in a slow tunnel of them, in the colours of their music, with
-// their songs riding the rings towards you. Drawn at the screen's own
+// Inside someone's core. It's the core itself: as the camera dives in, the
+// core's rings grow out of it until they fill the screen and you're in a slow
+// tunnel of them, in the colours of their music, with their songs riding the
+// rings, centred on their picture. Everything follows the camera's zoom, so
+// flying in and back out is one continuous move. Drawn at the screen's own
 // resolution, so it stays sharp however big it gets.
 
 const NEON = ["#5ef2ff", "#9b8cff", "#ff5fd2", "#b4ff5e"];
@@ -42,18 +44,20 @@ export function CoreInside({
   timeZone,
   from,
   cy,
+  coreR,
   zoom,
 }: {
   posts: Post[] | null;
   timeZone: string;
   from: number; // where the core was on screen as you flew in
   cy: number; // where the tunnel settles: around their picture
+  coreR: number; // the core's radius on screen before any zoom
   zoom: () => number; // the camera's zoom: the inside shows as you reach the core
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const look = useCoreLook(posts, timeZone);
   const colors = look?.colors.length ? look.colors.map(vivid) : NEON;
-  const live = useRef({ colors, cy, from, zoom, covers: [] as (HTMLImageElement | null)[] });
+  const live = useRef({ colors, cy, from, coreR, zoom, covers: [] as (HTMLImageElement | null)[] });
 
   // the covers that ride the rings: their newest songs
   const coverKey = (posts ?? []).slice(0, RINGS).map((p) => p.artwork_url ?? "").join("|");
@@ -69,6 +73,7 @@ export function CoreInside({
     live.current.colors = colors;
     live.current.cy = cy;
     live.current.from = from;
+    live.current.coreR = coreR;
     live.current.zoom = zoom;
   });
 
@@ -77,25 +82,27 @@ export function CoreInside({
     const ctx = cv?.getContext("2d");
     if (!cv || !ctx) return;
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // rings start far down the tunnel, a small bright core ahead of you
+    // the core's rings, smallest deepest
     const z = Array.from({ length: RINGS }, (_, i) => (i / RINGS) * DEEP + 1.6);
-    let t0: number | null = null; // when the camera reached the core
+    let t0: number | null = null; // when the core started to open
     let last = performance.now(),
+      lastZm = live.current.zoom(),
       raf = 0;
 
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      // seen only once the camera is deep enough, fading as it flies back out
       const zm = live.current.zoom();
-      cv.style.opacity = clamp01((zm - 1.8) / 1.4).toFixed(3);
-      if (t0 === null) {
-        if (zm < 1.8) {
-          raf = requestAnimationFrame(frame);
-          return;
-        }
-        t0 = now;
+      const dz = zm - lastZm;
+      lastZm = zm;
+      // takes over from the core as the camera reaches it, gives it back flying out
+      cv.style.opacity = clamp01((zm - 1.3) / 0.25).toFixed(3);
+      if (zm < 1.3) {
+        t0 = null;
+        raf = requestAnimationFrame(frame);
+        return;
       }
+      if (t0 === null) t0 = now;
       const t = (now - t0) / 1000;
       const dpr = Math.min(3, window.devicePixelRatio || 1);
       const w = window.innerWidth,
@@ -105,43 +112,48 @@ export function CoreInside({
         cv.height = Math.round(h * dpr);
       }
       const { colors, covers } = live.current;
-      // the tunnel opens where the core was, then rises to sit around their picture
-      const rise = clamp01((t - 0.5) / 1.1),
-        cy = live.current.from + (live.current.cy - live.current.from) * rise * rise * (3 - 2 * rise);
-      const cx = w / 2;
-      const F = Math.min(w, h) * 0.24;
+      // how far into the core: 0 where it is on the globe, 1 all the way in
+      const q = clamp01((zm - 1.3) / 2.5),
+        p = q * q * (3 - 2 * q);
+      const R0 = live.current.coreR * zm; // the core, as big as the camera sees it now
+      // it grows from where the core is to sit right behind their picture
+      const cx = w / 2,
+        cy = live.current.from + (live.current.cy - live.current.from) * p;
+      const F = R0 * 1.3 + (Math.min(w, h) * 0.24 - R0 * 1.3) * p;
+      const edge = R0 * 1.15 + (Math.hypot(w, h) * 1.3 - R0 * 1.15) * Math.pow(p, 1.5);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, w, h);
 
-      // the dark of the inside, tinted with their colours
-      ctx.fillStyle = "#04050c";
+      // the dark of the inside, tinted with their colours, deepening as you go in
+      const dark = clamp01(p * 1.6);
+      ctx.fillStyle = alpha("#04050c", dark);
       ctx.fillRect(0, 0, w, h);
       for (let k = 0; k < 3; k++) {
         const a = t * 0.05 + k * 2.1;
         const x = cx + Math.cos(a) * w * 0.35,
           y = cy + Math.sin(a * 1.3) * h * 0.25;
         const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(w, h) * 0.7);
-        g.addColorStop(0, drift(colors, k * 1.3 + t * 0.03, 0, 0.13));
+        g.addColorStop(0, drift(colors, k * 1.3 + t * 0.03, 0, 0.13 * dark));
         g.addColorStop(1, drift(colors, k * 1.3 + t * 0.03, 0, 0));
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, w, h);
       }
-      // the tunnel bends as you drift through it: the far end wanders a little
-      const vx = cx + Math.sin(t * 0.23) * w * 0.07,
-        vy = cy + Math.cos(t * 0.17) * h * 0.035;
-      // the heart of it, far ahead
-      const heart = ctx.createRadialGradient(vx, vy, 0, vx, vy, F * 0.9);
+      // the heart of it, right behind their picture
+      const heart = ctx.createRadialGradient(cx, cy, 0, cx, cy, F * 0.9);
       heart.addColorStop(0, drift(colors, t * 0.08, 0.5, 0.5));
       heart.addColorStop(0.3, drift(colors, t * 0.08 + 1, 0, 0.14));
       heart.addColorStop(1, drift(colors, t * 0.08 + 1, 0, 0));
       ctx.fillStyle = heart;
       ctx.fillRect(0, 0, w, h);
 
-      // flying in, the rings rush past; then they drift slowly towards you
-      const speed = calm ? 0.05 : 0.14 + 3.2 * Math.exp(-t * 2.2);
+      // diving in, the rings rush past you; flying out, they fall back into
+      // the core; in between they drift slowly towards you
+      const move = (calm ? 0.05 : 0.14) * dt + dz * 0.9;
       for (let i = 0; i < RINGS; i++) {
-        z[i] -= speed * dt;
+        z[i] -= move;
         if (z[i] < 0.12) z[i] += DEEP;
+        if (z[i] > DEEP + 1.6) z[i] -= DEEP;
       }
       const order = [...z.keys()].sort((a, b) => z[b] - z[a]); // far first
 
@@ -151,20 +163,17 @@ export function CoreInside({
         const d = z[i];
         const r = F / d;
         // fade in from the far end, out as it passes you
-        const a = clamp01((DEEP - 0.3 - d) / 1.2) * clamp01((d - 0.12) / 0.3) * clamp01(t * 1.5 + 0.2);
+        const a = clamp01((DEEP + 1.3 - d) / 1.2) * clamp01((d - 0.12) / 0.3);
         if (a < 0.01 || r > Math.hypot(w, h) * 1.5) continue;
         const amp = 0.05 + 0.03 * Math.sin(t * 0.7 + i);
         const spin = t * 0.05 * (i % 2 ? 1 : -1) + i;
         const n = Math.min(240, Math.max(60, Math.round(r / 3)));
-        const near = clamp01(1 - d / DEEP),
-          ox = vx + (cx - vx) * near,
-          oy = vy + (cy - vy) * near;
         ctx.beginPath();
         for (let k = 0; k <= n; k++) {
           const th = (k / n) * TAU;
           const rr = r * (1 + amp * wave(th + spin, i, t));
-          const x = ox + Math.cos(th) * rr,
-            y = oy + Math.sin(th) * rr * 0.94;
+          const x = cx + Math.cos(th) * rr,
+            y = cy + Math.sin(th) * rr * 0.94;
           if (k) ctx.lineTo(x, y);
           else ctx.moveTo(x, y);
         }
@@ -191,12 +200,11 @@ export function CoreInside({
         const s = Math.min(150, r * 0.34);
         // not over their picture and name: songs show once their ring is out past them
         const a =
-          clamp01((DEEP - 0.4 - d) / 0.9) * clamp01((d - 0.25) / 0.35) * clamp01(t * 1.2 - 0.4) * clamp01((r - 95) / 40);
+          clamp01((DEEP + 1.2 - d) / 0.9) * clamp01((d - 0.25) / 0.35) * clamp01(p * 2 - 1) * clamp01((r - 95) / 40);
         if (a < 0.01 || s < 6) continue;
         const ang = i * 2.39996 + t * 0.03;
-        const near = clamp01(1 - d / DEEP);
-        const x = vx + (cx - vx) * near + Math.cos(ang) * r - s / 2,
-          y = vy + (cy - vy) * near + Math.sin(ang) * r * 0.94 - s / 2;
+        const x = cx + Math.cos(ang) * r - s / 2,
+          y = cy + Math.sin(ang) * r * 0.94 - s / 2;
         ctx.save();
         ctx.globalAlpha = a;
         ctx.shadowColor = drift(colors, i * 0.7, 0, 0.6);
@@ -213,9 +221,18 @@ export function CoreInside({
       // a soft vignette keeps the eye in the middle
       const v = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.3, cx, cy, Math.max(w, h) * 0.85);
       v.addColorStop(0, "rgba(4,5,12,0)");
-      v.addColorStop(1, alpha("#04050c", 0.75));
+      v.addColorStop(1, alpha("#04050c", 0.75 * dark));
       ctx.fillStyle = v;
       ctx.fillRect(0, 0, w, h);
+
+      // all of it lives inside the core, whose edge grows past the screen's
+      ctx.globalCompositeOperation = "destination-in";
+      const m = ctx.createRadialGradient(cx, cy, edge * 0.75, cx, cy, edge);
+      m.addColorStop(0, "#000");
+      m.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = m;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "source-over";
 
       raf = requestAnimationFrame(frame);
     };
