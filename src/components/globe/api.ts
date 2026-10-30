@@ -28,6 +28,7 @@ import {
   type NewPost,
   type ReportReason,
   type SpotifyNow,
+  type Here,
   type SpotifyPlay,
 } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
@@ -168,7 +169,14 @@ export const serverApi: GlobeApi = {
   async savePush(sub) {
     await createClient().rpc("save_push", { sub_endpoint: sub.endpoint, sub_p256dh: sub.p256dh, sub_auth: sub.auth });
   },
-  spotify: { play: spotifyPlay, playAll: spotifyPlayAll, next: spotifyNext, pause: spotifyPause, resume: spotifyResume, now: spotifyNow },
+  spotify: {
+    play: (uri, at) => spotifyPlay(uri, at, deviceHere()),
+    playAll: (uris) => spotifyPlayAll(uris, deviceHere()),
+    next: spotifyNext,
+    pause: spotifyPause,
+    resume: () => spotifyResume(deviceHere()),
+    now: spotifyNow,
+  },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();
     const path = `${userId}/${crypto.randomUUID()}.jpg`;
@@ -191,4 +199,12 @@ export async function shrinkPhoto(file: File): Promise<Blob> {
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.85));
+}
+
+// Which kind of device this is, so a song plays on its own Spotify app.
+function deviceHere(): Here {
+  const ua = navigator.userAgent;
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) || (/Android/.test(ua) && !/Mobile/.test(ua)))
+    return "tablet";
+  return /iPhone|iPod|Android|Mobile/.test(ua) ? "phone" : "computer";
 }
