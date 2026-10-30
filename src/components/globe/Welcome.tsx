@@ -31,7 +31,7 @@ const seen = {
 };
 export const useWelcomeSeen = () => useSyncExternalStore(seen.sub, seen.get, () => true);
 
-export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
+export function Welcome({ api, onClose, onApp }: { api: GlobeApi; onClose(): void; onApp(): void }) {
   const close = () => {
     seen.set();
     notifyLater(3); // it's asking right now, so the notifications card holds off
@@ -63,6 +63,18 @@ export function Welcome({ api, onClose }: { api: GlobeApi; onClose(): void }) {
         </p>
         <button type="button" onClick={close} className="mt-1.5 h-12 rounded-full bg-accent text-[15px] font-semibold text-white">
           Let&apos;s go
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            seen.set();
+            onApp();
+          }}
+          className="-mt-1.5 flex h-10 items-center justify-center gap-2 text-sm font-semibold text-card-ink"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-192.png" alt="" width={20} height={20} className="h-5 w-5 rounded-[5px]" />
+          Get the app on your home screen
         </button>
       </div>
     </div>
