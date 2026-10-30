@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type Ref } from "react";
-import { formatDay, formatTime, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
+import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { formatDay, formatTime, initials, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
 import type { Post, Profile, SavedSong } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { ChatIcon } from "./Chat";
@@ -28,6 +28,8 @@ export function CoreView({
   onBlocked,
   rootRef,
   sheetRef,
+  onAvatar,
+  onCenter,
 }: {
   profile: Profile | null;
   posts: Post[] | null; // null while loading
@@ -43,6 +45,8 @@ export function CoreView({
   onBlocked(): void;
   rootRef: Ref<HTMLDivElement>;
   sheetRef: Ref<HTMLDivElement>;
+  onAvatar?: (file: File) => Promise<string | { error: string }>; // your own core: change your picture
+  onCenter?: (y: number) => void; // where the picture sits, for the core's rings to circle
 }) {
   const [month, setMonth] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -53,10 +57,26 @@ export function CoreView({
   const [full, setFull] = useState(false);
   const drag = useRef<number | null>(null);
   const sheet = useRef<HTMLDivElement>(null);
-  const low = `translateY(calc(${sheetTop}px - ${FULL_TOP}))`; // where it rests until pulled up
-  const live = useRef({ full, low, sheetTop, onClose });
+  // the sheet rests just under the picture and name, the core's rings above
+  const who = useRef<HTMLDivElement>(null);
+  const pic = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const a = pic.current?.getBoundingClientRect(),
+        b = who.current?.getBoundingClientRect();
+      if (a) onCenter?.(a.top + a.height / 2);
+      if (b) setMeasured(Math.round(b.bottom + 18));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [onCenter]);
+  const top = measured ?? sheetTop;
+  const low = `translateY(calc(${top}px - ${FULL_TOP}))`; // where it rests until pulled up
+  const live = useRef({ full, low, sheetTop: top, onClose });
   useEffect(() => {
-    live.current = { full, low, sheetTop, onClose };
+    live.current = { full, low, sheetTop: top, onClose };
   });
   useEffect(() => {
     const el = sheet.current;
@@ -123,17 +143,9 @@ export function CoreView({
 
   return (
     <div ref={rootRef} className="pointer-events-none fixed inset-0 z-[500]" style={{ opacity: 0 }}>
-      <div className="pointer-events-auto absolute left-6 right-3 top-[max(30px,env(safe-area-inset-top))] flex items-start">
-        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors" style={{ color: muted }}>
-            {mine ? "Your core" : `${first}'s core`}
-          </div>
-          <div className="display truncate text-[30px] leading-tight transition-colors" style={{ color: ink }}>
-            {profile?.display_name}
-          </div>
-          <div className="text-[13px] transition-colors" style={{ color: muted }}>
-            @{profile?.username}
-          </div>
+      <div className="pointer-events-auto absolute left-6 right-3 top-[max(30px,env(safe-area-inset-top))] flex items-center gap-2">
+        <div className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors" style={{ color: muted }}>
+          {mine ? "Your core" : `${first}'s core`}
         </div>
         {onAdd && <AddPill name={first ?? ""} onAdd={onAdd} />}
         {onMessage && <MessagePill name={first ?? ""} onMessage={onMessage} />}
@@ -146,6 +158,29 @@ export function CoreView({
         >
           <CloseIcon />
         </button>
+      </div>
+
+      {/* who it is, at the heart of their core */}
+      <div
+        ref={who}
+        className="pointer-events-auto absolute inset-x-6 top-[calc(max(30px,env(safe-area-inset-top))+52px)] flex flex-col items-center gap-1 text-center"
+      >
+        <div ref={pic}>
+          <Avatar
+            url={profile?.avatar_url ?? null}
+            name={profile?.display_name ?? ""}
+            onPick={mine ? onAvatar : undefined}
+          />
+        </div>
+        <div
+          className="display mt-1.5 max-w-full truncate text-[26px] leading-tight transition-colors"
+          style={{ color: ink, textShadow: "0 1px 12px rgba(4,5,12,0.85)" }}
+        >
+          {profile?.display_name}
+        </div>
+        <div className="text-[13px] transition-colors" style={{ color: muted, textShadow: "0 1px 10px rgba(4,5,12,0.85)" }}>
+          @{profile?.username}
+        </div>
       </div>
 
       {/* the sheet keeps one size and only slides (smooth on phones); the
@@ -169,7 +204,7 @@ export function CoreView({
               if (drag.current === null || !el) return;
               // follow the finger, never above the top
               const dy = e.clientY - drag.current;
-              const base = full ? "0px" : `(${sheetTop}px - ${FULL_TOP})`;
+              const base = full ? "0px" : `(${top}px - ${FULL_TOP})`;
               el.style.transition = "none";
               el.style.transform = `translateY(max(0px, calc(${base} + ${dy}px)))`;
             }}
@@ -196,8 +231,8 @@ export function CoreView({
             </button>
             <div
               aria-hidden={!full}
-              className={`flex w-full items-center gap-2 pb-1 transition-opacity duration-300 ${
-                full ? "opacity-100" : "pointer-events-none opacity-0"
+              className={`flex w-full items-center gap-2 transition-opacity duration-300 ${
+                full ? "pb-1 opacity-100" : "pointer-events-none h-0 overflow-hidden opacity-0"
               }`}
             >
               <div className="flex min-w-0 flex-1 flex-col">
@@ -415,5 +450,73 @@ function MessagePill({ name, onMessage }: { name: string; onMessage(): void }) {
       <ChatIcon size={13} />
       Message
     </button>
+  );
+}
+
+// Their picture, or their initials. On your own core, tap it to choose one.
+function Avatar({
+  url,
+  name,
+  onPick,
+}: {
+  url: string | null;
+  name: string;
+  onPick?: (file: File) => Promise<string | { error: string }>;
+}) {
+  const [shown, setShown] = useState(url);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  if (url && url !== shown && !busy) setShown(url);
+  const face = (
+    <span
+      className="relative flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-full text-[28px] font-semibold"
+      style={{
+        background: shown ? `center / cover no-repeat url("${shown}")` : "linear-gradient(135deg, #FFE1D6, #F6A9A0)",
+        color: "#8A2A22",
+        boxShadow: "0 0 0 3px rgba(255,255,255,0.85), 0 0 34px 6px rgba(255,255,255,0.28)",
+      }}
+    >
+      {!shown && initials(name)}
+      {busy && <span className="absolute inset-0 animate-pulse bg-white/40" />}
+    </span>
+  );
+  if (!onPick) return face;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        aria-label={shown ? "Change your picture" : "Add a picture"}
+        className="relative"
+        disabled={busy}
+      >
+        {face}
+        <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-white shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+          <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+        </span>
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          setBusy(true);
+          setError(null);
+          const r = await onPick(file);
+          setBusy(false);
+          if (typeof r === "string") setShown(r);
+          else setError(r.error);
+        }}
+      />
+      {error && <p className="text-xs text-red-300">{error}</p>}
+    </>
   );
 }

@@ -40,18 +40,20 @@ const wave = (th: number, i: number, t: number) =>
 export function CoreInside({
   posts,
   timeZone,
+  from,
   cy,
-  leaving,
+  zoom,
 }: {
   posts: Post[] | null;
   timeZone: string;
-  cy: number;
-  leaving: boolean;
+  from: number; // where the core was on screen as you flew in
+  cy: number; // where the tunnel settles: around their picture
+  zoom: () => number; // the camera's zoom: the inside shows as you reach the core
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const look = useCoreLook(posts, timeZone);
   const colors = look?.colors.length ? look.colors.map(vivid) : NEON;
-  const live = useRef({ colors, cy, covers: [] as (HTMLImageElement | null)[] });
+  const live = useRef({ colors, cy, from, zoom, covers: [] as (HTMLImageElement | null)[] });
 
   // the covers that ride the rings: their newest songs
   const coverKey = (posts ?? []).slice(0, RINGS).map((p) => p.artwork_url ?? "").join("|");
@@ -66,6 +68,8 @@ export function CoreInside({
   useEffect(() => {
     live.current.colors = colors;
     live.current.cy = cy;
+    live.current.from = from;
+    live.current.zoom = zoom;
   });
 
   useEffect(() => {
@@ -75,13 +79,23 @@ export function CoreInside({
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // rings start far down the tunnel, a small bright core ahead of you
     const z = Array.from({ length: RINGS }, (_, i) => (i / RINGS) * DEEP + 1.6);
-    const t0 = performance.now();
-    let last = t0,
+    let t0: number | null = null; // when the camera reached the core
+    let last = performance.now(),
       raf = 0;
 
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
+      // seen only once the camera is deep enough, fading as it flies back out
+      const zm = live.current.zoom();
+      cv.style.opacity = clamp01((zm - 1.8) / 1.4).toFixed(3);
+      if (t0 === null) {
+        if (zm < 1.8) {
+          raf = requestAnimationFrame(frame);
+          return;
+        }
+        t0 = now;
+      }
       const t = (now - t0) / 1000;
       const dpr = Math.min(3, window.devicePixelRatio || 1);
       const w = window.innerWidth,
@@ -90,9 +104,12 @@ export function CoreInside({
         cv.width = Math.round(w * dpr);
         cv.height = Math.round(h * dpr);
       }
-      const { colors, cy, covers } = live.current;
+      const { colors, covers } = live.current;
+      // the tunnel opens where the core was, then rises to sit around their picture
+      const rise = clamp01((t - 0.5) / 1.1),
+        cy = live.current.from + (live.current.cy - live.current.from) * rise * rise * (3 - 2 * rise);
       const cx = w / 2;
-      const F = Math.min(w, h) * 0.3;
+      const F = Math.min(w, h) * 0.24;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.globalCompositeOperation = "source-over";
 
@@ -172,7 +189,9 @@ export function CoreInside({
         const d = z[i];
         const r = F / d;
         const s = Math.min(150, r * 0.34);
-        const a = clamp01((DEEP - 0.4 - d) / 0.9) * clamp01((d - 0.25) / 0.35) * clamp01(t * 1.2 - 0.4);
+        // not over their picture and name: songs show once their ring is out past them
+        const a =
+          clamp01((DEEP - 0.4 - d) / 0.9) * clamp01((d - 0.25) / 0.35) * clamp01(t * 1.2 - 0.4) * clamp01((r - 95) / 40);
         if (a < 0.01 || s < 6) continue;
         const ang = i * 2.39996 + t * 0.03;
         const near = clamp01(1 - d / DEEP);
@@ -208,8 +227,8 @@ export function CoreInside({
     <canvas
       ref={ref}
       aria-hidden
-      className="core-inside pointer-events-none fixed inset-0 z-[499] h-full w-full transition-opacity duration-[400ms]"
-      style={leaving ? { opacity: 0, animation: "none" } : undefined}
+      className="pointer-events-none fixed inset-0 z-[499] h-full w-full"
+      style={{ opacity: 0 }}
     />
   );
 }

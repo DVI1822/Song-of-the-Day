@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, Post, Profile, SavedSong } from "@/lib/types";
-import { serverApi, type GlobeApi } from "./api";
+import { serverApi, shrinkPhoto, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
 import { skyAt, weatherSky, type SkyLook } from "./sky";
@@ -136,6 +136,9 @@ export type Live = {
 // what's playing, for the energy streak: its tile, and how to find its beat
 export type Beam = { k: number; paused: boolean; beat: Beat | null; clipTime: () => number | null } | null;
 export type Motion = ReturnType<typeof newMotion>;
+
+// looking down on the globe's north pole, where the core's rings are circles
+const CORE_PITCH = Math.PI / 2;
 type Els = ReturnType<typeof newEls>;
 
 function newMotion(posted: boolean) {
@@ -435,7 +438,9 @@ function Globe({
       s.lens = null;
       s.featFly = null;
       s.featOpen = false;
-      s.target = null;
+      // rise over the globe and look straight down into the core, so its rings
+      // open up into the tunnel you land in
+      s.target = { yaw: s.yaw, pitch: CORE_PITCH };
       setCoreFor({ who, k: k === ME ? null : k });
       setFocus(null);
       closePanel();
@@ -448,6 +453,7 @@ function Globe({
     s.coreOn = false;
     s.pendingCore = false;
     s.zoomTarget = 1;
+    s.target = { yaw: s.yaw, pitch: -0.3 }; // back level as you fly out
     setCoreOpen(false);
     setCoreFor(null);
   }, []);
@@ -488,13 +494,29 @@ function Globe({
       on = false;
     };
   }, [coreWho, api]);
+  // your picture, changed from your core
+  const [myAvatar, setMyAvatar] = useState(me.avatar_url ?? null);
+  const meNow = useMemo(() => ({ ...me, avatar_url: myAvatar }), [me, myAvatar]);
+  const onAvatar = useCallback(
+    async (file: File) => {
+      if (!api.setAvatar) return { error: "Pictures can't be changed here." };
+      const r = await api.setAvatar(me.id, await shrinkPhoto(file));
+      if (!r.url) return { error: r.error ?? "Couldn't upload your picture. Try again." };
+      setMyAvatar(r.url);
+      return r.url;
+    },
+    [api, me.id],
+  );
+  const coreZoom = useCallback(() => m.current.zoom, []);
+  // where the picture sits inside the core, for its rings to circle
+  const [coreCenter, setCoreCenter] = useState<number | null>(null);
   const coreData = !coreFor
     ? null
     : coreWho
       ? friendCore?.id === coreWho.id
         ? friendCore
         : { profile: coreWho, posts: null }
-      : { profile: me, posts: mySongs };
+      : { profile: meNow, posts: mySongs };
   // the inside of the core stays a moment after you leave, fading as you fly out
   const [inside, setInside] = useState(coreData);
   if (coreData && (inside?.profile !== coreData.profile || inside?.posts !== coreData.posts)) setInside(coreData);
@@ -646,7 +668,7 @@ function Globe({
         const dy = t.yaw - s.yaw,
           dp = wrapPi(t.pitch - s.pitch);
         if (Math.abs(dy) + Math.abs(dp) > 0.001) {
-          const f = ease(0.1, dt);
+          const f = ease(s.pendingCore ? 0.04 : 0.1, dt); // rising over a core: unhurried
           s.yaw += dy * f;
           s.pitch += dp * f;
         } else if (s.featFly === null && s.launch === null) s.target = null; // arrived: let the spin carry on
@@ -666,7 +688,10 @@ function Globe({
           s.coreOn = true;
           setCoreOpen(true);
         }
-        if (Math.abs(dz) > 0.01) s.zoom += dz * ease(0.07, dt);
+        // into a core: rise over the top first, then drop down into it
+        const rising = s.pendingCore && Math.abs(wrapPi(CORE_PITCH - s.pitch)) > 0.3;
+        if (rising) s.zoom += (1.25 - s.zoom) * ease(0.07, dt);
+        else if (Math.abs(dz) > 0.01) s.zoom += dz * ease(0.07, dt);
         else {
           s.zoom = s.zoomTarget;
           s.zoomTarget = null;
@@ -974,8 +999,9 @@ function Globe({
   const ink = inkLight ? "#EEF3F8" : "#0D2A3F";
   const muted = inkLight ? "#C2D0DE" : "#3E5566";
   const tabTop = Math.max(100, L.cy - 240);
-  // inside a core its sheet rests low, the stats peeking up, so the core has the screen
-  const coreSheetTop = Math.round(Math.max(L.cy + Math.max(56, L.R * 0.5), L.h - 250));
+  // inside a core the profile is the point: its sheet rests just under their
+  // picture and name (CoreView measures them; this is only its first guess)
+  const coreSheetTop = Math.round(L.h * 0.4);
   const panelW = Math.min(296, L.w - 58);
   // The star field turns with the globe, so it covers the screen's diagonal.
   const starBox = Math.ceil(Math.hypot(L.w, L.h) / 100) * 100 + 100;
@@ -1332,8 +1358,9 @@ function Globe({
         <CoreInside
           posts={inside.posts}
           timeZone={inside.profile.timezone}
-          cy={Math.round((110 + coreSheetTop) / 2)}
-          leaving={!coreData}
+          from={L.cy}
+          cy={coreCenter ?? Math.round(L.h * 0.2)}
+          zoom={coreZoom}
         />
       )}
       {coreOpen && coreData && (
@@ -1359,6 +1386,8 @@ function Globe({
           }
           api={api}
           onBlocked={() => window.location.reload()}
+          onAvatar={coreData.profile.id === me.id ? onAvatar : undefined}
+          onCenter={setCoreCenter}
           rootRef={(el) => void (R.current.prof = el)}
           sheetRef={(el) => void (R.current.profSheet = el)}
         />

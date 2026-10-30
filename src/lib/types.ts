@@ -6,6 +6,7 @@ export type Profile = {
   display_name: string;
   timezone: string;
   created_at: string;
+  avatar_url?: string | null; // their picture, if they've chosen one
 };
 
 export type Post = {
