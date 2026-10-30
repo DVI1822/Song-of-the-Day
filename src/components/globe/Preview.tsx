@@ -469,6 +469,7 @@ export function SongPlayer({
       connect.play(spotifyUri, from).then((r) => {
         if ("ok" in r) return setCx((c) => c && { ...c, device: r.device });
         setCx(null);
+        // no Spotify on this device to play it: Spotify's own player, right here
         if (r.error === "premium") setNote("Whole songs need Spotify Premium, so this is Spotify's preview.");
         playEmbed();
       });

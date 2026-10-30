@@ -414,9 +414,12 @@ async function spotifyDevice(token: string, here?: Here): Promise<Device | "not-
   const devices: Device[] = (list?.devices ?? []).filter((d: Device) => d.id && !d.is_restricted);
   const pick = (ds: Device[]) => ds.find((d) => d.is_active) ?? ds[0] ?? null;
   if (!here) return pick(devices);
-  const same = pick(devices.filter((d) => d.type?.toLowerCase() === KINDS[here]));
-  if (same || here !== "computer") return same ?? (devices.length ? "not-here" : null);
-  return pick(devices);
+  if (here === "computer") return pick(devices.filter((d) => d.type?.toLowerCase() === KINDS[here])) ?? pick(devices);
+  // from a phone, the phone's Spotify first, then anything that isn't a computer
+  // (Spotify doesn't always say what a phone is), never a computer
+  const near = pick(devices.filter((d) => d.type?.toLowerCase() === KINDS[here]))
+    ?? pick(devices.filter((d) => d.type?.toLowerCase() !== "computer"));
+  return near ?? (devices.length ? "not-here" : null);
 }
 
 async function startPlayback(body: object, here?: Here): Promise<SpotifyPlay> {
