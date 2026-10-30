@@ -208,6 +208,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
           return null;
         }
         if (r.error === "no-device") return "Open Spotify on your phone or computer, then shuffle again to hear whole songs.";
+        if (r.error === "not-here") return "Open the Spotify app on this device, then shuffle again to hear whole songs here.";
       }
       const list = order.filter((p) => p.preview_url);
       if (!list.length) return c ? null : "Connect Spotify in Settings to shuffle whole songs.";
@@ -471,6 +472,7 @@ export function SongPlayer({
         if ("ok" in r) return setCx((c) => c && { ...c, device: r.device });
         setCx(null);
         if (r.error === "no-device") setNote("Open Spotify on your phone or computer, then press play again to hear the whole song there.");
+        if (r.error === "not-here") setNote("Open the Spotify app on this device, then press play again to hear the whole song here.");
         if (r.error === "premium") setNote("Whole songs need Spotify Premium, so this is Spotify's preview.");
         playEmbed();
       });

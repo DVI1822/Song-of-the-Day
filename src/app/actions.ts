@@ -399,23 +399,34 @@ export async function unfollow(profileId: string) {
 
 export type SpotifyPlay =
   | { ok: true; device: string }
-  | { error: "not-linked" | "no-device" | "premium" | "failed" };
+  | { error: "not-linked" | "no-device" | "not-here" | "premium" | "failed" };
 
-// The device that's playing now, else whichever Spotify app is open.
-async function spotifyDevice(token: string) {
+// What you're tapping play on: a song played from your phone plays on your
+// phone's Spotify app, never on a computer that happens to have Spotify open.
+export type Here = "phone" | "tablet" | "computer";
+const KINDS: Record<Here, string> = { phone: "smartphone", tablet: "tablet", computer: "computer" };
+
+// The Spotify app on the device you're using (the one already playing first);
+// from a computer, failing that, whatever's playing or open.
+type Device = { id: string | null; name: string; type: string; is_active: boolean; is_restricted: boolean };
+async function spotifyDevice(token: string, here?: Here): Promise<Device | "not-here" | null> {
   const list = await spotifyApi(token, "/me/player/devices").then((r) => (r.ok ? r.json() : null));
-  type Device = { id: string | null; name: string; is_active: boolean; is_restricted: boolean };
   const devices: Device[] = (list?.devices ?? []).filter((d: Device) => d.id && !d.is_restricted);
-  return devices.find((d) => d.is_active) ?? devices[0] ?? null;
+  const pick = (ds: Device[]) => ds.find((d) => d.is_active) ?? ds[0] ?? null;
+  if (!here) return pick(devices);
+  const same = pick(devices.filter((d) => d.type?.toLowerCase() === KINDS[here]));
+  if (same || here !== "computer") return same ?? (devices.length ? "not-here" : null);
+  return pick(devices);
 }
 
-async function startPlayback(body: object): Promise<SpotifyPlay> {
+async function startPlayback(body: object, here?: Here): Promise<SpotifyPlay> {
   const { supabase, userId } = await getSession();
   if (!userId) return { error: "not-linked" };
   const token = await accessToken(supabase, userId);
   if (!token) return { error: "not-linked" };
-  const device = await spotifyDevice(token);
+  const device = await spotifyDevice(token, here);
   if (!device) return { error: "no-device" };
+  if (device === "not-here") return { error: "not-here" };
   const res = await spotifyApi(token, `/me/player/play?device_id=${device.id}`, { method: "PUT", body: JSON.stringify(body) });
   if (res.ok) return { ok: true, device: device.name };
   if (res.status === 403) return { error: "premium" };
@@ -423,17 +434,17 @@ async function startPlayback(body: object): Promise<SpotifyPlay> {
   return { error: "failed" };
 }
 
-export async function spotifyPlay(uri: string, positionMs = 0): Promise<SpotifyPlay> {
+export async function spotifyPlay(uri: string, positionMs = 0, here?: Here): Promise<SpotifyPlay> {
   if (!/^spotify:(track|album):[A-Za-z0-9]+$/.test(uri)) return { error: "failed" };
   const at = Math.max(0, Math.floor(positionMs) || 0);
-  return startPlayback(uri.startsWith("spotify:album:") ? { context_uri: uri } : { uris: [uri], position_ms: at });
+  return startPlayback(uri.startsWith("spotify:album:") ? { context_uri: uri } : { uris: [uri], position_ms: at }, here);
 }
 
 // Shuffle all: the whole list goes to Spotify, which plays it through.
-export async function spotifyPlayAll(uris: string[]): Promise<SpotifyPlay> {
+export async function spotifyPlayAll(uris: string[], here?: Here): Promise<SpotifyPlay> {
   const list = uris.filter((u) => /^spotify:track:[A-Za-z0-9]+$/.test(u)).slice(0, 100);
   if (!list.length) return { error: "failed" };
-  return startPlayback({ uris: list });
+  return startPlayback({ uris: list }, here);
 }
 
 export async function spotifyNext(): Promise<void> {
@@ -444,8 +455,8 @@ export async function spotifyNext(): Promise<void> {
 }
 
 // Carry on from where it was paused, on the same Spotify app.
-export async function spotifyResume(): Promise<SpotifyPlay> {
-  return startPlayback({});
+export async function spotifyResume(here?: Here): Promise<SpotifyPlay> {
+  return startPlayback({}, here);
 }
 
 export async function spotifyPause(): Promise<void> {
