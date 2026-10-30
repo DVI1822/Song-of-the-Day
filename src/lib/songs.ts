@@ -175,7 +175,7 @@ async function fromSpotifyPage(url: URL): Promise<{ title: string; artist: strin
   const m = url.pathname.match(/\/track\/([A-Za-z0-9]+)/);
   if (url.hostname !== "open.spotify.com" || !m) return null;
   const res = await fetch(`https://open.spotify.com/track/${m[1]}`, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; SongOfTheDay/1.0)", "Accept-Language": "en" },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; Fingerpick/1.0)", "Accept-Language": "en" },
     signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) return null;

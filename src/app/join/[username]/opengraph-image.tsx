@@ -7,7 +7,7 @@ import { isConfigured, supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "An invite to Song of the Day";
+export const alt = "An invite to Fingerpick";
 
 export default async function Image({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -63,11 +63,11 @@ export default async function Image({ params }: { params: Promise<{ username: st
         {cover && <img src={cover} alt="" width={360} height={360} style={{ objectFit: "cover" }} />}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ fontSize: 30, color: "#6A818C", fontWeight: 600 }}>Song of the Day</div>
+        <div style={{ fontSize: 30, color: "#6A818C", fontWeight: 600 }}>Fingerpick</div>
         <div
           style={{ fontSize: 68, fontWeight: 700, lineHeight: 1.08 }}
         >{`${first} saved you a spot on their globe`}</div>
-        <div style={{ fontSize: 30, color: "#D7262B", fontWeight: 600 }}>Share your Song of the Day with the world</div>
+        <div style={{ fontSize: 30, color: "#D7262B", fontWeight: 600 }}>Share your song of the day with the world</div>
       </div>
     </div>,
     size,
