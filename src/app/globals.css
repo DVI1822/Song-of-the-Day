@@ -86,6 +86,16 @@ body {
 }
 
 /* saving a song to your core: the little core pops */
+/* flying into a core: the inside fades up as the camera reaches it */
+@keyframes core-inside {
+  from {
+    opacity: 0;
+  }
+}
+.core-inside {
+  animation: core-inside 0.7s 0.2s ease-out both;
+}
+
 @keyframes core-pop {
   0% {
     transform: scale(0.7);

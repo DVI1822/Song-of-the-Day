@@ -15,6 +15,7 @@ import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { InstallCard } from "./Install";
 import { NotifyCard } from "./Notify";
+import { CoreInside } from "./CoreInside";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
 import { type CoreLook, drift, useCoreLook } from "./coreLook";
@@ -494,6 +495,15 @@ function Globe({
         ? friendCore
         : { profile: coreWho, posts: null }
       : { profile: me, posts: mySongs };
+  // the inside of the core stays a moment after you leave, fading as you fly out
+  const [inside, setInside] = useState(coreData);
+  if (coreData && (inside?.profile !== coreData.profile || inside?.posts !== coreData.posts)) setInside(coreData);
+  const inCore = Boolean(coreData);
+  useEffect(() => {
+    if (inCore) return;
+    const t = setTimeout(() => setInside(null), 450);
+    return () => clearTimeout(t);
+  }, [inCore]);
   const coreAdded = !coreWho || friends.some((f) => f.id === coreWho.id);
   // your own core: the songs you saved, fresh each time it opens
   const [saved, setSaved] = useState<SavedSong[] | null>(null);
@@ -964,6 +974,8 @@ function Globe({
   const ink = inkLight ? "#EEF3F8" : "#0D2A3F";
   const muted = inkLight ? "#C2D0DE" : "#3E5566";
   const tabTop = Math.max(100, L.cy - 240);
+  // inside a core its sheet rests low, the stats peeking up, so the core has the screen
+  const coreSheetTop = Math.round(Math.max(L.cy + Math.max(56, L.R * 0.5), L.h - 250));
   const panelW = Math.min(296, L.w - 58);
   // The star field turns with the globe, so it covers the screen's diagonal.
   const starBox = Math.ceil(Math.hypot(L.w, L.h) / 100) * 100 + 100;
@@ -1316,14 +1328,22 @@ function Globe({
 
       {compose && <Compose api={api} userId={me.id} onClose={() => setCompose(false)} onPosted={onPosted} />}
 
+      {inside && (
+        <CoreInside
+          posts={inside.posts}
+          timeZone={inside.profile.timezone}
+          cy={Math.round((110 + coreSheetTop) / 2)}
+          leaving={!coreData}
+        />
+      )}
       {coreOpen && coreData && (
         <CoreView
           profile={coreData.profile}
           posts={coreData.posts}
           saved={saved}
           mine={coreData.profile.id === me.id}
-          dark={darkOn}
-          sheetTop={Math.round(L.cy + Math.max(56, L.R * 0.5))}
+          dark
+          sheetTop={coreSheetTop}
           onClose={closeCore}
           onOpenToday={!coreWho ? () => fly(ME) : coreFor?.k != null ? () => fly(coreFor.k!) : undefined}
           onAdd={coreAdded ? undefined : addFromCore}
