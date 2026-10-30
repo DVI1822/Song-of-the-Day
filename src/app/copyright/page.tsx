@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/Legal";
 import { TakedownForm } from "./TakedownForm";
 
-export const metadata: Metadata = { title: "Copyright · Song of the Day" };
+export const metadata: Metadata = { title: "Copyright · Fingerpick" };
 
 export default function CopyrightPage() {
   return (
     <LegalPage title="Copyright takedowns" updated="October 25, 2026">
       <p>
-        Song of the Day doesn&apos;t host music. Songs play through the services they come from, like Spotify. What
+        Fingerpick doesn&apos;t host music. Songs play through the services they come from, like Spotify. What
         people do post here is a link, the song&apos;s details and cover, and their own caption and photo.
       </p>
       <p>

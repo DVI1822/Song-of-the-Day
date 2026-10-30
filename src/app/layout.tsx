@@ -20,8 +20,9 @@ const fredoka = Fredoka({
 });
 
 export const metadata: Metadata = {
-  title: "Song of the Day",
+  title: "Fingerpick",
   description: "One song a day. The one that hit hardest.",
+  appleWebApp: { title: "Fingerpick" }, // the name under the home screen icon
 };
 
 export const viewport: Viewport = {

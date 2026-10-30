@@ -2,7 +2,7 @@
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
-// How to put Song of the Day on your home screen, as a short slideshow: each
+// How to put Fingerpick on your home screen, as a short slideshow: each
 // tap drawn on a little phone screen, with the spot to tap pulsing. It shows
 // once on each phone that's still using it in a browser, and the ? card
 // brings it back any time. Android's Chrome lets a site bring up its own
@@ -88,7 +88,7 @@ function slidesFor(os: Os, way: Way): Slide[] {
   const open: Slide = {
     title: "Tap the new icon",
     text:
-      "Song of the Day is on your home screen now. It opens full screen like any app, and your friends' songs " +
+      "Fingerpick is on your home screen now. It opens full screen like any app, and your friends' songs " +
       "reach you as notifications.",
     art: <HomeArt os={os} />,
   };
@@ -227,7 +227,7 @@ export function AppTour({ onClose: done }: { onClose(): void }) {
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default bg-[#0D2A3F]/30" />
       <div
         role="dialog"
-        aria-label="Get the app: add Song of the Day to your home screen"
+        aria-label="Get the app: add Fingerpick to your home screen"
         className="rise-in relative flex w-full max-w-[380px] flex-col items-center gap-3 rounded-[28px] border border-white/60 bg-white/[0.94] px-6 pb-5 pt-5 text-center text-card-ink backdrop-blur-2xl"
         style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.55)" }}
         onTouchStart={(e) => void (x0.current = e.touches[0].clientX)}
@@ -392,7 +392,7 @@ function DialogArt({ os }: { os: Os }) {
           <div className="mt-3 flex items-center gap-1.5 rounded-[8px] bg-white p-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon-192.png" alt="" className="h-6 w-6 rounded-[6px]" />
-            <span className="font-semibold">Song of the Day</span>
+            <span className="font-semibold">Fingerpick</span>
           </div>
           <div className="mt-1.5 flex items-center justify-between rounded-[8px] bg-white p-1.5">
             Open as Web App
@@ -407,7 +407,7 @@ function DialogArt({ os }: { os: Os }) {
           <div className="mt-1.5 flex items-center gap-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon-192.png" alt="" className="h-6 w-6 rounded-[6px]" />
-            Song of the Day
+            Fingerpick
           </div>
           <div className="relative mt-2 flex justify-end gap-2 font-semibold text-[#1a73e8]">
             <span>Cancel</span>

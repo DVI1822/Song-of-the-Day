@@ -17,7 +17,7 @@ export default async function WelcomePage() {
           <div>
             <h1 className="display text-3xl">Invite only, for now</h1>
             <p className="mt-2 text-muted">
-              Song of the Day is open to a few friends while it&apos;s being tested. Ask whoever sent you the link to
+              Fingerpick is open to a few friends while it&apos;s being tested. Ask whoever sent you the link to
               add your email, then sign in again.
             </p>
           </div>

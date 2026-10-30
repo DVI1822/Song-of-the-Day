@@ -71,11 +71,11 @@ export function NotifyCard({ api }: { api: GlobeApi }) {
           <p className="rounded-[20px] bg-card-ink/[0.05] px-4 py-3.5 text-left text-[15px] leading-snug">
             {iphone ? (
               <>
-                Open <b>Settings</b>, tap <b>Notifications</b>, then <b>Song of the Day</b>, and turn on <b>Allow Notifications</b>.
+                Open <b>Settings</b>, tap <b>Notifications</b>, then <b>Fingerpick</b>, and turn on <b>Allow Notifications</b>.
               </>
             ) : phone ? (
               <>
-                Open your phone&apos;s <b>Settings</b>, find <b>Song of the Day</b> under <b>Notifications</b> (or your browser&apos;s
+                Open your phone&apos;s <b>Settings</b>, find <b>Fingerpick</b> under <b>Notifications</b> (or your browser&apos;s
                 site settings), and allow them.
               </>
             ) : (
