@@ -202,7 +202,7 @@ export async function shrinkPhoto(file: File): Promise<Blob> {
 }
 
 // Which kind of device this is, so a song plays on its own Spotify app.
-function deviceHere(): Here {
+export function deviceHere(): Here {
   const ua = navigator.userAgent;
   if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) || (/Android/.test(ua) && !/Mobile/.test(ua)))
     return "tablet";

@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, Post, Profile, SavedSong } from "@/lib/types";
-import { serverApi, type GlobeApi } from "./api";
+import { deviceHere, serverApi, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
 import { skyAt, weatherSky, type SkyLook } from "./sky";
@@ -60,9 +60,11 @@ export function GlobeApp(props: Props) {
   const spotify = (props.api ?? serverApi).spotify;
   const linked = Boolean(props.spotifyLinked);
   const connect = useMemo(() => (spotify ? { ...spotify, linked } : null), [spotify, linked]);
-  // the player lives in the root layout and stays with you after you leave
+  // the player lives in the root layout and stays with you after you leave.
+  // Whole songs through Spotify are for computers; a phone or tablet plays
+  // Spotify's preview right in the app, never on another device.
   const { setConnect } = usePreview();
-  useEffect(() => setConnect(connect), [connect, setConnect]);
+  useEffect(() => setConnect(deviceHere() === "computer" ? connect : null), [connect, setConnect]);
   return <Globe {...props} />;
 }
 
