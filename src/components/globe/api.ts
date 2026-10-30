@@ -39,6 +39,7 @@ import type { Core, Friend, Message, Note, Post, Profile, Reactions, SavedSong }
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
   previewSong(url: string): Promise<{ song?: ResolvedSong; error?: string }>;
+  setAvatar?(userId: string, photo: Blob): Promise<{ url?: string; error?: string }>;
   uploadPhoto(userId: string, photo: Blob): Promise<{ url?: string; error?: string }>;
   createPost(input: NewPost): Promise<{ post?: Post; error?: string }>;
   deleteTodayPost(postId: string): Promise<{ error?: string } | undefined>;
@@ -176,6 +177,26 @@ export const serverApi: GlobeApi = {
     pause: spotifyPause,
     resume: () => spotifyResume(deviceHere()),
     now: spotifyNow,
+  },
+  // Your picture lives in its own folder beside your one-day photos, so the
+  // daily sweep (data.ts) leaves it be; the one before it is removed.
+  async setAvatar(userId, photo) {
+    const supabase = createClient();
+    const path = `${userId}/avatar/${crypto.randomUUID()}.jpg`;
+    const { error } = await supabase.storage
+      .from("photos")
+      .upload(path, photo, { contentType: "image/jpeg", cacheControl: "31536000" });
+    if (error) return { error: "Couldn't upload your picture. Try again." };
+    const url = supabase.storage.from("photos").getPublicUrl(path).data.publicUrl;
+    const { error: saveError } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", userId);
+    if (saveError) {
+      await supabase.storage.from("photos").remove([path]);
+      return { error: "Couldn't save your picture. Try again." };
+    }
+    const { data: old } = await supabase.storage.from("photos").list(`${userId}/avatar`, { limit: 100 });
+    const stale = (old ?? []).map((f) => `${userId}/avatar/${f.name}`).filter((f) => f !== path);
+    if (stale.length) await supabase.storage.from("photos").remove(stale);
+    return { url };
   },
   async uploadPhoto(userId, photo) {
     const supabase = createClient();
