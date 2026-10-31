@@ -13,8 +13,8 @@
 
 export type HalloweenName = "pumpkin" | "haunted" | "blood";
 
-// The one that goes live on the day. null: none yet.
-export const HALLOWEEN_PICK: HalloweenName | null = null;
+// The one that goes live on the day (Derek picked Pumpkin Patch). null: none.
+export const HALLOWEEN_PICK: HalloweenName | null = "pumpkin";
 
 export type HalloweenLook = {
   name: HalloweenName;
