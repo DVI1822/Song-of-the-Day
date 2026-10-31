@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fredoka, Outfit } from "next/font/google";
+import { Creepster, Fredoka, Nosifer, Outfit, UnifrakturMaguntia } from "next/font/google";
 import { PreviewProvider } from "@/components/globe/Preview";
 import { HandoffWaiter } from "@/components/HandoffWaiter";
 import { SessionFromLink } from "@/components/SessionFromLink";
@@ -18,6 +18,12 @@ const fredoka = Fredoka({
   subsets: ["latin"],
   weight: ["600"],
 });
+
+// Halloween's title lettering (components/globe/halloween.ts); fetched only
+// when a look uses it.
+const creepster = Creepster({ variable: "--font-creepster", subsets: ["latin"], weight: "400", preload: false });
+const gothic = UnifrakturMaguntia({ variable: "--font-gothic", subsets: ["latin"], weight: "400", preload: false });
+const nosifer = Nosifer({ variable: "--font-nosifer", subsets: ["latin"], weight: "400", preload: false });
 
 export const metadata: Metadata = {
   title: "Song of the Day",
@@ -43,7 +49,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${outfit.variable} ${fredoka.variable} h-full antialiased`}>
+    <html lang="en" className={`${outfit.variable} ${fredoka.variable} ${creepster.variable} ${gothic.variable} ${nosifer.variable} h-full antialiased`}>
       <body className="min-h-full">
         {/* what's playing carries on from page to page */}
         <PreviewProvider>

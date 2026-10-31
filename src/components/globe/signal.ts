@@ -12,10 +12,14 @@
 
 import type { Weather } from "@/lib/weather";
 import { pulseAt } from "./beat";
+import { halloween } from "./halloween";
 import type { Live, Motion } from "./GlobeApp";
 import { PERSPECTIVE, TILT, camV, latLon, type Camera, type TileSim, type V3 } from "./math";
 
-const NEON: V3[] = ["#5ef2ff", "#9b8cff", "#ff5fd2", "#b4ff5e"].map(hex);
+const NEON_HEX = ["#5ef2ff", "#9b8cff", "#ff5fd2", "#b4ff5e"];
+// on Halloween the core takes that look's colours (halloween.ts)
+let neon: V3[] | null = null;
+const NEON = () => (neon ??= (halloween()?.core ?? NEON_HEX).map(hex));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const TAU = Math.PI * 2;
 
@@ -56,10 +60,11 @@ function envOf(s: Motion, w: Weather | null): Env {
 // one colour of the core's light, warmed by a low sun, cooled by rain,
 // whitened by snow and fog
 function tone(i: number, e: Env): V3 {
-  const n = NEON.length,
+  const NE = NEON();
+  const n = NE.length,
     x = ((i % n) + n) % n,
     j = Math.floor(x);
-  let c = mix3(NEON[j], NEON[(j + 1) % n], x - j);
+  let c = mix3(NE[j], NE[(j + 1) % n], x - j);
   c = mix3(c, e.warmC.map((v) => v * 255) as V3, 0.35 * e.warm);
   c = mix3(c, [150, 190, 255], 0.18 * e.wet);
   c = mix3(c, [245, 250, 255], 0.3 * e.snow + 0.15 * e.fog);

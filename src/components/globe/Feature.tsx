@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
 import { SignalCore } from "./SignalCore";
+import { halloween } from "./halloween";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
@@ -58,6 +59,7 @@ export function Feature({
   cardRef: Ref<HTMLDivElement>;
 }) {
   const time = formatTime(post.created_at, timeZone);
+  const hw = halloween(); // only ever shown after a tap, so always in the browser
   // big enough to see the whole cover: only a slight rounding, so no corner
   // of the artwork is cut off
   const radius = Math.round(0.03 * cover);
@@ -158,7 +160,10 @@ export function Feature({
         <div
           aria-hidden
           className={`absolute -inset-x-3.5 -bottom-4 -top-2 rounded-[30px] border border-white/50 backdrop-blur-2xl ${dark ? "bg-white/85" : "bg-white/60"}`}
-          style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.45)" }}
+          style={{
+            // on Halloween the card glows in the look's colour (halloween.ts)
+            boxShadow: `0 30px 80px -30px rgba(13,42,63,0.45)${hw ? `, 0 0 0 1.5px rgba(${hw.accentRgb},0.55), 0 0 60px -8px rgba(${hw.accentRgb},0.7)` : ""}`,
+          }}
         />
         <div className="relative flex h-7 items-center justify-between">
           <div className="min-w-0 truncate text-xs text-muted">

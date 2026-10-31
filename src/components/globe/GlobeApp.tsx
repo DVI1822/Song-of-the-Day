@@ -21,6 +21,8 @@ import { Feature } from "./Feature";
 import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
 import { SignalCore } from "./SignalCore";
+import { HalloweenScene } from "./HalloweenScene";
+import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
@@ -44,6 +46,10 @@ import {
   type Sun,
   type V3,
 } from "./math";
+
+// Halloween's look never changes while the page is open
+const noSub = () => () => {};
+const noLook = () => null;
 
 type Props = {
   me: Profile;
@@ -168,6 +174,7 @@ function newMotion(posted: boolean) {
     profP: 0,
     dk: 0,
     darkOn: false,
+    haunt: false, // a Halloween look is on
     launch: null as null | number,
     myLanded: posted,
     myLock: null as null | number,
@@ -279,6 +286,8 @@ function Globe({
   const [friendCore, setFriendCore] = useState<{ id: string; profile: Profile; posts: Post[] } | null>(null);
   const [darkOn, setDarkOn] = useState(false);
   const [skyLight, setSkyLight] = useState(false);
+  // Halloween's look, on the day (halloween.ts); read once we're in the browser
+  const hw = useSyncExternalStore(noSub, halloween, noLook);
   const [warm, setWarm] = useState(0);
   const [focus, setFocus] = useState<number | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
@@ -629,13 +638,17 @@ function Globe({
       if (!s.sun || now - s.sunAt > 1000) {
         s.sun = sunLight(clockNow(), s.geo);
         s.sky = skyAt((s.sun.el * 180) / Math.PI, s.sun.az);
+        const hwNow = halloween();
+        if (hwNow) s.sky = { bg: hwNow.sky, space: 1, light: true, warm: 0, warmC: [1, 1, 1] };
+        s.haunt = !!hwNow;
         setSkyLight(s.sky.light);
         setWarm(Math.round(s.sky.warm * 20) / 20);
         s.sunAt = now;
       }
       // the sky follows the real time of day (sky.ts): twilight, sunrise,
       // golden hour, bright day, sunset, then space.
-      const dGoal = 1 - s.sun.day;
+      // (on Halloween it's night all day)
+      const dGoal = s.haunt ? 1 : 1 - s.sun.day;
       s.dk = s.t === 0 || Math.abs(dGoal - s.dk) < 0.01 ? dGoal : s.dk + (dGoal - s.dk) * Math.min(1, dt * 5);
       if (s.dk > 0.5 !== s.darkOn) {
         s.darkOn = s.dk > 0.5;
@@ -1035,12 +1048,17 @@ function Globe({
       className="fixed inset-0 select-none overflow-hidden bg-white text-card-ink"
       style={{ opacity: size ? 1 : 0, transition: "opacity .4s" }}
     >
+      {/* on Halloween the buttons and badges take the look's colour */}
+      {hw && <style>{`.bg-accent{background-color:${hw.accent}!important}.text-accent{color:${hw.accent}!important}`}</style>}
 
       <div
         ref={(el) => void (R.current.chrome[0] = el)}
         className="pointer-events-none absolute inset-x-0 top-[max(26px,env(safe-area-inset-top))] z-[5] flex flex-col items-center gap-[3px]"
       >
-        <h1 className="display text-[26px] leading-[1.1] transition-colors duration-500" style={{ color: ink }}>
+        <h1
+          className="display text-[26px] leading-[1.1] transition-colors duration-500"
+          style={hw ? { color: hw.title, fontFamily: hw.titleFont, textShadow: hw.titleGlow, fontWeight: 400, letterSpacing: "0.02em", fontSize: hw.titleSize } : { color: ink }}
+        >
           Song of the Day
         </h1>
         <Clock color={muted} />
@@ -1069,10 +1087,10 @@ function Globe({
         <div
           ref={(el) => void (R.current.space = el)}
           className="pointer-events-none absolute inset-0"
-          style={{ opacity: 0, background: "radial-gradient(ellipse 120% 90% at 50% 46%, #121A3A 0%, #070B1E 45%, #020309 100%)" }}
+          style={{ opacity: 0, background: hw ? "transparent" : "radial-gradient(ellipse 120% 90% at 50% 46%, #121A3A 0%, #070B1E 45%, #020309 100%)" }}
         >
           <div
-            className="absolute inset-0"
+            className={`absolute inset-0 ${hw ? "hidden" : ""}`}
             style={{
               background:
                 "radial-gradient(ellipse 60% 40% at 18% 22%, rgba(120,90,200,0.16), rgba(120,90,200,0) 70%), radial-gradient(ellipse 55% 35% at 85% 78%, rgba(60,160,190,0.13), rgba(60,160,190,0) 70%)",
@@ -1093,7 +1111,8 @@ function Globe({
         </div>
         <WeatherSky weather={weather} dark={darkOn} warm={warm} />
         {/* the little sky moments only on clear-ish days */}
-        {size && (!weather || weather.kind === "clear" || weather.kind === "partly") && <Ambient dark={darkOn} w={L.w} h={L.h} />}
+        {size && !hw && (!weather || weather.kind === "clear" || weather.kind === "partly") && <Ambient dark={darkOn} w={L.w} h={L.h} />}
+        {size && hw && <HalloweenScene name={hw.name} layer="back" w={L.w} h={L.h} cx={L.cx} cy={L.cy} R={L.R} />}
         {/* clouds, then the weather and seasons further away than the globe's middle */}
         <canvas ref={(el) => void (R.current.wxSky = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -1135,6 +1154,7 @@ function Globe({
         </div>
         {/* the weather and seasons nearer than the globe's middle */}
         <canvas ref={(el) => void (R.current.wxFront = el)} className="pointer-events-none absolute inset-0 z-[2] h-full w-full" />
+        {size && hw && <HalloweenScene name={hw.name} layer="front" w={L.w} h={L.h} cx={L.cx} cy={L.cy} R={L.R} />}
         </div>
       </div>
 
@@ -1156,7 +1176,9 @@ function Globe({
             onClick={openCompose}
             aria-label="Add today's song"
             className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white"
-            style={{ boxShadow: "0 0 0 6px rgba(215,38,43,0.12), 0 12px 28px -8px rgba(215,38,43,0.55)" }}
+            style={{
+              boxShadow: `0 0 0 6px rgba(${hw?.accentRgb ?? "215,38,43"},0.12), 0 12px 28px -8px rgba(${hw?.accentRgb ?? "215,38,43"},0.55)`,
+            }}
           >
             <svg aria-hidden width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
