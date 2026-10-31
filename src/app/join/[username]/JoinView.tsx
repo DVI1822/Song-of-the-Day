@@ -41,7 +41,7 @@ export function JoinView({
     >
       <div className="aura fixed left-1/2 top-[34%] h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2" />
       <main className="relative mx-auto flex min-h-dvh max-w-md flex-col items-center px-5 pb-10 pt-8 text-center">
-        <div className="display text-[15px] tracking-tight">Fingerpick</div>
+        <div className="display text-[15px] tracking-tight">Song of the Day</div>
 
         <div className="relative mt-4 flex h-[340px] w-full items-center justify-center" style={{ perspective: 900 }}>
           <div className="preserve-3d relative" style={{ transform: `rotateX(${-TILT}deg) rotateZ(-23.4deg)` }}>

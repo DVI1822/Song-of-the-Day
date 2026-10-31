@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/Legal";
 
-export const metadata: Metadata = { title: "Privacy · Fingerpick" };
+export const metadata: Metadata = { title: "Privacy · Song of the Day" };
 
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy policy" updated="October 25, 2026">
       <p>
-        Fingerpick is a small site for sharing one song a day with friends. This page says what it keeps about you,
+        Song of the Day is a small site for sharing one song a day with friends. This page says what it keeps about you,
         why, and how to get rid of it.
       </p>
 

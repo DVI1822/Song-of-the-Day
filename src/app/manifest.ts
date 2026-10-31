@@ -4,8 +4,8 @@ import type { MetadataRoute } from "next";
 // iPhones need before they'll show its nudges.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Fingerpick",
-    short_name: "Fingerpick",
+    name: "Song of the Day",
+    short_name: "Song of the Day",
     description: "One song a day. The one that hit hardest.",
     start_url: "/",
     display: "standalone",

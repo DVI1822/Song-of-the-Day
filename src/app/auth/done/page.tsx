@@ -64,7 +64,7 @@ export default function AuthDone() {
           <>
             <h1 className="display text-3xl">You&apos;re signed in</h1>
             <p className="max-w-[300px] text-muted">
-              Go back to Fingerpick where you asked for the link. It signs you in by itself.
+              Go back to Song of the Day where you asked for the link. It signs you in by itself.
             </p>
             <button type="button" onClick={stayHere} className="mt-4 text-sm font-semibold text-muted underline-offset-2 hover:underline">
               Use it in this browser instead

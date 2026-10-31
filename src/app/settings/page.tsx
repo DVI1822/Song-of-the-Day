@@ -42,7 +42,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <form action={unlinkSpotify} className="flex flex-col gap-3">
             <p className="text-sm">
               Connected{link.spotify_name ? ` as ${link.spotify_name}` : ""}. Play starts songs on whichever Spotify app
-              you have open, whole if you have Premium. Disconnecting deletes your Spotify link from Fingerpick.
+              you have open, whole if you have Premium. Disconnecting deletes your Spotify link from Song of the Day.
             </p>
             <button className={ghostButtonClass}>Disconnect Spotify</button>
           </form>

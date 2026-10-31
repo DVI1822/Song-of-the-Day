@@ -12,7 +12,7 @@ import { TodayCard } from "./TodayCard";
 
 export async function generateMetadata({ params }: PageProps<"/u/[username]">) {
   const { username } = await params;
-  return { title: `@${username} · Fingerpick` };
+  return { title: `@${username} · Song of the Day` };
 }
 
 export default async function ProfilePage({ params }: PageProps<"/u/[username]">) {
