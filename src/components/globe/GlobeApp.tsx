@@ -1041,7 +1041,7 @@ function Globe({
         className="pointer-events-none absolute inset-x-0 top-[max(26px,env(safe-area-inset-top))] z-[5] flex flex-col items-center gap-[3px]"
       >
         <h1 className="display text-[26px] leading-[1.1] transition-colors duration-500" style={{ color: ink }}>
-          Fingerpick
+          Song of the Day
         </h1>
         <Clock color={muted} />
       </div>

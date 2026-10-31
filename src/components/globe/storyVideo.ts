@@ -10,7 +10,7 @@ import { sunAt } from "./math";
 // Safari and recent Chrome make MP4s), otherwise kept as a picture. It's
 // silent: Instagram mutes or takes down Stories with recorded music.
 
-export const BRAND = { name: "Fingerpick", domain: "mysong.day" };
+export const BRAND = { name: "Song of the Day", domain: "mysong.day" };
 
 export type StorySky = "sunny" | "rain" | "golden" | "night";
 export const SKIES: { k: StorySky; label: string }[] = [

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/Legal";
 
-export const metadata: Metadata = { title: "Terms · Fingerpick" };
+export const metadata: Metadata = { title: "Terms · Song of the Day" };
 
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of use" updated="October 25, 2026">
-      <p>Fingerpick is a small, free site for friends. By using it you agree to these few things.</p>
+      <p>Song of the Day is a small, free site for friends. By using it you agree to these few things.</p>
       <ul>
         <li>Share songs, captions and photos you&apos;re allowed to share, and be kind. Nothing hateful or illegal.</li>
         <li>Keep your sign-in to yourself. You&apos;re responsible for what&apos;s posted from your account.</li>
@@ -15,7 +15,7 @@ export default function TermsPage() {
           sell any music. Song details and covers belong to their owners.
         </li>
         <li>
-          Spotify is a trademark of Spotify AB. Fingerpick isn&apos;t made or endorsed by Spotify, and Spotify
+          Spotify is a trademark of Spotify AB. Song of the Day isn&apos;t made or endorsed by Spotify, and Spotify
           isn&apos;t responsible for it.
         </li>
         <li>

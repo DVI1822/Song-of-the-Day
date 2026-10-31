@@ -1,4 +1,4 @@
-// Fingerpick's service worker: shows the noon and 9 PM nudges and the
+// Song of the Day's service worker: shows the noon and 9 PM nudges and the
 // likes and notes on your song, friends posting theirs, and opens the globe
 // when one is tapped.
 
@@ -8,7 +8,7 @@ self.addEventListener("push", (event) => {
     data = event.data ? event.data.json() : {};
   } catch {}
   event.waitUntil(
-    self.registration.showNotification(data.title || "Fingerpick", {
+    self.registration.showNotification(data.title || "Song of the Day", {
       body: data.body || "What's your song today?",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
