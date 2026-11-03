@@ -197,23 +197,23 @@ preview.
 ## Part 4d: Send sign-in emails from your own domain (needed for Yahoo and AOL)
 
 Supabase's built-in email sender is only for trying things out. It sends from
-a shared Supabase address with no link to `toptrack.io`, it only sends a couple
+a shared Supabase address with no link to `mytoptrack.io`, it only sends a couple
 of emails an hour for the whole site, and it may only deliver to members of
 your Supabase team. Yahoo and AOL (both run by Yahoo) check that an email
 really comes from the domain it claims (SPF, DKIM and DMARC) and quietly drop
 mail that doesn't. Gmail is more forgiving, which is why it seemed to work.
 
 The fix is to send through Resend (free for 3,000 emails a month) from
-`hello@toptrack.io`.
+`hello@mytoptrack.io`.
 
-**0. Move the site to toptrack.io (once)**
+**0. Move the site to mytoptrack.io (once)**
 
-1. In Vercel, add `toptrack.io` under the project's **Settings → Domains**, and
+1. In Vercel, add `mytoptrack.io` under the project's **Settings → Domains**, and
    set `mysong.day` to redirect to it so old links keep working.
 2. In Supabase **Authentication → URL Configuration**, set **Site URL** to
-   `https://toptrack.io` and add `https://toptrack.io/auth/callback` to
+   `https://mytoptrack.io` and add `https://mytoptrack.io/auth/callback` to
    **Redirect URLs**.
-3. In the Spotify developer dashboard, add `https://toptrack.io/spotify/callback`
+3. In the Spotify developer dashboard, add `https://mytoptrack.io/spotify/callback`
    as a Redirect URI.
 
 Everyone signs in once more on the new address, since sign-ins are per domain.
@@ -221,14 +221,14 @@ Everyone signs in once more on the new address, since sign-ins are per domain.
 **1. Set up Resend (5 minutes)**
 
 1. Sign up at [resend.com](https://resend.com).
-2. Open **Domains → Add Domain**, type `toptrack.io`, and click **Add**.
+2. Open **Domains → Add Domain**, type `mytoptrack.io`, and click **Add**.
 3. Resend shows 3 or 4 DNS records (an MX and a TXT on `send`, and a TXT on
    `resend._domainkey`). Keep that page open.
 
 **2. Add the records to your domain's DNS**
 
-1. Open DNS for `toptrack.io`. Since it was bought through Vercel, that's
-   **vercel.com → Domains → toptrack.io → DNS Records**.
+1. Open DNS for `mytoptrack.io`. Since it was bought through Vercel, that's
+   **vercel.com → Domains → mytoptrack.io → DNS Records**.
 2. Add each record from Resend exactly as shown (type, name, value).
 3. Add one more TXT record so Yahoo and AOL see a DMARC policy:
    - **Name:** `_dmarc`
@@ -242,7 +242,7 @@ Everyone signs in once more on the new address, since sign-ins are per domain.
    copy the key.
 2. In Supabase, open **Authentication → Emails → SMTP Settings** and turn on
    **Enable custom SMTP**:
-   - **Sender email:** `hello@toptrack.io`
+   - **Sender email:** `hello@mytoptrack.io`
    - **Sender name:** `TopTrack`
    - **Host:** `smtp.resend.com`
    - **Port:** `465`

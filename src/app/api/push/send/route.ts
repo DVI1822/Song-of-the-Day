@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const { subs } = (await req.json().catch(() => ({}))) as { subs?: Sub[] };
   if (!Array.isArray(subs)) return new Response("Bad request", { status: 400 });
 
-  webpush.setVapidDetails("https://toptrack.io", pub, priv);
+  webpush.setVapidDetails("https://mytoptrack.io", pub, priv);
   const gone: string[] = [];
   await Promise.all(
     subs.map((s) =>

@@ -426,7 +426,7 @@ function InAppArt() {
       <Page />
       <div className="absolute inset-x-0 top-0 flex h-7 items-center justify-between bg-white/95 px-2 text-[9px] font-semibold text-card-ink">
         <span>✕</span>
-        <span className="opacity-60">toptrack.io</span>
+        <span className="opacity-60">mytoptrack.io</span>
         <span className="relative">
           •••
           <Tap className="-right-[9px] -top-[8px]" />
