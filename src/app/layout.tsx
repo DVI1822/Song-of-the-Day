@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bungee, Creepster, Fredoka, Nosifer, Outfit, UnifrakturMaguntia } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { PreviewProvider } from "@/components/globe/Preview";
 import { HandoffWaiter } from "@/components/HandoffWaiter";
 import { SessionFromLink } from "@/components/SessionFromLink";
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SessionFromLink />
           <HandoffWaiter />
         </PreviewProvider>
+        <Analytics />
       </body>
     </html>
   );
