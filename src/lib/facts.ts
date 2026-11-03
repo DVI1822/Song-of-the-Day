@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseUrl } from "./supabase/env";
-import type { SongFact, SongFacts } from "./types";
+import type { ArtistPhoto, SongFact, SongFacts } from "./types";
 
 // A few short facts about the song you posted (how it was made, the story
 // behind it, the artist), shown under the Globe once you've posted.
@@ -59,13 +59,14 @@ export function songKey(title: string, artist: string) {
 
 // --- Wikipedia ---------------------------------------------------------------
 
-type Page = { title: string; text: string; url: string };
+// qid: its Wikidata item; image: the photo at the top of the article
+type Page = { title: string; text: string; url: string; qid?: string; image?: string };
 
-async function wiki(params: Record<string, string>) {
-  const url = new URL("https://en.wikipedia.org/w/api.php");
+async function wiki(params: Record<string, string>, host = "en.wikipedia.org") {
+  const url = new URL(`https://${host}/w/api.php`);
   for (const [k, v] of Object.entries({ ...params, format: "json", formatversion: "2" })) url.searchParams.set(k, v);
   const res = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`Wikipedia ${res.status}`);
+  if (!res.ok) throw new Error(`${host} ${res.status}`);
   return res.json();
 }
 
@@ -75,10 +76,16 @@ async function search(q: string): Promise<string[]> {
 }
 
 async function page(title: string): Promise<Page | null> {
-  const j = await wiki({ action: "query", prop: "extracts|info", inprop: "url", explaintext: "1", redirects: "1", titles: title });
+  const j = await wiki({ action: "query", prop: "extracts|info|pageprops|pageimages", inprop: "url", ppprop: "wikibase_item", piprop: "name", explaintext: "1", redirects: "1", titles: title });
   const p = j?.query?.pages?.[0];
   if (!p || p.missing || !p.extract) return null;
-  return { title: p.title, text: p.extract, url: p.fullurl ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, "_"))}` };
+  return {
+    title: p.title,
+    text: p.extract,
+    url: p.fullurl ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, "_"))}`,
+    qid: p.pageprops?.wikibase_item,
+    image: p.pageimage,
+  };
 }
 
 // Keep the story (lead, background, recording, composition, release...) and
@@ -140,85 +147,223 @@ async function findArtist(artist: string): Promise<Page | null> {
   return null;
 }
 
+// --- a photo of the artist -------------------------------------------------------
+
+// Not the photo everyone has seen: one from the artist's Wikimedia Commons
+// category (live shots, old press photos...), never the one at the top of
+// their Wikipedia article, picked by the song so different songs by the same
+// artist get different photos. Commons photos are free to show with a credit.
+
+const NOT_A_PHOTO = /logo|signature|autograph|album|cover|poster|ticket|flyer|map|chart|award|plaque|grave|tomb|stamp|coin|banner|sign\b|setlist|wristband|merch|\.svg|\.png/i;
+const strip = (html: string) => html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+
+function hash(s: string) {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
+type CommonsFile = {
+  title: string;
+  imageinfo?: { thumburl?: string; thumbwidth?: number; thumbheight?: number; width: number; height: number; mime: string; descriptionurl: string; extmetadata?: Record<string, { value?: string }> }[];
+};
+
+async function commonsCategory(qid: string): Promise<string | null> {
+  const j = await wiki({ action: "wbgetclaims", entity: qid, property: "P373" }, "www.wikidata.org");
+  return j?.claims?.P373?.[0]?.mainsnak?.datavalue?.value ?? null;
+}
+
+async function filesIn(cat: string): Promise<CommonsFile[]> {
+  const j = await wiki(
+    {
+      action: "query",
+      generator: "categorymembers",
+      gcmtitle: `Category:${cat}`,
+      gcmtype: "file",
+      gcmlimit: "50",
+      prop: "imageinfo",
+      iiprop: "url|size|mime|extmetadata",
+      iiurlwidth: "960",
+      iiextmetadatafilter: "Artist|LicenseShortName|Restrictions",
+    },
+    "commons.wikimedia.org",
+  );
+  return j?.query?.pages ?? [];
+}
+
+export async function findPhoto(art: Page | null, key: string): Promise<ArtistPhoto | null> {
+  if (!art?.qid) return null;
+  const cat = await commonsCategory(art.qid);
+  if (!cat) return null;
+  // the category itself, plus a few of its own (like "<artist> in concert")
+  const files = await filesIn(cat);
+  if (files.length < 12) {
+    const sub = await wiki({ action: "query", list: "categorymembers", cmtitle: `Category:${cat}`, cmtype: "subcat", cmlimit: "40" }, "commons.wikimedia.org");
+    const name = bare(mainArtist(art.title.replace(/\s*\([^)]*\)\s*$/, "")));
+    const subs = ((sub?.query?.categorymembers ?? []) as { title: string }[])
+      .map((c) => c.title.replace(/^Category:/, ""))
+      .filter((t) => bare(t).includes(name) && !NOT_A_PHOTO.test(t))
+      .sort((x, y) => hash(key + x) - hash(key + y))
+      .slice(0, 3);
+    for (const more of await Promise.all(subs.map((t) => filesIn(t).catch(() => [])))) files.push(...more);
+  }
+  const main = art.image ? bare(art.image) : null;
+  const ok = files.filter((f) => {
+    const i = f.imageinfo?.[0];
+    if (!i?.thumburl || i.mime !== "image/jpeg") return false;
+    if (i.width < 500 || i.height < 400 || i.width / i.height > 1.9 || i.height / i.width > 1.6) return false;
+    if (NOT_A_PHOTO.test(f.title)) return false;
+    if (main && bare(f.title.replace(/^File:/, "")) === main) return false;
+    const m = i.extmetadata ?? {};
+    if (!m.LicenseShortName?.value || (m.Restrictions?.value ?? "").includes("trademarked")) return false;
+    return true;
+  });
+  const seen = new Set<string>();
+  const uniq = ok.filter((f) => !seen.has(f.title) && seen.add(f.title)).sort((a, b) => a.title.localeCompare(b.title));
+  if (!uniq.length) return null;
+  const f = uniq[hash(key) % uniq.length];
+  const i = f.imageinfo![0];
+  const m = i.extmetadata ?? {};
+  return {
+    url: i.thumburl!,
+    width: i.thumbwidth ?? 960,
+    height: i.thumbheight ?? 960,
+    page: i.descriptionurl,
+    credit: strip(m.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons",
+    license: strip(m.LicenseShortName?.value ?? ""),
+  };
+}
+
 // --- picking the facts ---------------------------------------------------------
+
+// Where Claude may look besides the Wikipedia articles: music press and
+// reference sites that report on how songs were made.
+export const SITES: Record<string, string> = {
+  "en.wikipedia.org": "Wikipedia",
+  "rollingstone.com": "Rolling Stone",
+  "pitchfork.com": "Pitchfork",
+  "npr.org": "NPR",
+  "bbc.co.uk": "BBC",
+  "bbc.com": "BBC",
+  "theguardian.com": "The Guardian",
+  "nme.com": "NME",
+  "billboard.com": "Billboard",
+  "genius.com": "Genius",
+  "stereogum.com": "Stereogum",
+  "consequence.net": "Consequence",
+  "uncut.co.uk": "Uncut",
+  "loudersound.com": "Louder",
+  "soundonsound.com": "Sound On Sound",
+  "mixonline.com": "Mix",
+  "musicradar.com": "MusicRadar",
+  "vulture.com": "Vulture",
+  "nytimes.com": "The New York Times",
+  "newyorker.com": "The New Yorker",
+  "spin.com": "Spin",
+  "udiscovermusic.com": "uDiscover Music",
+  "songfacts.com": "Songfacts",
+  "allmusic.com": "AllMusic",
+  "complex.com": "Complex",
+  "xxlmag.com": "XXL",
+};
+
+export function siteName(url: string) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const hit = Object.keys(SITES).find((d) => host === d || host.endsWith(`.${d}`));
+    return hit ? SITES[hit] : host;
+  } catch {
+    return "Source";
+  }
+}
 
 const SYSTEM = `You write the short "behind the song" notes for TopTrack, an app where friends each share the one song that hit hardest today. Right after someone posts their song, a few of your notes appear under it.
 
-You get Wikipedia text about the song and/or its artist. Pick up to 3 facts from that text that a fan would enjoy learning: how and where the song was written or recorded, who played on it, what inspired it, a surprising detail about its story, or something striking about the artist. Prefer facts about this song; use the artist only when the song text is thin or missing. Skip dry facts (chart positions, sales, certifications, release dates, track lengths) unless they're genuinely remarkable, and never say only that "X is a song by Y".
+You may get Wikipedia articles about the song and its artist, and you can search music press sites. Look for up to 3 facts a fan would enjoy learning: how and where the song was written or recorded, who played on it, what inspired it, a surprising detail about its story, or something striking about the artist. Prefer facts about this exact song (check it's the right song by the right artist); use the artist only when there's little about the song. Skip dry facts (chart positions, sales, certifications, release dates, track lengths) unless they're genuinely remarkable, and never say only that "X is a song by Y". Search at most twice, and only if the articles don't already give you good material.
 
 Rules:
-- Use only what the text says. Do not add anything from your own knowledge, even if you're sure it's true.
-- Each fact is one sentence of at most 140 characters, plain and conversational, in present or past tense, no emoji, no exclamation marks.
-- For each fact, give "quote": a passage copied exactly, character for character, from the text, that states the fact. Keep it under 300 characters.
-- "about" is "song" or "artist".
-- Fewer facts is fine. If nothing is worth saying, return an empty list.`;
+- Every fact must come from a source you were given or found, and be cited. Do not add anything from your own knowledge, even if you're sure it's true.
+- Each fact is one sentence of at most 140 characters, plain and conversational, no emoji, no exclamation marks.
+- Write nothing but the facts, each on its own line, in this form:
+FACT (song): <the fact>
+FACT (artist): <the fact>
+- Fewer facts is fine. If nothing is worth saying, write NONE.`;
 
-const SCHEMA = {
-  type: "object",
-  properties: {
-    facts: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          text: { type: "string" },
-          quote: { type: "string" },
-          about: { type: "string", enum: ["song", "artist"] },
-        },
-        required: ["text", "quote", "about"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["facts"],
-  additionalProperties: false,
-};
+type Cite = { url: string; title: string };
 
-type Drafted = { text: string; quote: string; about: "song" | "artist" };
-
-// A fact stays only if its quote really is in the article it names.
-export function verified(drafts: Drafted[], song: Page | null, artist: Page | null): SongFact[] {
-  const seen = new Set<string>();
+// Claude's answer arrives as text pieces, each with the passages it cites.
+// Put the pieces back into lines and keep the FACT lines that cite something.
+export function factsFrom(
+  blocks: { type: string; text?: string; citations?: unknown[] | null }[],
+  docs: Page[],
+): SongFact[] {
+  const lines: { text: string; cites: Cite[] }[] = [{ text: "", cites: [] }];
+  for (const b of blocks) {
+    if (b.type !== "text" || !b.text) continue;
+    const cites: Cite[] = [];
+    for (const c of (b.citations ?? []) as { type: string; url?: string; title?: string; document_index?: number }[]) {
+      if (c.type === "web_search_result_location" && c.url) cites.push({ url: c.url, title: c.title ?? "" });
+      else if (c.type === "char_location" && c.document_index !== undefined && docs[c.document_index])
+        cites.push({ url: docs[c.document_index].url, title: docs[c.document_index].title });
+    }
+    const parts = b.text.split("\n");
+    parts.forEach((part, k) => {
+      if (k > 0) lines.push({ text: "", cites: [] });
+      const line = lines[lines.length - 1];
+      line.text += part;
+      if (part.trim()) line.cites.push(...cites);
+    });
+  }
   const out: SongFact[] = [];
-  for (const d of drafts) {
-    const text = d.text?.trim();
-    const quote = norm(d.quote ?? "");
-    if (!text || text.length > 180 || quote.length < 12) continue;
-    const src = [song, artist].filter(Boolean).map((p) => norm(p!.text));
-    if (!src.some((s) => s.includes(quote))) continue;
-    if (seen.has(bare(text))) continue;
+  const seen = new Set<string>();
+  for (const l of lines) {
+    const m = l.text.trim().match(/^FACT \((song|artist)\):\s*(.+)$/i);
+    if (!m || !l.cites.length) continue;
+    const text = m[2].trim();
+    if (text.length < 12 || text.length > 180 || seen.has(bare(text))) continue;
     seen.add(bare(text));
-    out.push({ text, about: d.about === "artist" ? "artist" : "song" });
+    const c = l.cites[0];
+    out.push({ text, about: m[1].toLowerCase() === "artist" ? "artist" : "song", source: { name: siteName(c.url), url: c.url } });
   }
   return out.slice(0, 3);
 }
 
 async function withClaude(title: string, artist: string, song: Page | null, art: Page | null): Promise<SongFact[]> {
-  const docs = [
-    song && `<article about="song" title="${song.title}">\n${story(song.text, 12_000)}\n</article>`,
-    art && `<article about="artist" title="${art.title}">\n${story(art.text, song ? 5_000 : 9_000)}\n</article>`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  // the articles go in as documents, so Claude can cite exact passages
+  const docs = [song && { ...song, text: story(song.text, 12_000) }, art && { ...art, text: story(art.text, song ? 5_000 : 9_000) }].filter(
+    (d): d is Page => Boolean(d),
+  );
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [
+    ...docs.map((d) => ({
+      type: "document" as const,
+      source: { type: "text" as const, media_type: "text/plain" as const, data: d.text },
+      title: `Wikipedia: ${d.title}`,
+      citations: { enabled: true },
+    })),
+    { type: "text", text: `The song someone just posted: "${title}" by ${artist}.` },
+  ];
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
   const client = new Anthropic();
-  const res = await client.beta.messages.create({
-    model: MODEL,
-    max_tokens: 4000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: "user", content: `${docs}\n\nThe song someone just posted: "${title}" by ${artist}.` }],
-  });
-  if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") return [];
-  const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-  let drafts: Drafted[] = [];
-  try {
-    drafts = JSON.parse(text).facts ?? [];
-  } catch {
-    return [];
+  for (let turn = 0; turn < 3; turn++) {
+    const res = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 8000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "low" },
+      system: SYSTEM,
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2, allowed_domains: Object.keys(SITES) }],
+      messages,
+    });
+    // a long search can pause the turn; hand it back to carry on
+    if (res.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: res.content });
+      continue;
+    }
+    if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") return [];
+    return factsFrom(res.content, docs);
   }
-  return verified(drafts, song, art);
+  return [];
 }
 
 // No key: the first couple of sentences of the song's article (or the
@@ -232,7 +377,7 @@ export function plain(song: Page | null, art: Page | null): SongFact[] {
     .map((s) => s.replace(/\s*\([^)]*\)/g, "").replace(/\s+/g, " ").trim())
     .filter((s) => s.length > 20 && s.length <= 180 && !/\bis an? (?:[\w-]+ )*(?:song|single)\b/i.test(s))
     .slice(0, 3)
-    .map((text) => ({ text, about: song ? "song" : "artist" }));
+    .map((text) => ({ text, about: song ? "song" : "artist", source: { name: "Wikipedia", url: p.url } }));
 }
 
 async function make(title: string, artist: string): Promise<SongFacts> {
@@ -241,16 +386,14 @@ async function make(title: string, artist: string): Promise<SongFacts> {
   const art = a.status === "fulfilled" ? a.value : null;
   // Wikipedia being down isn't the same as having nothing: don't keep that
   if (!song && !art && (s.status === "rejected" || a.status === "rejected")) throw new Error("Wikipedia didn't answer");
-  if (!song && !art) return { facts: [], sources: [] };
-  const facts = process.env.ANTHROPIC_API_KEY ? await withClaude(title, artist, song, art) : plain(song, art);
-  const used = new Set(facts.map((f) => f.about));
-  const sources = (
-    [
-      ["song", song],
-      ["artist", art],
-    ] as const
-  ).flatMap(([about, p]) => (p && used.has(about) ? [{ title: p.title, url: p.url, about }] : []));
-  return { facts, sources };
+  const key = process.env.ANTHROPIC_API_KEY;
+  // Claude can still search the music press when Wikipedia has nothing
+  if (!song && !art && !key) return { facts: [] };
+  const [facts, photo] = await Promise.all([
+    key ? withClaude(title, artist, song, art) : plain(song, art),
+    findPhoto(art, songKey(title, artist)).catch(() => null),
+  ]);
+  return { facts, photo };
 }
 
 // --- the cache -----------------------------------------------------------------
@@ -265,12 +408,12 @@ const pending = new Map<string, Promise<SongFacts>>();
 
 export async function factsFor(title: string, artist: string): Promise<SongFacts> {
   const key = songKey(title, artist);
-  if (!key || key === "|") return { facts: [], sources: [] };
+  if (!key || key === "|") return { facts: [] };
   const db = admin();
   if (db) {
-    const { data } = await db.from("song_facts").select("facts, sources, created_at").eq("song_key", key).maybeSingle();
+    const { data } = await db.from("song_facts").select("facts, photo, created_at").eq("song_key", key).maybeSingle();
     if (data && (data.facts?.length || Date.now() - Date.parse(data.created_at) < RETRY_EMPTY_MS))
-      return { facts: data.facts ?? [], sources: data.sources ?? [] };
+      return { facts: data.facts ?? [], photo: data.photo ?? null };
   }
   let job = pending.get(key);
   if (!job) {
@@ -281,7 +424,7 @@ export async function factsFor(title: string, artist: string): Promise<SongFacts
   if (db) {
     await db
       .from("song_facts")
-      .upsert({ song_key: key, title: cleanTitle(title), artist: mainArtist(artist), facts: out.facts, sources: out.sources, made_by: process.env.ANTHROPIC_API_KEY ? MODEL : "wikipedia", created_at: new Date().toISOString() });
+      .upsert({ song_key: key, title: cleanTitle(title), artist: mainArtist(artist), facts: out.facts, photo: out.photo ?? null, made_by: process.env.ANTHROPIC_API_KEY ? MODEL : "wikipedia", created_at: new Date().toISOString() });
   }
   return out;
 }

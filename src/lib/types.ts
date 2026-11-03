@@ -70,7 +70,9 @@ export type Message = {
   read_at: string | null;
 };
 
-// A few facts about a song, from Wikipedia (see lib/facts.ts), with the
-// articles they came from.
-export type SongFact = { text: string; about: "song" | "artist" };
-export type SongFacts = { facts: SongFact[]; sources: { title: string; url: string; about: "song" | "artist" }[] };
+// A few facts about a song, from Wikipedia and music sites (see lib/facts.ts).
+// source: the page the fact was taken from (Wikipedia or a music site)
+export type SongFact = { text: string; about: "song" | "artist"; source?: { name: string; url: string } };
+// photo: a less-seen photo of the artist from Wikimedia Commons, with who took it
+export type ArtistPhoto = { url: string; width: number; height: number; page: string; credit: string; license: string };
+export type SongFacts = { facts: SongFact[]; photo?: ArtistPhoto | null };

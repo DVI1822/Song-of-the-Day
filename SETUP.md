@@ -197,11 +197,13 @@ preview.
 ## Part 4d: Facts about your song (optional)
 
 After you post, a few short facts about your song (how it was made, the
-story behind it, the artist) turn over under the Globe. They come from the
-song's Wikipedia article: Claude reads the article and picks the best few,
-and any fact it can't back with a word-for-word quote from the article is
-thrown out. Each song is looked up once and kept, so it costs about 2 to 3
-cents per new song.
+story behind it, the artist) turn over under the Globe, beside a less-seen
+photo of the artist. Claude reads the song's and artist's Wikipedia articles
+and may search a short list of music sites (Rolling Stone, Pitchfork, NPR,
+Genius...). Every fact has to cite the passage it came from, and any fact
+without one is thrown out. The photo comes from Wikimedia Commons, with the
+photographer credited. Each song is looked up once and kept, so it costs
+roughly 5 to 8 cents per new song.
 
 1. In Supabase's **SQL Editor**, run
    `supabase/migrations/20261108000000_song_facts.sql`.

@@ -180,14 +180,24 @@ const demoApi: GlobeApi = {
     await new Promise((r) => setTimeout(r, 900));
     return {
       facts: [
-        { text: "Lune Harbor recorded Paper Moons in one night in a boathouse, with the tide coming in under the floor.", about: "song" as const },
-        { text: "The ticking in the chorus is a kitchen timer the drummer forgot to switch off, and they kept it.", about: "song" as const },
-        { text: "Lune Harbor started as two cousins trading voice memos across three time zones.", about: "artist" as const },
+        {
+          text: "Lune Harbor recorded Paper Moons in one night in a boathouse, with the tide coming in under the floor.",
+          about: "song" as const,
+          source: { name: "Wikipedia", url: "https://en.wikipedia.org/" },
+        },
+        {
+          text: "The ticking in the chorus is a kitchen timer the drummer forgot to switch off, and they kept it.",
+          about: "song" as const,
+          source: { name: "Rolling Stone", url: "https://www.rollingstone.com/" },
+        },
+        {
+          text: "Lune Harbor started as two cousins trading voice memos across three time zones.",
+          about: "artist" as const,
+          source: { name: "Pitchfork", url: "https://pitchfork.com/" },
+        },
       ],
-      sources: [
-        { title: "Paper Moons", url: "https://en.wikipedia.org/", about: "song" as const },
-        { title: "Lune Harbor", url: "https://en.wikipedia.org/", about: "artist" as const },
-      ],
+      // a painted stand-in for the band's photo
+      photo: { url: cover(4), width: 480, height: 480, page: "https://commons.wikimedia.org/", credit: "Jo Rivera", license: "CC BY-SA 4.0" },
     };
   },
   async previewSong() {

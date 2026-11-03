@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 // Facts about a song on the Globe: only for a post you can see, so nobody can
 // use this to look up (and spend on) any song they like.
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("post");
