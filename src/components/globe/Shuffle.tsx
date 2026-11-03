@@ -12,7 +12,11 @@ import { Cover, glass } from "./ui";
 // root layout, so it keeps going on every page: the Globe shows it in this
 // bar, everywhere else in the mini player.
 
-export function Shuffle({ songs }: { songs: Post[] }) {
+// On the Globe, the bar names who put the song there and, tapped, takes you to
+// their tile.
+type Who = { name: (p: Post) => string | null; open: (p: Post) => void };
+
+export function Shuffle({ songs, who }: { songs: Post[]; who?: Who }) {
   const pv = usePreview();
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +26,7 @@ export function Shuffle({ songs }: { songs: Post[] }) {
     return () => setDocked(false);
   }, [setDocked]);
 
-  if (pv.shuffle || pv.track) return <Controls />;
+  if (pv.shuffle || pv.track) return <Controls who={who} />;
   if (!songs.length) return null;
 
   const start = async () => {
@@ -67,20 +71,43 @@ export function MiniPlayer() {
   );
 }
 
-function Controls() {
+// The tiny now-playing pill: cover, song, album when it fits, who played it.
+function Controls({ who }: { who?: Who }) {
   const pv = usePreview();
   const sh = pv.shuffle;
   const now = sh?.now ?? pv.track?.post;
   if (!now) return null;
   const paused = sh ? sh.paused : Boolean(pv.track?.paused);
-  const btn = "flex h-9 w-9 flex-none items-center justify-center rounded-full";
+  const by = who?.name(now) ?? null;
+  const btn = "flex h-7 w-7 flex-none items-center justify-center rounded-full";
+  const info = (
+    <>
+      <Cover src={now.artwork_url} seed={now.title} size={28} style={{ borderRadius: 999 }} />
+      <span className="flex min-w-0 flex-1 flex-col pl-2 pr-1 text-left leading-[1.15]">
+        <span className="truncate text-[12px] font-semibold">{now.title}</span>
+        <span className="truncate text-[10.5px]">
+          {by && <span className="font-semibold text-accent">{by}</span>}
+          {by && now.album && <span className="opacity-40"> · </span>}
+          {now.album && <span className="opacity-60">{now.album}</span>}
+          {!by && !now.album && <span className="opacity-60">{now.artist}</span>}
+        </span>
+      </span>
+    </>
+  );
   return (
-    <div className="flex h-12 max-w-[340px] items-center gap-1 rounded-full py-1.5 pl-1.5 pr-1" style={glass(false)}>
-      <Cover src={now.artwork_url} seed={now.title} size={36} />
-      <div className="flex min-w-0 flex-1 flex-col px-1.5 leading-tight">
-        <span className="truncate text-[13px] font-semibold">{now.title}</span>
-        <span className="truncate text-[11px] opacity-60">{now.artist}</span>
-      </div>
+    <div className="flex h-10 w-[min(272px,calc(100vw-40px))] items-center rounded-full py-1 pl-1 pr-1" style={glass(false)}>
+      {who ? (
+        <button
+          type="button"
+          onClick={() => who.open(now)}
+          aria-label={`${now.title}${by ? `, played by ${by}` : ""}. Show it on the globe`}
+          className="flex min-w-0 flex-1 items-center rounded-full"
+        >
+          {info}
+        </button>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center">{info}</div>
+      )}
       <button type="button" onClick={sh ? pv.shuffleToggle : pv.toggle} aria-label={paused ? "Play" : "Pause"} className={btn}>
         {paused ? <PlayIcon /> : <PauseIcon />}
       </button>
@@ -89,7 +116,7 @@ function Controls() {
           <NextIcon />
         </button>
       )}
-      <button type="button" onClick={pv.stop} aria-label="Stop" className={btn}>
+      <button type="button" onClick={pv.stop} aria-label="Stop" className={`${btn} opacity-50`}>
         <CloseIcon />
       </button>
     </div>
@@ -102,22 +129,22 @@ const ShuffleIcon = () => (
   </svg>
 );
 const PlayIcon = () => (
-  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
     <path d="M7 4.5v15l13-7.5z" />
   </svg>
 );
 const PauseIcon = () => (
-  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
     <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
   </svg>
 );
 const NextIcon = () => (
-  <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
     <path d="M5 4.5v15l11-7.5zM17 4h3v16h-3z" />
   </svg>
 );
 const CloseIcon = () => (
-  <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+  <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
     <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 );
