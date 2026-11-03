@@ -7,6 +7,7 @@
   --color-muted: #6a818c;
   --color-accent: #d7262b;
   --color-accent-deep: #b3161c;
+  --color-coral: #ff5e57;
   --color-ring: #ff4a4f;
   --color-card: #ffffff;
   --color-card-ink: #0d2a3f;
@@ -83,6 +84,23 @@ body {
 
 .rise-in {
   animation: rise-in 0.5s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+/* "Added to core": a little pill that rises, holds, then fades */
+@keyframes toast-blip {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  14%,
+  78% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 /* saving a song to your core: the little core pops */
