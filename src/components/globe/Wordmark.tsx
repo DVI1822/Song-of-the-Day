@@ -18,8 +18,6 @@ const RIM: "coral" | "blend" = "coral";
 export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }) {
   // by day the pale brand colours would vanish into the blue sky, so they deepen a little
   const [g1, g2] = light ? ["185,240,168", "143,208,255"] : ["70,170,96", "48,132,206"];
-  // a faint fill so the letters read as tinted glass
-  const top = light ? "rgba(255,255,255,0.14)" : "rgba(13,42,63,0.1)";
   const id = light ? "wm-night" : "wm-day";
   const rim = RIM === "blend" ? `url(#${id}-rim-g)` : CORAL;
   // one drawing in the hand's own units, so the rim colour runs across hand and letters alike;
@@ -73,10 +71,11 @@ export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }
         strokeWidth={1.375}
         strokeOpacity={0.95}
         style={{ fontFamily: "var(--font-bungee), var(--font-outfit), sans-serif" }}
+        fill={`url(#${id}-glass)`}
         aria-hidden
       >
-        <tspan fill={top}>TOP</tspan>
-        <tspan fill={`url(#${id}-glass)`}>TRACK</tspan>
+        <tspan>TOP</tspan>
+        <tspan>TRACK</tspan>
       </text>
     </svg>
   );

@@ -1076,7 +1076,7 @@ function Globe({
           className="display text-[26px] leading-[1.1] transition-colors duration-500"
           style={hw ? { color: hw.title, fontFamily: hw.titleFont, textShadow: hw.titleGlow, fontWeight: 400, letterSpacing: "0.02em", fontSize: hw.titleSize } : { color: ink }}
         >
-          {hw ? "TopTrack" : <Wordmark light={inkLight} />}
+          {hw ? "TopTrack" : <Wordmark light={inkLight} size={31} />}
         </h1>
         <Clock color={muted} />
         {posted && !launching && <Countdown color={muted} timeZone={me.timezone} />}
@@ -1917,7 +1917,7 @@ function useNow() {
 function Clock({ color }: { color: string }) {
   const now = useNow();
   return (
-    <div className="h-4 text-xs tracking-[0.02em] transition-colors duration-500" style={{ color }}>
+    <div className="h-5 text-sm tracking-[0.02em] transition-colors duration-500" style={{ color }}>
       {now &&
         `${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`}
     </div>
@@ -1972,7 +1972,7 @@ function Countdown({ color, timeZone }: { color: string; timeZone: string }) {
     <div
       role="timer"
       aria-label={`${hh} hours ${mm} minutes until the next song`}
-      className="h-4 text-[11px] tracking-[0.04em] tabular-nums opacity-75 transition-colors duration-500"
+      className="h-5 text-[13px] tracking-[0.04em] tabular-nums opacity-75 transition-colors duration-500"
       style={{ color }}
     >
       next song in {two(hh)}:{two(mm)}:{two(ss)}
