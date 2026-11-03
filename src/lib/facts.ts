@@ -24,7 +24,7 @@ const UA = "TopTrack/1.0 (https://www.mytoptrack.io)";
 const RETRY_EMPTY_MS = 6 * 3_600_000;
 // Bumped when the way facts are made changes, so empty answers from before
 // are tried again.
-const VERSION = "v4";
+const VERSION = "v5";
 
 // --- the song's key: one row per song, whatever version was posted ---------
 
@@ -235,6 +235,43 @@ export async function findPhoto(art: Page | null, key: string): Promise<ArtistPh
     credit: strip(m.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons",
     license: strip(m.LicenseShortName?.value ?? ""),
   };
+}
+
+// The picture an article shows when it's shared (its og:image), from the
+// pages the facts came from, artist facts first. Not from Wikipedia (that's
+// Commons above) or Bandcamp (where it's the album cover, already on screen).
+const NOT_ARTICLE_PHOTO = /logo|favicon|default|placeholder|avatar|icon|sprite|blank/i;
+
+async function pagePhoto(facts: SongFact[]): Promise<ArtistPhoto | null> {
+  const pages = [...facts]
+    .sort((a, b) => (a.about === b.about ? 0 : a.about === "artist" ? -1 : 1))
+    .map((f) => f.source?.url)
+    .filter((u): u is string => !!u && !/wikipedia\.org|bandcamp\.com/i.test(u));
+  // look at each page's photo and keep the biggest (press photos, usually 1200px or more)
+  const shots = await Promise.all(
+    [...new Set(pages)].slice(0, 4).map(async (page): Promise<ArtistPhoto | null> => {
+      const res = await fetch(page, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(6000) }).catch(() => null);
+      if (!res?.ok) return null;
+      const head = (await res.text()).slice(0, 200_000);
+      const tag = head.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)(?::url)?["'][^>]*>/i)?.[0];
+      const src = tag?.match(/content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&");
+      if (!src) return null;
+      let url: URL;
+      try {
+        url = new URL(src, page);
+      } catch {
+        return null;
+      }
+      if (url.protocol !== "https:" || NOT_ARTICLE_PHOTO.test(url.pathname)) return null;
+      const num = (prop: string) => Number(head.match(new RegExp(`<meta[^>]+property=["']og:image:${prop}["'][^>]+content=["'](\\d+)`, "i"))?.[1]) || 0;
+      const width = num("width");
+      const height = num("height");
+      if (width && width < 600) return null;
+      return { url: url.href, width: width || 1200, height: height || 800, page, credit: siteName(page), license: "" };
+    }),
+  );
+  const ok = shots.filter((p): p is ArtistPhoto => !!p);
+  return ok.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? null;
 }
 
 // --- picking the facts ---------------------------------------------------------
@@ -476,7 +513,15 @@ async function make(title: string, artist: string): Promise<SongFacts & { keep: 
   ]);
   // if Claude couldn't, the article's opening lines beat nothing
   const facts = picked?.length ? picked : plain(song, art);
-  return { facts, photo, keep: picked !== null && !down };
+  // no free photo on Commons (smaller artists): the photo from an article
+  // the facts came from, shown like a link preview and credited to it
+  const pic =
+    photo ??
+    (await pagePhoto(facts).catch((e) => {
+      console.error("song facts: article photo failed", e);
+      return null;
+    }));
+  return { facts, photo: pic, keep: picked !== null && !down };
 }
 
 // --- the cache -----------------------------------------------------------------
@@ -498,7 +543,9 @@ export async function factsFor(title: string, artist: string): Promise<SongFacts
     const fresh = data && String(data.made_by).endsWith(VERSION) && Date.now() - Date.parse(data.created_at) < RETRY_EMPTY_MS;
     // facts made before the Anthropic key was added are made again with it
     const upgrade = process.env.ANTHROPIC_API_KEY && String(data?.made_by).startsWith("wikipedia");
-    if (data && !upgrade && (data.facts?.length || fresh))
+    // kept before article photos existed and without a photo: made again once
+    const noPhoto = data?.facts?.length && !data.photo && !String(data.made_by).endsWith(VERSION);
+    if (data && !upgrade && !noPhoto && (data.facts?.length || fresh))
       return { facts: data.facts ?? [], photo: data.photo ?? null };
   }
   if (!db) console.warn("song facts: SUPABASE_SECRET_KEY isn't set, so nothing is saved");
