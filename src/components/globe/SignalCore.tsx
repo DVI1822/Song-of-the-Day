@@ -5,8 +5,9 @@ import { coreColor, corePoints, nearFar } from "./signal";
 
 // The core as a small picture: the Signal sphere of waves, slowly turning,
 // for the Core tab, core buttons and anywhere else the core stands for
-// someone. `rings` thins it out for tiny sizes.
-export function SignalCore({ className, rings, still }: { className?: string; rings?: number; still?: boolean }) {
+// someone. `rings` thins it out for tiny sizes; `tint` ("r,g,b") draws it in
+// one colour instead of the neon spectrum.
+export function SignalCore({ className, rings, still, tint }: { className?: string; rings?: number; still?: boolean; tint?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -41,14 +42,15 @@ export function SignalCore({ className, rings, still }: { className?: string; ri
               ctx.stroke();
             };
             // a faint glow, then the line, so it reads on light glass and dark sky alike
-            line(coreColor(i * (3.6 / n) + t * 0.08, 0, front ? 0.25 : 0.08), w * 3);
-            line(coreColor(i * (3.6 / n) + t * 0.08, 0, front ? 1 : 0.4), front ? w : w * 0.7);
+            const col = (a: number) => (tint ? `rgba(${tint},${a})` : coreColor(i * (3.6 / n) + t * 0.08, 0, a));
+            line(col(tint ? (front ? 0.12 : 0.04) : front ? 0.25 : 0.08), w * 3);
+            line(col(front ? 1 : 0.4), front ? w : w * 0.7);
           }
         });
       if (!calm) raf = requestAnimationFrame(paint);
     };
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [rings, still]);
+  }, [rings, still, tint]);
   return <canvas ref={ref} aria-hidden className={className} />;
 }

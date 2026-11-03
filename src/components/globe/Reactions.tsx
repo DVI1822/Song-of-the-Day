@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type Ref } from "react";
 import { formatTime, initials } from "@/lib/day";
 import type { Note, Post, Reactions } from "@/lib/types";
 import type { GlobeApi } from "./api";
+import { SignalCore } from "./SignalCore";
 import { CloseIcon } from "./ui";
 
 // Liking a song and the notes people leave on it. The like is a set of level
@@ -70,16 +71,26 @@ const NoteIcon = ({ on }: { on?: boolean }) => (
 
 // Your core, drawn in the same line: the Signal sphere, a circle holding three
 // sound waves, with a plus tucked at its bottom right. Once the song is in your
-// core the sphere fills softly and the plus turns to a tick.
+// core it comes alive: the real core, turning, in the same coral line, with the
+// plus turned to a tick.
+const CORAL = "255,94,87";
 const CoreIcon = ({ on }: { on?: boolean }) => (
-  <svg aria-hidden width={ICON} height={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="8.6" fill="currentColor" fillOpacity={on ? 0.18 : 0} />
-    <path d="M5.2 8.6c1.7-1.3 3.4-1.3 5.1 0s3.4 1.3 5.1 0 2.4-1.1 3.4-.5" />
-    <path d="M3.6 12.2c1.9-1.4 3.8-1.4 5.7 0s3.8 1.4 5.7 0 3.8-1.4 5.4 0" />
-    <path d="M5.2 15.8c1.7-1.3 3.4-1.3 5.1 0s3.4 1.3 5.1 0" />
-    <circle cx="19.4" cy="19.4" r="3.6" fill={on ? "currentColor" : "white"} />
-    <path d={on ? "M17.8 19.5l1.1 1.1 2.1-2.3" : "M19.4 17.8v3.2M17.8 19.4h3.2"} stroke={on ? "white" : "currentColor"} />
-  </svg>
+  <span className="relative block" style={{ width: ICON, height: ICON }}>
+    {on ? (
+      <SignalCore tint={CORAL} rings={7} className="absolute inset-[1px] h-[calc(100%-2px)] w-[calc(100%-2px)]" />
+    ) : (
+      <svg aria-hidden width={ICON} height={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" className="absolute inset-0">
+        <circle cx="12" cy="12" r="8.6" />
+        <path d="M5.2 8.6c1.7-1.3 3.4-1.3 5.1 0s3.4 1.3 5.1 0 2.4-1.1 3.4-.5" />
+        <path d="M3.6 12.2c1.9-1.4 3.8-1.4 5.7 0s3.8 1.4 5.7 0 3.8-1.4 5.4 0" />
+        <path d="M5.2 15.8c1.7-1.3 3.4-1.3 5.1 0s3.4 1.3 5.1 0" />
+      </svg>
+    )}
+    <svg aria-hidden width={ICON} height={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" className="absolute inset-0">
+      <circle cx="19.4" cy="19.4" r="3.6" fill={on ? "currentColor" : "white"} />
+      <path d={on ? "M17.8 19.5l1.1 1.1 2.1-2.3" : "M19.4 17.8v3.2M17.8 19.4h3.2"} stroke={on ? "white" : "currentColor"} />
+    </svg>
+  </span>
 );
 
 // The buttons beside a song's title: save it to your core (not on your own
