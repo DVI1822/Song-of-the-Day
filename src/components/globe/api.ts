@@ -172,7 +172,9 @@ export const serverApi: GlobeApi = {
   // A route, not a server action: making a song's facts the first time can
   // take a few seconds, and server actions wait in line behind each other.
   async facts(postId) {
-    const res = await fetch(`/api/facts?post=${encodeURIComponent(postId)}`).catch(() => null);
+    // never from the phone's cache: the server keeps each song's facts, and an
+    // old empty answer kept here would hide them
+    const res = await fetch(`/api/facts?post=${encodeURIComponent(postId)}`, { cache: "no-store" }).catch(() => null);
     if (!res?.ok) return null;
     return res.json();
   },

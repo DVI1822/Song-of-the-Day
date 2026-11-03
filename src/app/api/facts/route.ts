@@ -16,9 +16,7 @@ export async function GET(request: NextRequest) {
   if (!post) return NextResponse.json({ error: "No such song" }, { status: 404 });
   try {
     const facts = await factsFor(post.title, post.artist);
-    // an empty answer isn't kept by the phone, so the next tap asks again
-    const cache = facts.facts.length ? "private, max-age=3600" : "no-store";
-    return NextResponse.json(facts, { headers: { "Cache-Control": cache } });
+    return NextResponse.json(facts, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error("song facts", e);
     return NextResponse.json({ error: "Couldn't find facts right now" }, { status: 502 });
