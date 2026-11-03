@@ -22,6 +22,7 @@ import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
 import { SignalCore } from "./SignalCore";
 import { HalloweenScene } from "./HalloweenScene";
+import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
@@ -1059,7 +1060,7 @@ function Globe({
           className="display text-[26px] leading-[1.1] transition-colors duration-500"
           style={hw ? { color: hw.title, fontFamily: hw.titleFont, textShadow: hw.titleGlow, fontWeight: 400, letterSpacing: "0.02em", fontSize: hw.titleSize } : { color: ink }}
         >
-          Song of the Day
+          {hw ? "TopTrack" : <Wordmark light={inkLight} />}
         </h1>
         <Clock color={muted} />
       </div>

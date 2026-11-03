@@ -57,7 +57,7 @@ export function InviteCard({
 
   const share = async () => {
     if (navigator.share) {
-      await navigator.share({ title: "Song of the Day", text: message }).catch(() => {});
+      await navigator.share({ title: "TopTrack", text: message }).catch(() => {});
       return;
     }
     await navigator.clipboard?.writeText(link).catch(() => {});
@@ -99,7 +99,7 @@ export function InviteCard({
   const inviteHref = (p: Picked) =>
     p.tel
       ? `sms:${p.tel.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(message)}`
-      : `mailto:${p.email}?subject=${encodeURIComponent(`${firstName} invited you to Song of the Day`)}&body=${encodeURIComponent(message)}`;
+      : `mailto:${p.email}?subject=${encodeURIComponent(`${firstName} invited you to TopTrack`)}&body=${encodeURIComponent(message)}`;
 
   const pill = "flex h-9 flex-none items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold";
 
