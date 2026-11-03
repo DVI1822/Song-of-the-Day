@@ -7,7 +7,7 @@ const HAND = `<rect x="35" y="78" width="27" height="30"/>
   <rect x="62" y="47" width="10.5" height="25" rx="5.25"/><rect x="51.5" y="44" width="11" height="28" rx="5.5"/><rect x="40.5" y="42" width="11" height="30" rx="5.5"/>
   <path d="M27 50 V72 C27 80 33 86 41 86 H60 C68 86 72.5 80 72.5 72 V64 Z"/>
   <path d="M24 66 C24 60 30 58 36 60 L58 64 C63 65 64 72 59 73 L36 74 C29 74 24 72 24 66 Z"/>`;
-// the knuckle, thumb and nail lines, cut out of the hand so the sky shows through them too
+// the knuckle, thumb and nail lines: cut out of the hand, then drawn back in the rim colour
 const DETAIL = `<path d="M40.5 50 V60 M51.5 50 V62 M62 52 V63"/><path d="M24 66 C24 60 30 58 36 60 L58 64 C63 65 64 72 59 73 L36 74 C29 74 24 72 24 66 Z"/><path d="M30.5 22 H37" stroke-linecap="round"/>`;
 
 // the icon's coral, for the glass rim; `blend` fades it into deep blue across the name
@@ -63,6 +63,8 @@ export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }
           <g fill={rim} dangerouslySetInnerHTML={{ __html: HAND }} />
         </g>
       </g>
+      {/* the knuckle, thumb and nail lines, drawn in the rim colour */}
+      <g fill="none" stroke={rim} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" opacity={0.95} dangerouslySetInnerHTML={{ __html: DETAIL }} />
       <text
         x="80.1"
         y="73.8"
