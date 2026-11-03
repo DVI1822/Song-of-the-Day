@@ -7,6 +7,7 @@ import { SignalCore } from "./SignalCore";
 import { halloween } from "./halloween";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
+import { FactsButton } from "./SongFacts";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
 import type { StorySky } from "./storyVideo";
 import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
@@ -202,7 +203,8 @@ export function Feature({
             </button>
           </div>
         </div>
-        {flagging ? (
+        <div className="relative">
+          {flagging ? (
           <div className="relative overflow-hidden" style={{ width: cover, height: cover, borderRadius: radius }}>
             <Cover
               src={post.artwork_url}
@@ -284,7 +286,10 @@ export function Feature({
               </div>
             </div>
           </button>
-        )}
+          )}
+          {/* the compass star with the song's facts, on the cover's bottom right */}
+          {!flagging && <FactsButton post={post} load={api.facts} />}
+        </div>
         <div ref={card} className="flex flex-col gap-3.5">
           <div className="relative flex flex-col gap-[3px]">
             <div

@@ -195,3 +195,10 @@ body {
 .tap-ring {
   animation: tap-ring 1.4s ease-out infinite;
 }
+
+/* the compass star by the song facts: a slow turn, a fast one while it pulls them in */
+@keyframes star-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

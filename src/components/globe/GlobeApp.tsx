@@ -8,6 +8,7 @@ import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
 import { skyAt, weatherSky, type SkyLook } from "./sky";
 import { Shuffle } from "./Shuffle";
+import { MyFacts } from "./SongFacts";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
@@ -286,6 +287,9 @@ function Globe({
   const [coreOpen, setCoreOpen] = useState(false);
   const [friendCore, setFriendCore] = useState<{ id: string; profile: Profile; posts: Post[] } | null>(null);
   const [darkOn, setDarkOn] = useState(false);
+  // the facts about your song are out (on short phones they take the song count's place)
+  const [factsOpen, setFactsOpen] = useState(false);
+  const [starHost, setStarHost] = useState<HTMLElement | null>(null);
   const [skyLight, setSkyLight] = useState(false);
   // Halloween's look, on the day (halloween.ts); read once we're in the browser
   const hw = useSyncExternalStore(noSub, halloween, noLook);
@@ -1179,13 +1183,15 @@ function Globe({
       {/* lightning lights up everything */}
       <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
-      {/* the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
+      {/* facts about your song once you've posted, the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
       <div
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex flex-col items-center justify-end gap-2"
         style={{ minHeight: posted ? 0 : 90 }}
       >
-        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
+        {/* your song's facts, which live in the compass star at the globe's bottom left */}
+        {posted && !launching && <MyFacts post={myPost} load={api.facts} onOpen={setFactsOpen} starHost={starHost} dark={darkOn} />}
+        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && !(factsOpen && L.h < 740) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
         <Shuffle songs={shuffleSongs} who={shuffleWho} />
         {!posted && !launching && (
           <button
@@ -1227,6 +1233,16 @@ function Globe({
           <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
         </svg>
       </button>
+
+      {/* the facts about your song: a compass star opposite the button above */}
+      <div
+        ref={(el) => {
+          R.current.chrome[6] = el;
+          if (el !== starHost) setStarHost(el);
+        }}
+        className="absolute z-[6]"
+        style={{ left: L.cx - L.R * 0.8 - 20, top: L.cy + L.R * 0.8 - 20 }}
+      />
 
       {/* what this is, any time */}
       <HelpButton dark={darkOn} onClick={() => setHelp(true)} buttonRef={(el) => void (R.current.chrome[5] = el)} />

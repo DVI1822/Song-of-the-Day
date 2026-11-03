@@ -194,6 +194,35 @@ preview.
    (name plus their Spotify account's email). In development mode Spotify
    lets up to 5 people connect.
 
+## Part 4d: Facts about your song (optional)
+
+After you post, a few short facts about your song (how it was made, the
+story behind it, the artist) turn over under the Globe, beside a less-seen
+photo of the artist, then get pulled into a compass star button at the globe's bottom left that brings them back with a tap. Open anyone's song and the same star, on the album cover's bottom right, shows its facts. Claude reads the song's and artist's Wikipedia articles
+and may search a short list of music sites (Rolling Stone, Pitchfork, NPR,
+Genius...). Every fact has to cite the passage it came from, and any fact
+without one is thrown out. The photo comes from Wikimedia Commons, with the
+photographer credited. Each song is looked up once and kept, so it costs
+roughly 5 to 8 cents per new song.
+
+1. In Supabase's **SQL Editor**, run
+   `supabase/migrations/20261108000000_song_facts.sql`.
+2. In Supabase, open **Project Settings → API Keys**, and under **Secret
+   keys** copy a secret key (`sb_secret_...`; create one if there isn't
+   one). Keep it private: it can read and write everything.
+3. Get an Anthropic API key at <https://platform.claude.com> (**API keys →
+   Create key**) and add a little credit under **Billing**.
+4. In Vercel, open the project's **Settings → Environment Variables** and add,
+   for all environments:
+   - `SUPABASE_SECRET_KEY`: the key from step 2
+   - `ANTHROPIC_API_KEY`: the key from step 3
+
+   Then open **Deployments**, and on the newest one click **⋯ → Redeploy**.
+
+Without `ANTHROPIC_API_KEY` the facts are the opening lines of the Wikipedia
+article instead. Without `SUPABASE_SECRET_KEY` they still show but aren't
+kept, so every visit looks them up again.
+
 ## Part 5: Try it
 
 1. Open your site, click **Get started**, and enter the email you invited.
