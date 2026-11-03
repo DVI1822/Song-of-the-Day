@@ -1,6 +1,6 @@
 // The TopTrack name at the top of the Globe: the icon's raised hand, then TOP
-// and TRACK in Bungee. Everything is see-through, so the sky, clouds and rain
-// show through the letters. `light` is true when the sky behind is dark.
+// and TRACK in Bungee, drawn like glass: a faint tint inside a crisp rim, so the
+// sky, clouds and rain clearly show through. `light` is true when the sky is dark.
 
 const HAND = `<rect x="35" y="78" width="27" height="30"/>
   <rect x="27" y="11" width="13.5" height="50" rx="6.75"/>
@@ -13,8 +13,12 @@ const DETAIL = `<path d="M40.5 50 V60 M51.5 50 V62 M62 52 V63"/><path d="M24 66 
 export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }) {
   // by day the pale brand colours would vanish into the blue sky, so they deepen a little
   const [g1, g2] = light ? ["185,240,168", "143,208,255"] : ["70,170,96", "48,132,206"];
-  const top = light ? "rgba(255,255,255,0.42)" : "rgba(13,42,63,0.34)";
-  const track = `linear-gradient(180deg, rgba(${g1},0.5), rgba(${g2},0.5))`;
+  // a faint fill so the letters read as tinted glass, and a brighter rim that keeps them legible
+  const top = light ? "rgba(255,255,255,0.14)" : "rgba(13,42,63,0.1)";
+  const topRim = light ? "rgba(255,255,255,0.6)" : "rgba(13,42,63,0.45)";
+  const track = `linear-gradient(180deg, rgba(${g1},0.2), rgba(${g2},0.2))`;
+  const trackRim = light ? `rgba(${g2},0.75)` : `rgba(${g2},0.7)`;
+  const stroke = size * 0.022;
   const id = light ? "wm-night" : "wm-day";
   return (
     <span className="inline-flex items-end" style={{ gap: size * 0.1, fontFamily: "var(--font-bungee), var(--font-outfit), sans-serif", fontSize: size, lineHeight: 1 }}>
@@ -28,14 +32,22 @@ export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }
             <rect x="0" y="0" width="100" height="86" fill="#fff" />
             <g fill="none" stroke="#000" strokeWidth="2.2" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: DETAIL }} />
           </mask>
+          {/* keeps only the outer edge of the hand, for the glass rim */}
+          <filter id={`${id}-rim`} x="-10%" y="-10%" width="120%" height="120%">
+            <feMorphology in="SourceAlpha" operator="erode" radius="1.4" result="in" />
+            <feComposite in="SourceGraphic" in2="in" operator="out" />
+          </filter>
         </defs>
-        <g mask={`url(#${id}-m)`} opacity={0.5}>
-          <g fill={`url(#${id})`} dangerouslySetInnerHTML={{ __html: HAND }} />
+        <g mask={`url(#${id}-m)`}>
+          <g opacity={0.2} fill={`url(#${id})`} dangerouslySetInnerHTML={{ __html: HAND }} />
+          <g filter={`url(#${id}-rim)`} opacity={0.9}>
+            <g fill={`url(#${id})`} dangerouslySetInnerHTML={{ __html: HAND }} />
+          </g>
         </g>
       </svg>
       <span aria-hidden>
-        <span style={{ color: top }}>TOP</span>
-        <span style={{ backgroundImage: track, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>TRACK</span>
+        <span style={{ color: top, WebkitTextStroke: `${stroke}px ${topRim}` }}>TOP</span>
+        <span style={{ backgroundImage: track, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", WebkitTextStroke: `${stroke}px ${trackRim}` }}>TRACK</span>
       </span>
       <span className="sr-only">TopTrack</span>
     </span>
