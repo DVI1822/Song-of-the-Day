@@ -16,8 +16,10 @@
   --color-nav: #f4f7f8;
   --color-glow: #d9fff8;
   --color-tile-back: #eef2f4;
-  --font-sans: var(--font-outfit), system-ui, sans-serif;
-  --font-bubble: var(--font-fredoka), var(--font-outfit), sans-serif;
+  /* Everything is set in Bungee, the logo's font, so the whole app speaks
+     with one voice. Outfit stays only as the fallback while it loads. */
+  --font-sans: var(--font-bungee), var(--font-outfit), system-ui, sans-serif;
+  --font-bubble: var(--font-bungee), var(--font-outfit), sans-serif;
 }
 
 :root {
@@ -29,6 +31,8 @@ body {
   background: var(--color-void);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* Bungee comes in one weight; never fake a bold or italic on top of it */
+  font-synthesis: none;
   /* no double-tap zoom or rubber-banding: the Globe handles its own gestures */
   touch-action: manipulation;
   overscroll-behavior: none;

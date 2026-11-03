@@ -437,8 +437,8 @@ export async function prepare(input: StoryInput) {
   const { post, songs, sky } = input;
   const css = getComputedStyle(document.body);
   const fonts = {
-    display: css.getPropertyValue("--font-fredoka").trim() || "sans-serif",
-    body: css.getPropertyValue("--font-outfit").trim() || "sans-serif",
+    display: css.getPropertyValue("--font-bungee").trim() || "sans-serif",
+    body: css.getPropertyValue("--font-bungee").trim() || "sans-serif",
   };
   await Promise.all([document.fonts.load(`600 70px ${fonts.display}`), document.fonts.load(`400 30px ${fonts.body}`), document.fonts.load(`600 38px ${fonts.body}`)]).catch(() => {});
 
