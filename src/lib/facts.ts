@@ -240,18 +240,15 @@ export async function findPhoto(art: Page | null, key: string): Promise<ArtistPh
 // --- picking the facts ---------------------------------------------------------
 
 // Where Claude may look besides the Wikipedia articles: music press and
-// reference sites that report on how songs were made.
+// reference sites that report on how songs were made. Sites that block
+// Anthropic's search (the BBC, the Guardian, Pitchfork, Genius, the New York
+// Times...) can't be on this list: the whole request is refused if one is.
 export const SITES: Record<string, string> = {
   "en.wikipedia.org": "Wikipedia",
   "rollingstone.com": "Rolling Stone",
-  "pitchfork.com": "Pitchfork",
   "npr.org": "NPR",
-  "bbc.co.uk": "BBC",
-  "bbc.com": "BBC",
-  "theguardian.com": "The Guardian",
   "nme.com": "NME",
   "billboard.com": "Billboard",
-  "genius.com": "Genius",
   "stereogum.com": "Stereogum",
   "consequence.net": "Consequence",
   "uncut.co.uk": "Uncut",
@@ -259,15 +256,23 @@ export const SITES: Record<string, string> = {
   "soundonsound.com": "Sound On Sound",
   "mixonline.com": "Mix",
   "musicradar.com": "MusicRadar",
-  "vulture.com": "Vulture",
-  "nytimes.com": "The New York Times",
-  "newyorker.com": "The New Yorker",
   "spin.com": "Spin",
   "udiscovermusic.com": "uDiscover Music",
   "songfacts.com": "Songfacts",
   "allmusic.com": "AllMusic",
   "complex.com": "Complex",
   "xxlmag.com": "XXL",
+  // smaller and independent artists
+  "bandcamp.com": "Bandcamp",
+  "thefader.com": "The Fader",
+  "pastemagazine.com": "Paste",
+  "brooklynvegan.com": "BrooklynVegan",
+  "dazeddigital.com": "Dazed",
+  "clashmusic.com": "Clash",
+  "atwoodmagazine.com": "Atwood Magazine",
+  "undertheradarmag.com": "Under the Radar",
+  "lineofbestfit.com": "The Line of Best Fit",
+  "kexp.org": "KEXP",
 };
 
 export function siteName(url: string) {
@@ -282,7 +287,7 @@ export function siteName(url: string) {
 
 const SYSTEM = `You write the short "behind the song" notes for TopTrack, an app where friends each share the one song that hit hardest today. Right after someone posts their song, a few of your notes appear under it.
 
-You may get Wikipedia articles about the song and its artist, and you can search music press sites. Look for up to 3 facts a fan would enjoy learning: how and where the song was written or recorded, who played on it, what inspired it, a surprising detail about its story, or something striking about the artist. Prefer facts about this exact song (check it's the right song by the right artist); use the artist only when there's little about the song. Skip dry facts (chart positions, sales, certifications, release dates, track lengths) unless they're genuinely remarkable, and never say only that "X is a song by Y". Search at most twice, and only if the articles don't already give you good material.
+You may get Wikipedia articles about the song and its artist, and you can search music press sites. Look for up to 3 facts a fan would enjoy learning: how and where the song was written or recorded, who played on it, what inspired it, a surprising detail about its story, or something striking about the artist. Prefer facts about this exact song (check it's the right song by the right artist); when there's little about the song, find facts about the artist instead (where they're from, how they started, how they make their music). Skip dry facts (chart positions, sales, certifications, release dates, track lengths) unless they're genuinely remarkable, and never say only that "X is a song by Y". Search at most three times, and only if the articles don't already give you good material; if searching for the song finds nothing, search for the artist.
 
 Rules:
 - Every fact must come from a source you were given or found, and be cited. Do not add anything from your own knowledge, even if you're sure it's true.
@@ -348,17 +353,28 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
   ];
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
   const client = new Anthropic({ timeout: 75_000, maxRetries: 1 });
+  let sites = Object.keys(SITES);
   try {
-    for (let turn = 0; turn < 3; turn++) {
-      const res = await client.beta.messages.create({
+    const ask = () =>
+      client.beta.messages.create({
         model: MODEL,
         max_tokens: 8000,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         output_config: { effort: "low" },
         system: SYSTEM,
-        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2, allowed_domains: Object.keys(SITES) }],
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3, allowed_domains: sites }],
         messages,
+      });
+    for (let turn = 0; turn < 3; turn++) {
+      const res = await ask().catch((e) => {
+        // a site on the list that has since blocked Anthropic's search: drop it and ask again
+        const blocked = e instanceof Anthropic.BadRequestError && e.message.match(/not accessible to our user agent: \[([^\]]*)\]/);
+        if (!blocked) throw e;
+        const gone = new Set(blocked[1].split(",").map((d) => d.trim().replace(/^'|'$/g, "")));
+        console.warn(`song facts: these sites block the search, take them off the list: ${[...gone].join(", ")}`);
+        sites = sites.filter((d) => !gone.has(d));
+        return ask();
       });
       // a long search can pause the turn; hand it back to carry on
       if (res.stop_reason === "pause_turn") {
@@ -378,7 +394,7 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
     }
     return [];
   } catch (e) {
-    console.error(`song facts: Claude call failed for "${title}" by ${artist}`, e);
+    console.error(`song facts: Claude call failed for "${title}" by ${artist}: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 }
