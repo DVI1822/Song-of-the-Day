@@ -175,6 +175,21 @@ const CHAT: Message[] = [
 ];
 
 const demoApi: GlobeApi = {
+  // made-up facts for the made-up song
+  async facts() {
+    await new Promise((r) => setTimeout(r, 900));
+    return {
+      facts: [
+        { text: "Lune Harbor recorded Paper Moons in one night in a boathouse, with the tide coming in under the floor.", about: "song" as const },
+        { text: "The ticking in the chorus is a kitchen timer the drummer forgot to switch off, and they kept it.", about: "song" as const },
+        { text: "Lune Harbor started as two cousins trading voice memos across three time zones.", about: "artist" as const },
+      ],
+      sources: [
+        { title: "Paper Moons", url: "https://en.wikipedia.org/", about: "song" as const },
+        { title: "Lune Harbor", url: "https://en.wikipedia.org/", about: "artist" as const },
+      ],
+    };
+  },
   async previewSong() {
     await new Promise((r) => setTimeout(r, 1100));
     return {

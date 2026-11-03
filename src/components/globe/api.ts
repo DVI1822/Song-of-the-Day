@@ -34,7 +34,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, Message, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
+import type { Core, Friend, Message, Note, Post, Profile, Reactions, SavedSong, SongFacts } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -62,6 +62,8 @@ export type GlobeApi = {
   savePush?(sub: { endpoint: string; p256dh: string; auth: string }): Promise<void>;
   // what's new since the Globe opened; the demo has nothing new
   news?(): Promise<News | null>;
+  // a few facts about the song you posted, from Wikipedia
+  facts?(postId: string): Promise<SongFacts | null>;
   // Spotify Connect, for people who linked Spotify. The demo has none.
   spotify?: SpotifyConnect;
 };
@@ -167,6 +169,13 @@ export const serverApi: GlobeApi = {
   addNote,
   deleteNote,
   chat: supabaseChat,
+  // A route, not a server action: making a song's facts the first time can
+  // take a few seconds, and server actions wait in line behind each other.
+  async facts(postId) {
+    const res = await fetch(`/api/facts?post=${encodeURIComponent(postId)}`).catch(() => null);
+    if (!res?.ok) return null;
+    return res.json();
+  },
   async savePush(sub) {
     await createClient().rpc("save_push", { sub_endpoint: sub.endpoint, sub_p256dh: sub.p256dh, sub_auth: sub.auth });
   },

@@ -8,6 +8,7 @@ import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
 import { skyAt, weatherSky, type SkyLook } from "./sky";
 import { Shuffle } from "./Shuffle";
+import { SongFacts } from "./SongFacts";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
@@ -1179,13 +1180,19 @@ function Globe({
       {/* lightning lights up everything */}
       <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
-      {/* the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
+      {/* facts about your song once you've posted, the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
       <div
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex flex-col items-center justify-end gap-2"
         style={{ minHeight: posted ? 0 : 90 }}
       >
-        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
+        {/* on short phones the facts take the song count's place */}
+        {posted && !launching && (
+          <div className="mb-2">
+            <SongFacts post={myPost} load={api.facts} />
+          </div>
+        )}
+        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && !(posted && L.h < 740) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
         <Shuffle songs={shuffleSongs} who={shuffleWho} />
         {!posted && !launching && (
           <button

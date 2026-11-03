@@ -69,3 +69,8 @@ export type Message = {
   created_at: string;
   read_at: string | null;
 };
+
+// A few facts about a song, from Wikipedia (see lib/facts.ts), with the
+// articles they came from.
+export type SongFact = { text: string; about: "song" | "artist" };
+export type SongFacts = { facts: SongFact[]; sources: { title: string; url: string; about: "song" | "artist" }[] };
