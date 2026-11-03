@@ -51,8 +51,9 @@ export const LevelsIcon = ({ on, size = 22, stroke = 1.8 }: { on?: boolean; size
   </svg>
 );
 // The three buttons share one size and one thin coral line, so they read as a set.
-const ICON = 27;
-const LINE = 1.15;
+const ICON = 46;
+const LINE_PX = 1.4; // on screen
+const LINE = (LINE_PX * 24) / ICON; // in the 24-unit drawing
 
 // Notes: a speech bubble with a little music note in it, filled once you've
 // left one.
@@ -108,13 +109,13 @@ export function ReactionButtons({
   const [savePop, setSavePop] = useState(0);
   const likes = r?.feels.length ?? 0,
     notes = r?.notes.length ?? 0;
-  const count = "min-w-[1ch] text-[12px] font-semibold tabular-nums leading-none text-coral";
-  // each button is the same square, icon dead centre; a count hangs off its
-  // right edge so it never pushes the icons out of line
-  const btn = "relative flex h-11 w-11 items-center justify-center rounded-full text-coral";
-  const badge = `pointer-events-none absolute left-[38px] top-1/2 -translate-y-1/2 ${count}`;
+  const count = "min-w-[1ch] text-[15px] font-semibold tabular-nums leading-none text-coral";
+  // a row of equal columns, each button dead centre in its own; a count hangs
+  // off the icon's right edge so it never pushes the icons out of line
+  const btn = "relative flex h-14 w-14 items-center justify-center rounded-full text-coral";
+  const badge = `pointer-events-none absolute left-[52px] top-1/2 -translate-y-1/2 ${count}`;
   return (
-    <div className="-mr-1 flex flex-none items-center gap-2.5 pr-2.5">
+    <div className={`grid ${mine ? "grid-cols-2" : "grid-cols-3"} justify-items-center`}>
       {!mine && (
         <button
           ref={saveRef}
@@ -146,14 +147,14 @@ export function ReactionButtons({
           aria-pressed={mine ? undefined : liked}
           className={btn}
         >
-          <LevelsIcon on={liked} size={ICON} stroke={LINE} />
+          <LevelsIcon on={liked} size={ICON} stroke={LINE_PX} />
         </button>
         {likes > 0 && (
           <button
             type="button"
             onClick={onLikes}
             aria-label={`See who liked it (${likes})`}
-            className={`${count} absolute left-[34px] top-1/2 flex h-8 -translate-y-1/2 items-center px-1`}
+            className={`${count} absolute left-[48px] top-1/2 flex h-10 -translate-y-1/2 items-center px-1`}
           >
             {likes}
           </button>

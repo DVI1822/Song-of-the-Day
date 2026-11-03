@@ -280,6 +280,19 @@ export function Feature({
           {/* the compass star with the song's facts, on the cover's bottom right */}
           {!flagging && <FactsButton post={post} load={api.facts} />}
         </div>
+        {/* "Added to core", a moment over the bottom of the cover */}
+        {toast > 0 && (
+          <div className="pointer-events-none absolute inset-x-0 z-10 flex justify-center" style={{ top: 42 + cover - 54 }}>
+            <div
+              key={toast}
+              role="status"
+              className="whitespace-nowrap rounded-full border border-coral/70 bg-white/90 px-4 py-2 text-[14px] font-semibold text-card-ink shadow-[0_10px_26px_-12px_rgba(13,42,63,0.5)] backdrop-blur-md"
+              style={{ animation: "toast-blip 1.6s cubic-bezier(.2,.75,.25,1) both" }}
+            >
+              Added to core
+            </div>
+          </div>
+        )}
         <div ref={card} className="flex flex-col gap-3.5">
           <div className="relative flex flex-col gap-[3px]">
             <div
@@ -293,26 +306,18 @@ export function Feature({
               <div className="min-w-0 flex-1 truncate text-[15px] text-muted">
                 {[post.artist, post.album].filter(Boolean).join(" · ")}
               </div>
-              <ReactionButtons
-                r={r}
-                mine={mine}
-                meId={me.id}
-                onFeel={feel}
-                onLikes={() => setLikesOpen(true)}
-                onNotes={() => setNotesOpen(true)}
-                onSave={save}
-              />
-              {toast > 0 && (
-                <div
-                  key={toast}
-                  role="status"
-                  className="pointer-events-none absolute bottom-full right-0 z-10 mb-1.5 whitespace-nowrap rounded-full border border-coral/70 bg-white/90 px-3 py-1.5 text-[13px] font-semibold text-card-ink shadow-[0_10px_26px_-12px_rgba(13,42,63,0.5)] backdrop-blur-md"
-                  style={{ animation: "toast-blip 1.6s cubic-bezier(.2,.75,.25,1) both" }}
-                >
-                  Added to core
-                </div>
-              )}
             </div>
+          </div>
+          <div className="-my-1.5">
+            <ReactionButtons
+              r={r}
+              mine={mine}
+              meId={me.id}
+              onFeel={feel}
+              onLikes={() => setLikesOpen(true)}
+              onNotes={() => setNotesOpen(true)}
+              onSave={save}
+            />
           </div>
           <div className="relative">
             <SongPlayer
