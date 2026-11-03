@@ -88,8 +88,8 @@ export function Feature({
   // save it to your core, or take it back out, the same way
   const save = async () => {
     if (!r || mine) return;
-    setTip(false);
     const on = !r.saved;
+    if (on) setToast((n) => n + 1);
     const before = r;
     setR({ ...r, saved: on });
     const res = await api.save(post.id, on);
@@ -130,23 +130,13 @@ export function Feature({
     return () => ro.disconnect();
   }, [top, cover]);
 
-  // the first song you open that isn't yours explains the core button, once
-  const [tip, setTip] = useState(false);
+  // a quick "Added to core" when you save it (the count restarts the pill)
+  const [toast, setToast] = useState(0);
   useEffect(() => {
-    if (mine) return;
-    try {
-      if (localStorage.getItem(TIP_KEY)) return;
-    } catch {
-      return;
-    }
-    const t = setTimeout(() => {
-      setTip(true);
-      try {
-        localStorage.setItem(TIP_KEY, "1");
-      } catch {}
-    }, 900);
+    if (!toast) return;
+    const t = setTimeout(() => setToast(0), 1600);
     return () => clearTimeout(t);
-  }, [mine]);
+  }, [toast]);
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
@@ -312,7 +302,16 @@ export function Feature({
                 onNotes={() => setNotesOpen(true)}
                 onSave={save}
               />
-              {tip && <SaveTip onDone={() => setTip(false)} />}
+              {toast > 0 && (
+                <div
+                  key={toast}
+                  role="status"
+                  className="pointer-events-none absolute bottom-full right-0 z-10 mb-1.5 whitespace-nowrap rounded-full border border-coral/70 bg-white/90 px-3 py-1.5 text-[13px] font-semibold text-card-ink shadow-[0_10px_26px_-12px_rgba(13,42,63,0.5)] backdrop-blur-md"
+                  style={{ animation: "toast-blip 1.6s cubic-bezier(.2,.75,.25,1) both" }}
+                >
+                  Added to core
+                </div>
+              )}
             </div>
           </div>
           <div className="relative">
@@ -353,28 +352,7 @@ export function Feature({
   );
 }
 
-const TIP_KEY = "sotd-save-tip";
-
 // The caption on the back of the cover: smaller as it gets longer, and on a
 // smaller cover, so all 100 characters fit inside the square.
 const captionSize = (text: string, cover: number) =>
   Math.round((text.length > 70 ? 18 : text.length > 40 ? 21 : 25) * Math.min(1, cover / 320));
-
-// A bubble over the core button, the first time: what saving does.
-function SaveTip({ onDone }: { onDone(): void }) {
-  return (
-    <div
-      role="status"
-      className="rise-in absolute bottom-full right-0 z-10 mb-2.5 flex w-[250px] flex-col gap-2 rounded-[18px] bg-card-ink px-4 py-3 text-white shadow-[0_14px_34px_-12px_rgba(13,42,63,0.6)]"
-    >
-      <div className="text-[13px] leading-snug">
-        <b className="font-semibold">Save it to your core.</b> Tap the little core to keep this song in your core, so you can
-        find it again anytime.
-      </div>
-      <button type="button" onClick={onDone} className="self-end text-xs font-semibold text-white/80 hover:text-white">
-        Got it
-      </button>
-      <span aria-hidden className="absolute -bottom-1.5 right-[112px] h-3 w-3 rotate-45 bg-card-ink" />
-    </div>
-  );
-}
