@@ -31,13 +31,8 @@ const nosifer = Nosifer({ variable: "--font-nosifer", subsets: ["latin"], weight
 export const metadata: Metadata = {
   title: "TopTrack",
   description: "One song a day. The one that hit hardest.",
-  // The iPhone home screen icon, as a plain file at the address Safari also
-  // looks for on its own, so Add to Home Screen never falls back to a letter.
-  icons: {
-    icon: [{ url: "/icon.png", sizes: "256x256", type: "image/png" }],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-  },
-  appleWebApp: { title: "TopTrack" }, // the name under the home screen icon
+  // The icons and home screen name are written straight into <head> below,
+  // not here (see the note there).
 };
 
 export const viewport: Viewport = {
@@ -53,6 +48,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${outfit.variable} ${fredoka.variable} ${bungee.variable} ${creepster.variable} ${gothic.variable} ${nosifer.variable} h-full antialiased`}>
+      {/* The home screen icon and name, always in <head>. Pages that look
+          something up for their title (invite links, profiles) make Next send
+          its metadata late, inside <body>, and Safari's Add to Home Screen
+          only reads <head>, so friends adding from an invite link got a gray
+          letter instead of the icon. */}
+      <head>
+        <link rel="icon" href="/icon.png" sizes="256x256" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" type="image/png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="apple-mobile-web-app-title" content="TopTrack" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body className="min-h-full">
         {/* what's playing carries on from page to page */}
         <PreviewProvider>
