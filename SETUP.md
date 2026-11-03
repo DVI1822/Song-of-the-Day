@@ -194,72 +194,48 @@ preview.
    (name plus their Spotify account's email). In development mode Spotify
    lets up to 5 people connect.
 
-## Part 4d: Send sign-in emails from your own domain (needed for Yahoo and AOL)
+## Part 4d: Move the site and its sign-in emails to mytoptrack.io
 
-Supabase's built-in email sender is only for trying things out. It sends from
-a shared Supabase address with no link to `mytoptrack.io`, it only sends a couple
-of emails an hour for the whole site, and it may only deliver to members of
-your Supabase team. Yahoo and AOL (both run by Yahoo) check that an email
-really comes from the domain it claims (SPF, DKIM and DMARC) and quietly drop
-mail that doesn't. Gmail is more forgiving, which is why it seemed to work.
+Sign-in emails already go through Resend (Supabase custom SMTP, API key
+"Supabase SOTD"). Yahoo and AOL (both run by Yahoo) are much stricter than
+Gmail: they want the sending domain to pass SPF and DKIM and to publish a
+DMARC record, or they quietly drop the email. These steps move the site, and
+the sender, to `mytoptrack.io` with all of that in place.
 
-The fix is to send through Resend (free for 3,000 emails a month) from
-`hello@mytoptrack.io`.
+**1. Move the site (once)**
 
-**0. Move the site to mytoptrack.io (once)**
-
-1. In Vercel, add `mytoptrack.io` under the project's **Settings → Domains**, and
-   set `mysong.day` to redirect to it so old links keep working.
+1. In Vercel, add `mytoptrack.io` under the project's **Settings → Domains**,
+   and set `mysong.day` to redirect to it so old links keep working.
 2. In Supabase **Authentication → URL Configuration**, set **Site URL** to
    `https://mytoptrack.io` and add `https://mytoptrack.io/auth/callback` to
    **Redirect URLs**.
-3. In the Spotify developer dashboard, add `https://mytoptrack.io/spotify/callback`
-   as a Redirect URI.
+3. In the Spotify developer dashboard, add
+   `https://mytoptrack.io/spotify/callback` as a Redirect URI.
 
 Everyone signs in once more on the new address, since sign-ins are per domain.
 
-**1. Set up Resend (5 minutes)**
+**2. Verify the domain in Resend**
 
-1. Sign up at [resend.com](https://resend.com).
-2. Open **Domains → Add Domain**, type `mytoptrack.io`, and click **Add**.
-3. Resend shows 3 or 4 DNS records (an MX and a TXT on `send`, and a TXT on
-   `resend._domainkey`). Keep that page open.
+1. In Resend, open **Domains → Add Domain** and add `mytoptrack.io`.
+2. Add the records it shows (MX and TXT on `send`, TXT on
+   `resend._domainkey`) in **vercel.com → Domains → mytoptrack.io → DNS
+   Records**, plus a TXT record named `_dmarc` with `v=DMARC1; p=none;`.
+3. Click **Verify DNS Records** and wait for it to turn green.
 
-**2. Add the records to your domain's DNS**
+**3. Change the sender in Supabase**
 
-1. Open DNS for `mytoptrack.io`. Since it was bought through Vercel, that's
-   **vercel.com → Domains → mytoptrack.io → DNS Records**.
-2. Add each record from Resend exactly as shown (type, name, value).
-3. Add one more TXT record so Yahoo and AOL see a DMARC policy:
-   - **Name:** `_dmarc`
-   - **Value:** `v=DMARC1; p=none;`
-4. Back in Resend, click **Verify DNS Records**. It can take a few minutes to
-   an hour to turn green.
+In **Authentication → Emails → SMTP Settings**, keep the Resend host, port,
+username and key, and change **Sender email** to `hello@mytoptrack.io` and
+**Sender name** to `TopTrack`. Save.
 
-**3. Point Supabase at Resend**
+**4. If a Yahoo or AOL address still gets nothing**
 
-1. In Resend, open **API Keys → Create API Key** (Sending access is enough) and
-   copy the key.
-2. In Supabase, open **Authentication → Emails → SMTP Settings** and turn on
-   **Enable custom SMTP**:
-   - **Sender email:** `hello@mytoptrack.io`
-   - **Sender name:** `TopTrack`
-   - **Host:** `smtp.resend.com`
-   - **Port:** `465`
-   - **Username:** `resend`
-   - **Password:** the API key from Resend
-3. Click **Save**.
-4. Open **Authentication → Rate Limits** and set **Rate limit for sending
-   emails** to something like 100 an hour.
-
-(Resend also has a one-click Supabase integration under **Settings →
-Integrations** that fills in step 3 for you. Either way works.)
-
-**4. Test it**
-
-Sign out, then sign in with a Yahoo or AOL address. The email should arrive
-within a minute, from TopTrack. If it lands in **Bulk**, mark it "Not spam"
-once; it gets better as more people sign in.
+- Open Resend **Emails** and search for the address. **Delivered** means it's
+  in their Bulk folder. **Bounced** or **Suppressed** means Resend stopped
+  sending to it after an earlier failure: remove it under **Suppressions** and
+  try again. No entry at all means Supabase never sent it; check
+  **Authentication → Rate Limits** (raise "sending emails" to about 100 an
+  hour).
 
 ---
 
@@ -292,9 +268,8 @@ clicking it they only see an "invite only, for now" page.
 
 ## Good to know
 
-- **Sign-in emails need your own sender.** Supabase's built-in sender only
-  sends a few emails an hour and Yahoo and AOL drop its mail. Part 4d sets up
-  Resend so every address gets the code.
+- **Sign-in emails go through Resend.** Part 4d covers the sending domain
+  and what to check when an address gets nothing.
 - **Every change goes live on its own.** Each time a pull request is merged
   into `main`, Vercel rebuilds the site in a minute or two.
 - **Pull requests get preview links.** Vercel comments a preview link on each
