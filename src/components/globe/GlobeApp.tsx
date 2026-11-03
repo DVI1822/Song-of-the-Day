@@ -1018,6 +1018,22 @@ function Globe({
     s.target = aim(sim.current.pos(shuffleK), s.yaw);
     setFocus(shuffleK);
   }, [shuffleK]);
+  // the now-playing pill names whoever put the song on your globe, and tapped,
+  // flies you to its tile
+  const shuffleWho = useMemo(() => {
+    const kOf = (p: Post) => (p.id === myPost?.id ? ME : friends.findIndex((f) => !f.hidden && f.post?.id === p.id));
+    return {
+      name: (p: Post) => {
+        const k = kOf(p);
+        return k === ME ? "You" : k >= 0 ? friends[k].display_name : null;
+      },
+      open: (p: Post) => {
+        const k = kOf(p);
+        if (k === -1 || m.current.featOn || m.current.coreOn) return;
+        pick(k, false);
+      },
+    };
+  }, [friends, myPost, pick]);
   // the title follows how dark the top of the sky is (sky.ts): the weather's
   // sky when there's one, and dark lettering once a fair day clouds over
   const wxSky = weatherSky(weather, darkOn ? 1 : 0, warm);
@@ -1063,6 +1079,7 @@ function Globe({
           {hw ? "TopTrack" : <Wordmark light={inkLight} />}
         </h1>
         <Clock color={muted} />
+        {posted && !launching && <Countdown color={muted} timeZone={me.timezone} />}
       </div>
 
       {/* the stage */}
@@ -1162,21 +1179,20 @@ function Globe({
       {/* lightning lights up everything */}
       <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
-      {/* + until you've posted, then the countdown to midnight, with shuffle all just above */}
+      {/* the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
       <div
         ref={(el) => void (R.current.chrome[1] = el)}
-        className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex h-[90px] items-center justify-center"
+        className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex flex-col items-center justify-end gap-2"
+        style={{ minHeight: posted ? 0 : 90 }}
       >
-        <div className="absolute inset-x-0 bottom-full flex flex-col items-center gap-2 pb-1">
-          {shuffleSongs.length > 0 && <SongCount n={shuffleSongs.length} dark={darkOn} />}
-          <Shuffle songs={shuffleSongs} />
-        </div>
+        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
+        <Shuffle songs={shuffleSongs} who={shuffleWho} />
         {!posted && !launching && (
           <button
             type="button"
             onClick={openCompose}
             aria-label="Add today's song"
-            className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white"
+            className="mt-3 flex h-16 w-16 flex-none items-center justify-center rounded-full bg-accent text-white"
             style={{
               boxShadow: `0 0 0 6px rgba(${hw?.accentRgb ?? "215,38,43"},0.12), 0 12px 28px -8px rgba(${hw?.accentRgb ?? "215,38,43"},0.55)`,
             }}
@@ -1186,7 +1202,6 @@ function Globe({
             </svg>
           </button>
         )}
-        {posted && !launching && <Countdown dark={darkOn} timeZone={me.timezone} />}
       </div>
 
       {/* recenter: bring every posted song round to the front for a while */}
@@ -1909,8 +1924,7 @@ function Clock({ color }: { color: string }) {
   );
 }
 
-// Time left until midnight where you live, when the next song opens up.
-// The countdown's hollow bubble lettering.
+// The song count's hollow bubble lettering.
 const outline = (dark: boolean): React.CSSProperties =>
   dark
     ? { color: "rgba(230,240,255,0.06)", WebkitTextStroke: "1.5px rgba(230,240,255,0.6)", textShadow: "0 0 18px rgba(180,210,255,0.25)" }
@@ -1933,7 +1947,9 @@ function SongCount({ n, dark }: { n: number; dark: boolean }) {
   );
 }
 
-function Countdown({ dark, timeZone }: { dark: boolean; timeZone: string }) {
+// Time left until midnight where you live, when the next song opens up: a
+// small line under the clock.
+function Countdown({ color, timeZone }: { color: string; timeZone: string }) {
   const now = useNow();
   if (!now) return null;
   let left: number;
@@ -1956,10 +1972,10 @@ function Countdown({ dark, timeZone }: { dark: boolean; timeZone: string }) {
     <div
       role="timer"
       aria-label={`${hh} hours ${mm} minutes until the next song`}
-      className="font-bubble text-[50px] font-semibold leading-none tracking-[0.05em] tabular-nums transition-colors duration-500"
-      style={outline(dark)}
+      className="h-4 text-[11px] tracking-[0.04em] tabular-nums opacity-75 transition-colors duration-500"
+      style={{ color }}
     >
-      {two(hh)}:{two(mm)}:{two(ss)}
+      next song in {two(hh)}:{two(mm)}:{two(ss)}
     </div>
   );
 }
