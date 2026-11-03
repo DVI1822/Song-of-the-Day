@@ -203,7 +203,8 @@ export function Feature({
             </button>
           </div>
         </div>
-        {flagging ? (
+        <div className="relative">
+          {flagging ? (
           <div className="relative overflow-hidden" style={{ width: cover, height: cover, borderRadius: radius }}>
             <Cover
               src={post.artwork_url}
@@ -285,7 +286,10 @@ export function Feature({
               </div>
             </div>
           </button>
-        )}
+          )}
+          {/* the compass star with the song's facts, on the cover's bottom right */}
+          {!flagging && <FactsButton post={post} load={api.facts} />}
+        </div>
         <div ref={card} className="flex flex-col gap-3.5">
           <div className="relative flex flex-col gap-[3px]">
             <div
@@ -329,7 +333,6 @@ export function Feature({
           </div>
         </div>
       </div>
-      <FactsButton post={post} load={api.facts} />
       {notesOpen && (
         <NotesSheet
           api={api}

@@ -6,11 +6,12 @@ import type { Post, SongFacts as Facts } from "@/lib/types";
 import { glass } from "./ui";
 
 // Facts about a song (how it was made, the story behind it, the artist), one
-// at a time, beside a less-seen photo of the artist. They live in a little
-// compass star at the bottom left: right after you post, your song's facts
-// come out on their own, then get pulled back into the star like a black
-// hole. A tap on the star brings them out again. In any song you open, the
-// star is there too, and its facts only come out when you tap it.
+// at a time, beside a less-seen photo of the artist. They live in a compass
+// star button at the globe's bottom left, opposite the "bring the songs to the
+// front" button: right after you post, your song's facts come out on their
+// own, then get pulled back into the star like a black hole. A tap on the star
+// brings them out again. In any song you open, the star sits on the bottom
+// right of the album cover, and its facts only come out when you tap it.
 
 type Load = (postId: string) => Promise<Facts | null>;
 
@@ -192,34 +193,33 @@ function Flight({ open, star, children }: { open: boolean; star: RefObject<HTMLE
 
 // --- the compass star ---------------------------------------------------------------
 
-// A compass rose: four long points and four short, each a lit half and a
-// shaded half, in pale gold on a dark round. While it's pulling the facts in,
-// it grows, glows and spins like a little black hole.
+// A plain compass star, drawn like the Globe's other button icons: one
+// colour (the button's ink), a four-point star with short ticks between the
+// points. While it's pulling the facts in it spins, like a little black hole.
 export function CompassStar({ spin }: { spin?: boolean }) {
-  const point = (angle: number, long: number, half: number, k: number) => (
-    <g key={k} transform={`rotate(${angle})`}>
-      <path d={`M0 0 L0 ${-long} L${half} ${-half * 1.1} Z`} fill="#FFF4DC" />
-      <path d={`M0 0 L0 ${-long} L${-half} ${-half * 1.1} Z`} fill="#C9A35F" />
-    </g>
-  );
   return (
-    <svg aria-hidden viewBox="-50 -50 100 100" className={`h-full w-full ${spin ? "animate-[star-spin_0.9s_linear_infinite]" : "animate-[star-spin_60s_linear_infinite]"}`}>
-      <circle r="31" fill="none" stroke="rgba(255,236,200,0.28)" strokeWidth="1" />
-      <circle r="22" fill="none" stroke="rgba(255,236,200,0.16)" strokeWidth="0.8" strokeDasharray="1.5 3" />
-      {[45, 135, 225, 315].map((a, k) => point(a, 27, 6, k))}
-      {[0, 90, 180, 270].map((a, k) => point(a, 44, 8, k + 4))}
-      <circle r="3.2" fill="#FFF4DC" />
-      <circle r="1.4" fill="#C9A35F" />
+    <svg
+      aria-hidden
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      className={spin ? "animate-[star-spin_0.8s_linear_infinite]" : ""}
+    >
+      <path d="M12 2 14.5 9.5 22 12 14.5 14.5 12 22 9.5 14.5 2 12 9.5 9.5Z" fill="currentColor" />
+      <path d="M5.6 5.6 7.6 7.6M18.4 5.6 16.4 7.6M5.6 18.4 7.6 16.4M18.4 18.4 16.4 16.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
 
+// The round glass button, the twin of the "bring the songs to the front"
+// button on the other side of the globe.
 function StarButton({
   starRef,
   pulling,
   busy,
   open,
   label,
+  dark,
   onClick,
 }: {
   starRef: RefObject<HTMLButtonElement | null>;
@@ -227,6 +227,7 @@ function StarButton({
   busy?: boolean;
   open: boolean;
   label: string;
+  dark: boolean;
   onClick: () => void;
 }) {
   return (
@@ -236,14 +237,8 @@ function StarButton({
       onClick={onClick}
       aria-label={label}
       aria-expanded={open}
-      className="pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full p-[5px] transition-[transform,box-shadow] duration-500"
-      style={{
-        background: "radial-gradient(circle, #03040A 0%, #070A18 42%, #172042 78%, #26335E 100%)",
-        transform: pulling ? "scale(1.4)" : "none",
-        boxShadow: pulling
-          ? "0 0 0 1.5px rgba(255,190,130,0.7), 0 0 26px 8px rgba(255,140,90,0.45), 0 0 60px 12px rgba(120,110,255,0.25)"
-          : `0 0 0 1px rgba(255,236,200,${open ? 0.6 : 0.3}), 0 8px 20px -8px rgba(5,8,20,0.7)${open ? ", 0 0 18px 2px rgba(255,220,160,0.3)" : ""}`,
-      }}
+      className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-500"
+      style={{ ...glass(dark), transform: pulling ? "scale(1.25)" : "none" }}
     >
       <CompassStar spin={pulling || busy} />
     </button>
@@ -252,7 +247,19 @@ function StarButton({
 
 // --- on the Globe: your own song -------------------------------------------------------
 
-export function MyFacts({ post, load, onOpen }: { post: Post | null; load?: Load; onOpen?: (open: boolean) => void }) {
+export function MyFacts({
+  post,
+  load,
+  onOpen,
+  starHost,
+  dark,
+}: {
+  post: Post | null;
+  load?: Load;
+  onOpen?: (open: boolean) => void;
+  starHost: HTMLElement | null;
+  dark: boolean;
+}) {
   const [got, setGot] = useState<{ id: string; facts: Facts } | null>(null);
   const [open, setOpen] = useState(false);
   const [pulling, setPulling] = useState(false);
@@ -304,19 +311,22 @@ export function MyFacts({ post, load, onOpen }: { post: Post | null; load?: Load
   if (!facts || !post) return null;
   return (
     <>
-      <div className="absolute bottom-0 left-[18px] z-[1]">
-        <StarButton
-          starRef={star}
-          pulling={pulling}
-          open={open}
-          label={open ? "Put the facts about your song away" : "Facts about your song"}
-          onClick={() => {
-            setAuto(false);
-            if (open) close();
-            else setOpen(true);
-          }}
-        />
-      </div>
+      {starHost &&
+        createPortal(
+          <StarButton
+            starRef={star}
+            pulling={pulling}
+            open={open}
+            dark={dark}
+            label={open ? "Put the facts about your song away" : "Facts about your song"}
+            onClick={() => {
+              setAuto(false);
+              if (open) close();
+              else setOpen(true);
+            }}
+          />,
+          starHost,
+        )}
       <Flight open={open} star={star}>
         <div className="mb-2">
           <FactsCard post={post} facts={facts} />
@@ -328,10 +338,9 @@ export function MyFacts({ post, load, onOpen }: { post: Post | null; load?: Load
 
 // --- in a song you open: only when you tap the star ------------------------------------------
 
-// The card comes out above the song, where there's room, and only asks the
-// server for the facts once you tap. On short phones the star sits top left,
-// clear of the play button.
-
+// The star sits on the bottom right of the album cover; the card comes out
+// above the song, where there's room, and the facts are only asked for once
+// you tap.
 export function FactsButton({ post, load }: { post: Post; load?: Load }) {
   const [facts, setFacts] = useState<Facts | null>(null);
   const [busy, setBusy] = useState(false);
@@ -363,19 +372,22 @@ export function FactsButton({ post, load }: { post: Post; load?: Load }) {
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 top-[max(20px,env(safe-area-inset-top))] z-[2] flex justify-center [@media(max-height:739px)]:top-[calc(max(20px,env(safe-area-inset-top))+54px)]">
-        {facts && (
-          <Flight open={open} star={star}>
-            <FactsCard post={post} facts={facts} />
-          </Flight>
+      {facts &&
+        createPortal(
+          <div className="pointer-events-none fixed inset-x-0 top-[max(20px,env(safe-area-inset-top))] z-[490] flex justify-center">
+            <Flight open={open} star={star}>
+              <FactsCard post={post} facts={facts} />
+            </Flight>
+          </div>,
+          document.body,
         )}
-      </div>
-      <div className="absolute bottom-[calc(46px+env(safe-area-inset-bottom))] left-[18px] z-[2] flex items-center gap-2.5 [@media(max-height:739px)]:bottom-auto [@media(max-height:739px)]:top-[max(20px,env(safe-area-inset-top))]">
+      <div className="absolute bottom-3 right-3 z-[2] flex flex-row-reverse items-center gap-2">
         <StarButton
           starRef={star}
           pulling={pulling}
           busy={busy}
           open={open}
+          dark={false}
           label={open ? "Put the facts away" : `Facts about ${post.title}`}
           onClick={tap}
         />
