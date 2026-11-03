@@ -8,7 +8,7 @@ import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
 import { skyAt, weatherSky, type SkyLook } from "./sky";
 import { Shuffle } from "./Shuffle";
-import { SongFacts } from "./SongFacts";
+import { MyFacts } from "./SongFacts";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
 import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
@@ -287,6 +287,8 @@ function Globe({
   const [coreOpen, setCoreOpen] = useState(false);
   const [friendCore, setFriendCore] = useState<{ id: string; profile: Profile; posts: Post[] } | null>(null);
   const [darkOn, setDarkOn] = useState(false);
+  // the facts about your song are out (on short phones they take the song count's place)
+  const [factsOpen, setFactsOpen] = useState(false);
   const [skyLight, setSkyLight] = useState(false);
   // Halloween's look, on the day (halloween.ts); read once we're in the browser
   const hw = useSyncExternalStore(noSub, halloween, noLook);
@@ -1186,13 +1188,9 @@ function Globe({
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex flex-col items-center justify-end gap-2"
         style={{ minHeight: posted ? 0 : 90 }}
       >
-        {/* on short phones the facts take the song count's place */}
-        {posted && !launching && (
-          <div className="mb-2">
-            <SongFacts post={myPost} load={api.facts} />
-          </div>
-        )}
-        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && !(posted && L.h < 740) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
+        {/* your song's facts, which live in the compass star at the bottom left */}
+        {posted && !launching && <MyFacts post={myPost} load={api.facts} onOpen={setFactsOpen} />}
+        {shuffleSongs.length > 0 && !(pv.shuffle || pv.track) && !(factsOpen && L.h < 740) && <SongCount n={shuffleSongs.length} dark={darkOn} />}
         <Shuffle songs={shuffleSongs} who={shuffleWho} />
         {!posted && !launching && (
           <button

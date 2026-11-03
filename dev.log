@@ -1,0 +1,28 @@
+▲ Next.js 16.4.2 (Turbopack)
+- Local:         http://localhost:3005
+- Network:       http://192.0.2.2:3005
+✓ Ready in 595ms
+✓ Running next.config.ts took 88ms
+
+ GET /demo 200 in 1923ms (next.js: 1178ms, proxy.ts: 276ms, application-code: 469ms)
+ GET /demo 200 in 148ms (next.js: 7ms, proxy.ts: 13ms, application-code: 128ms)
+ GET /api/weather 200 in 200ms (next.js: 131ms, proxy.ts: 12ms, application-code: 57ms)
+ GET /api/weather 200 in 32ms (next.js: 8ms, proxy.ts: 14ms, application-code: 10ms)
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundPosition) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundSize) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+ GET /demo 200 in 185ms (next.js: 69ms, proxy.ts: 9ms, application-code: 106ms)
+ GET /api/weather 200 in 26ms (next.js: 12ms, proxy.ts: 7ms, application-code: 7ms)
+ GET /api/weather 200 in 18ms (next.js: 7ms, proxy.ts: 6ms, application-code: 6ms)
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundPosition) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundSize) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+ GET /demo 200 in 119ms (next.js: 7ms, proxy.ts: 5ms, application-code: 107ms)
+ GET /api/weather 200 in 34ms (next.js: 7ms, proxy.ts: 20ms, application-code: 7ms)
+ GET /api/weather 200 in 26ms (next.js: 13ms, proxy.ts: 6ms, application-code: 7ms)
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundPosition) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundSize) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+ GET /demo 200 in 214ms (next.js: 39ms, proxy.ts: 7ms, application-code: 168ms)
+ GET /api/weather 200 in 21ms (next.js: 7ms, proxy.ts: 9ms, application-code: 5ms)
+ GET /api/weather 200 in 23ms (next.js: 10ms, proxy.ts: 7ms, application-code: 6ms)
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundPosition) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+[browser] Updating a style property during rerender (background) when a conflicting property is set (backgroundSize) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+[?25h

@@ -198,7 +198,7 @@ preview.
 
 After you post, a few short facts about your song (how it was made, the
 story behind it, the artist) turn over under the Globe, beside a less-seen
-photo of the artist. Claude reads the song's and artist's Wikipedia articles
+photo of the artist, then get pulled into a compass star at the bottom left that brings them back with a tap. Open anyone's song and the same star shows its facts. Claude reads the song's and artist's Wikipedia articles
 and may search a short list of music sites (Rolling Stone, Pitchfork, NPR,
 Genius...). Every fact has to cite the passage it came from, and any fact
 without one is thrown out. The photo comes from Wikimedia Commons, with the

@@ -176,8 +176,25 @@ const CHAT: Message[] = [
 
 const demoApi: GlobeApi = {
   // made-up facts for the made-up song
-  async facts() {
+  async facts(postId) {
     await new Promise((r) => setTimeout(r, 900));
+    const theirs = FRIENDS.find((f) => f.post?.id === postId)?.post;
+    if (theirs)
+      return {
+        facts: [
+          {
+            text: `${theirs.artist} cut ${theirs.title} live in one take, then spent a week trying to beat it and gave up.`,
+            about: "song" as const,
+            source: { name: "Pitchfork", url: "https://pitchfork.com/" },
+          },
+          {
+            text: `The whistle at the end of ${theirs.title} is the producer's dog, recorded by accident.`,
+            about: "song" as const,
+            source: { name: "NPR", url: "https://www.npr.org/" },
+          },
+        ],
+        photo: { url: cover(9), width: 480, height: 480, page: "https://commons.wikimedia.org/", credit: "Sam Okafor", license: "CC BY 2.0" },
+      };
     return {
       facts: [
         {

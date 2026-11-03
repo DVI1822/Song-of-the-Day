@@ -7,6 +7,7 @@ import { SignalCore } from "./SignalCore";
 import { halloween } from "./halloween";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
+import { FactsButton } from "./SongFacts";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
 import type { StorySky } from "./storyVideo";
 import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
@@ -328,6 +329,7 @@ export function Feature({
           </div>
         </div>
       </div>
+      <FactsButton post={post} load={api.facts} />
       {notesOpen && (
         <NotesSheet
           api={api}
