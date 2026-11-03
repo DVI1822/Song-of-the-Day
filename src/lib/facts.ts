@@ -21,10 +21,10 @@ import type { ArtistPhoto, SongFact, SongFacts } from "./types";
 const MODEL = "claude-opus-5-5";
 const UA = "TopTrack/1.0 (https://www.mytoptrack.io)";
 // A song nobody found anything on is looked for again after this long.
-const RETRY_EMPTY_MS = 86_400_000;
+const RETRY_EMPTY_MS = 6 * 3_600_000;
 // Bumped when the way facts are made changes, so empty answers from before
 // are tried again.
-const VERSION = "v2";
+const VERSION = "v3";
 
 // --- the song's key: one row per song, whatever version was posted ---------
 
@@ -273,6 +273,8 @@ export const SITES: Record<string, string> = {
   "undertheradarmag.com": "Under the Radar",
   "lineofbestfit.com": "The Line of Best Fit",
   "kexp.org": "KEXP",
+  "exclaim.ca": "Exclaim!",
+  "wbez.org": "WBEZ",
 };
 
 export function siteName(url: string) {
@@ -287,7 +289,7 @@ export function siteName(url: string) {
 
 const SYSTEM = `You write the short "behind the song" notes for TopTrack, an app where friends each share the one song that hit hardest today. Right after someone posts their song, a few of your notes appear under it.
 
-You may get Wikipedia articles about the song and its artist, and you can search music press sites. Look for up to 3 facts a fan would enjoy learning: how and where the song was written or recorded, who played on it, what inspired it, a surprising detail about its story, or something striking about the artist. Prefer facts about this exact song (check it's the right song by the right artist); when there's little about the song, find facts about the artist instead (where they're from, how they started, how they make their music). Skip dry facts (chart positions, sales, certifications, release dates, track lengths) unless they're genuinely remarkable, and never say only that "X is a song by Y". Search at most three times, and only if the articles don't already give you good material; if searching for the song finds nothing, search for the artist.
+You may get Wikipedia articles about the song and its artist, and you can search music press sites. Look for up to 3 facts a fan would enjoy learning: how and where the song was written or recorded, who played on it, what inspired it, a surprising detail about its story, or something striking about the artist. Prefer facts about this exact song (check it's the right song by the right artist); when there's little about the song, find facts about the artist instead (where they're from, how they started, how they make their music). Skip dry facts (chart positions, sales, certifications, release dates, track lengths) unless they're genuinely remarkable, and never say only that "X is a song by Y". Search at most three times, and only if the articles don't already give you good material. Song titles and artist names are often ordinary words, so search the way a fan would: the artist's name in quotes with the song title, then the artist's name in quotes with words like musician, band, album or interview. If the song finds nothing, search for the artist: who they are, where they're from, other bands they've been in, how they make their music.
 
 Rules:
 - Every fact must come from a source you were given or found, and be cited. Do not add anything from your own knowledge, even if you're sure it's true.
@@ -296,6 +298,9 @@ Rules:
 FACT (song): <the fact>
 FACT (artist): <the fact>
 - Fewer facts is fine. If nothing is worth saying, write NONE.`;
+
+// Added when the music press had nothing: the search may go anywhere then.
+const WIDER = `The music sites had nothing on this one, so now you can search the whole web. Use pages that report on the artist: music press, local papers and radio, interviews, the artist's or label's own pages, Bandcamp. Skip lyrics sites, fan wikis, AI-written pages, and anything about a different artist with a similar name.`;
 
 type Cite = { url: string; title: string };
 
@@ -351,10 +356,15 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
     })),
     { type: "text", text: `The song someone just posted: "${title}" by ${artist}.` },
   ];
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
   const client = new Anthropic({ timeout: 75_000, maxRetries: 1 });
   let sites = Object.keys(SITES);
-  try {
+  // First only the music press on the list; if that finds nothing (a small
+  // artist the press hasn't covered), anywhere on the web. Either way every
+  // fact must cite where it came from.
+  const attempt = async (open: boolean): Promise<SongFact[]> => {
+    const messages: Anthropic.Beta.BetaMessageParam[] = [
+      { role: "user", content: open ? [...content, { type: "text", text: WIDER }] : content },
+    ];
     const ask = () =>
       client.beta.messages.create({
         model: MODEL,
@@ -363,7 +373,11 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
         fallbacks: "default",
         output_config: { effort: "low" },
         system: SYSTEM,
-        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3, allowed_domains: sites }],
+        tools: [
+          open
+            ? { type: "web_search_20260209", name: "web_search", max_uses: 3 }
+            : { type: "web_search_20260209", name: "web_search", max_uses: 3, allowed_domains: sites },
+        ],
         messages,
       });
     for (let turn = 0; turn < 3; turn++) {
@@ -388,11 +402,15 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
       const facts = factsFrom(res.content, docs);
       if (!facts.length) {
         const said = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-        console.warn(`song facts: no cited facts for "${title}" by ${artist}. Claude wrote: ${said.slice(0, 500)}`);
+        console.warn(`song facts: no cited facts for "${title}" by ${artist}${open ? " (whole web)" : ""}. Claude wrote: ${said.slice(0, 500)}`);
       }
       return facts;
     }
     return [];
+  };
+  try {
+    const facts = await attempt(false);
+    return facts.length ? facts : await attempt(true);
   } catch (e) {
     console.error(`song facts: Claude call failed for "${title}" by ${artist}: ${e instanceof Error ? e.message : String(e)}`);
     return null;
