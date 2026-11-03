@@ -15,10 +15,10 @@ export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }
   const [g1, g2] = light ? ["185,240,168", "143,208,255"] : ["70,170,96", "48,132,206"];
   // a faint fill so the letters read as tinted glass, and a brighter rim that keeps them legible
   const top = light ? "rgba(255,255,255,0.14)" : "rgba(13,42,63,0.1)";
-  const topRim = light ? "rgba(255,255,255,0.8)" : "rgba(13,42,63,0.6)";
+  const topRim = light ? "rgba(255,255,255,0.6)" : "rgba(13,42,63,0.45)";
   const track = `linear-gradient(180deg, rgba(${g1},0.2), rgba(${g2},0.2))`;
-  const trackRim = light ? `rgba(${g2},0.9)` : `rgba(${g2},0.85)`;
-  const stroke = Math.max(1, size * 0.045);
+  const trackRim = light ? `rgba(${g2},0.75)` : `rgba(${g2},0.7)`;
+  const stroke = size * 0.022;
   const id = light ? "wm-night" : "wm-day";
   return (
     <span className="inline-flex items-end" style={{ gap: size * 0.1, fontFamily: "var(--font-bungee), var(--font-outfit), sans-serif", fontSize: size, lineHeight: 1 }}>
@@ -34,7 +34,7 @@ export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }
           </mask>
           {/* keeps only the outer edge of the hand, for the glass rim */}
           <filter id={`${id}-rim`} x="-10%" y="-10%" width="120%" height="120%">
-            <feMorphology in="SourceAlpha" operator="erode" radius="2.6" result="in" />
+            <feMorphology in="SourceAlpha" operator="erode" radius="1.4" result="in" />
             <feComposite in="SourceGraphic" in2="in" operator="out" />
           </filter>
         </defs>
