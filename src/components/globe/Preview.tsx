@@ -160,7 +160,15 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
               setTrack((t) => (t?.kind === "embed" && spotifyUriOf(t.post) === uri ? { ...t, paused: isPaused } : t));
               if (!isPaused) setEmbedShown(false);
             });
-            resolve(c);
+            // Spotify hands over its controller before its player has loaded
+            // the song, and a play() sent before then is dropped (which is why
+            // play used to need a second tap). Wait for "ready", with a
+            // fallback in case it never says so.
+            const done = setTimeout(() => resolve(c), 5000);
+            c.addListener("ready", () => {
+              clearTimeout(done);
+              resolve(c);
+            });
           }),
         ),
     );
@@ -398,6 +406,13 @@ export function SongPlayer({
   }, [big, spotifyUri, connect, embedBusy, spotifyController]);
   // it started: stop waiting (set during render, React's way to follow a prop)
   if (waiting && sp?.playing) setWaiting(false);
+  // Spotify's player can still swallow the first play() while it settles:
+  // ask once more, so one tap is always enough
+  useEffect(() => {
+    if (!waiting || !spotifyUri) return;
+    const t = setTimeout(() => void spotifyController(spotifyUri).then((x) => x.play()), 1200);
+    return () => clearTimeout(t);
+  }, [waiting, spotifyUri, spotifyController]);
   // still not playing after a few seconds: show Spotify's player for a tap
   const stuck = waiting && !sp?.playing;
   useEffect(() => {
@@ -405,7 +420,7 @@ export function SongPlayer({
     const t = setTimeout(() => {
       setWaiting(false);
       showEmbed(true);
-    }, 3500);
+    }, 5000);
     return () => clearTimeout(t);
   }, [stuck, showEmbed]);
 
@@ -454,6 +469,7 @@ export function SongPlayer({
     // pause, or carry on, without losing your place
     if (mine && pv.track) {
       if (cx) setCx({ ...cx, playing: Boolean(paused) });
+      setWaiting(false);
       return pv.toggle();
     }
     if (connect && spotifyUri) {
