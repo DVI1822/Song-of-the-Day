@@ -13,11 +13,11 @@ const DETAIL = `<path d="M40.5 50 V60 M51.5 50 V62 M62 52 V63"/><path d="M24 66 
 export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }) {
   // by day the pale brand colours would vanish into the blue sky, so they deepen a little
   const [g1, g2] = light ? ["185,240,168", "143,208,255"] : ["70,170,96", "48,132,206"];
-  const top = light ? "rgba(255,255,255,0.62)" : "rgba(13,42,63,0.5)";
-  const track = `linear-gradient(180deg, rgba(${g1},0.72), rgba(${g2},0.72))`;
+  const top = light ? "rgba(255,255,255,0.42)" : "rgba(13,42,63,0.34)";
+  const track = `linear-gradient(180deg, rgba(${g1},0.5), rgba(${g2},0.5))`;
   const id = light ? "wm-night" : "wm-day";
   return (
-    <span className="inline-flex items-end" style={{ gap: size * 0.28, fontFamily: "var(--font-bungee), var(--font-outfit), sans-serif", fontSize: size, lineHeight: 1 }}>
+    <span className="inline-flex items-end" style={{ gap: size * 0.1, fontFamily: "var(--font-bungee), var(--font-outfit), sans-serif", fontSize: size, lineHeight: 1 }}>
       <svg viewBox="22 9 52 78" width={size * 0.83} height={size * 1.25} aria-hidden style={{ marginBottom: size * -0.06 }}>
         <defs>
           <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="0" y1="12" x2="0" y2="86">
@@ -29,7 +29,7 @@ export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }
             <g fill="none" stroke="#000" strokeWidth="2.2" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: DETAIL }} />
           </mask>
         </defs>
-        <g mask={`url(#${id}-m)`} opacity={0.72}>
+        <g mask={`url(#${id}-m)`} opacity={0.5}>
           <g fill={`url(#${id})`} dangerouslySetInnerHTML={{ __html: HAND }} />
         </g>
       </svg>
