@@ -20,8 +20,11 @@ import type { ArtistPhoto, SongFact, SongFacts } from "./types";
 
 const MODEL = "claude-opus-5-5";
 const UA = "TopTrack/1.0 (https://www.mytoptrack.io)";
-// A song with nothing on Wikipedia is looked for again after this long.
-const RETRY_EMPTY_MS = 14 * 86_400_000;
+// A song nobody found anything on is looked for again after this long.
+const RETRY_EMPTY_MS = 86_400_000;
+// Bumped when the way facts are made changes, so empty answers from before
+// are tried again.
+const VERSION = "v2";
 
 // --- the song's key: one row per song, whatever version was posted ---------
 
@@ -328,7 +331,8 @@ export function factsFrom(
   return out.slice(0, 3);
 }
 
-async function withClaude(title: string, artist: string, song: Page | null, art: Page | null): Promise<SongFact[]> {
+// null: the call itself failed (so the answer isn't kept and is tried again)
+async function withClaude(title: string, artist: string, song: Page | null, art: Page | null): Promise<SongFact[] | null> {
   // the articles go in as documents, so Claude can cite exact passages
   const docs = [song && { ...song, text: story(song.text, 12_000) }, art && { ...art, text: story(art.text, song ? 5_000 : 9_000) }].filter(
     (d): d is Page => Boolean(d),
@@ -343,27 +347,40 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
     { type: "text", text: `The song someone just posted: "${title}" by ${artist}.` },
   ];
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
-  const client = new Anthropic();
-  for (let turn = 0; turn < 3; turn++) {
-    const res = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "low" },
-      system: SYSTEM,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2, allowed_domains: Object.keys(SITES) }],
-      messages,
-    });
-    // a long search can pause the turn; hand it back to carry on
-    if (res.stop_reason === "pause_turn") {
-      messages.push({ role: "assistant", content: res.content });
-      continue;
+  const client = new Anthropic({ timeout: 75_000, maxRetries: 1 });
+  try {
+    for (let turn = 0; turn < 3; turn++) {
+      const res = await client.beta.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        output_config: { effort: "low" },
+        system: SYSTEM,
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2, allowed_domains: Object.keys(SITES) }],
+        messages,
+      });
+      // a long search can pause the turn; hand it back to carry on
+      if (res.stop_reason === "pause_turn") {
+        messages.push({ role: "assistant", content: res.content });
+        continue;
+      }
+      if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") {
+        console.warn(`song facts: Claude stopped (${res.stop_reason}) on "${title}" by ${artist}`);
+        return [];
+      }
+      const facts = factsFrom(res.content, docs);
+      if (!facts.length) {
+        const said = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+        console.warn(`song facts: no cited facts for "${title}" by ${artist}. Claude wrote: ${said.slice(0, 500)}`);
+      }
+      return facts;
     }
-    if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") return [];
-    return factsFrom(res.content, docs);
+    return [];
+  } catch (e) {
+    console.error(`song facts: Claude call failed for "${title}" by ${artist}`, e);
+    return null;
   }
-  return [];
 }
 
 // No key: the first couple of sentences of the song's article (or the
@@ -380,20 +397,29 @@ export function plain(song: Page | null, art: Page | null): SongFact[] {
     .map((text) => ({ text, about: song ? "song" : "artist", source: { name: "Wikipedia", url: p.url } }));
 }
 
-async function make(title: string, artist: string): Promise<SongFacts> {
+// keep: false when part of it failed, so it isn't saved and is tried again
+async function make(title: string, artist: string): Promise<SongFacts & { keep: boolean }> {
   const [s, a] = await Promise.allSettled([findSong(title, artist), findArtist(artist)]);
   const song = s.status === "fulfilled" ? s.value : null;
   const art = a.status === "fulfilled" ? a.value : null;
+  for (const r of [s, a]) if (r.status === "rejected") console.error("song facts: Wikipedia failed", r.reason);
   // Wikipedia being down isn't the same as having nothing: don't keep that
-  if (!song && !art && (s.status === "rejected" || a.status === "rejected")) throw new Error("Wikipedia didn't answer");
+  const down = !song && !art && (s.status === "rejected" || a.status === "rejected");
   const key = process.env.ANTHROPIC_API_KEY;
+  if (down && !key) throw new Error("Wikipedia didn't answer");
+  console.log(`song facts: "${title}" by ${artist}: song page ${song?.title ?? "none"}, artist page ${art?.title ?? "none"}`);
   // Claude can still search the music press when Wikipedia has nothing
-  if (!song && !art && !key) return { facts: [] };
-  const [facts, photo] = await Promise.all([
+  if (!song && !art && !key) return { facts: [], keep: true };
+  const [picked, photo] = await Promise.all([
     key ? withClaude(title, artist, song, art) : plain(song, art),
-    findPhoto(art, songKey(title, artist)).catch(() => null),
+    findPhoto(art, songKey(title, artist)).catch((e) => {
+      console.error("song facts: photo failed", e);
+      return null;
+    }),
   ]);
-  return { facts, photo };
+  // if Claude couldn't, the article's opening lines beat nothing
+  const facts = picked?.length ? picked : plain(song, art);
+  return { facts, photo, keep: picked !== null && !down };
 }
 
 // --- the cache -----------------------------------------------------------------
@@ -404,27 +430,31 @@ function admin() {
   return createClient(supabaseUrl, key, { auth: { persistSession: false } });
 }
 
-const pending = new Map<string, Promise<SongFacts>>();
+const pending = new Map<string, ReturnType<typeof make>>();
 
 export async function factsFor(title: string, artist: string): Promise<SongFacts> {
   const key = songKey(title, artist);
   if (!key || key === "|") return { facts: [] };
   const db = admin();
   if (db) {
-    const { data } = await db.from("song_facts").select("facts, photo, created_at").eq("song_key", key).maybeSingle();
-    if (data && (data.facts?.length || Date.now() - Date.parse(data.created_at) < RETRY_EMPTY_MS))
+    const { data } = await db.from("song_facts").select("facts, photo, made_by, created_at").eq("song_key", key).maybeSingle();
+    const fresh = data && String(data.made_by).endsWith(VERSION) && Date.now() - Date.parse(data.created_at) < RETRY_EMPTY_MS;
+    // facts made before the Anthropic key was added are made again with it
+    const upgrade = process.env.ANTHROPIC_API_KEY && String(data?.made_by).startsWith("wikipedia");
+    if (data && !upgrade && (data.facts?.length || fresh))
       return { facts: data.facts ?? [], photo: data.photo ?? null };
   }
+  if (!db) console.warn("song facts: SUPABASE_SECRET_KEY isn't set, so nothing is saved");
   let job = pending.get(key);
   if (!job) {
     job = make(title, artist).finally(() => pending.delete(key));
     pending.set(key, job);
   }
-  const out = await job;
-  if (db) {
+  const { keep, ...out } = await job;
+  if (db && keep) {
     await db
       .from("song_facts")
-      .upsert({ song_key: key, title: cleanTitle(title), artist: mainArtist(artist), facts: out.facts, photo: out.photo ?? null, made_by: process.env.ANTHROPIC_API_KEY ? MODEL : "wikipedia", created_at: new Date().toISOString() });
+      .upsert({ song_key: key, title: cleanTitle(title), artist: mainArtist(artist), facts: out.facts, photo: out.photo ?? null, made_by: `${process.env.ANTHROPIC_API_KEY ? MODEL : "wikipedia"} ${VERSION}`, created_at: new Date().toISOString() });
   }
   return out;
 }

@@ -261,6 +261,10 @@ export function MyFacts({
   dark: boolean;
 }) {
   const [got, setGot] = useState<{ id: string; facts: Facts } | null>(null);
+  // the post whose first load has come back, and a tap's load
+  const [tried, setTried] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [none, setNone] = useState(false);
   const [open, setOpen] = useState(false);
   const [pulling, setPulling] = useState(false);
   const star = useRef<HTMLButtonElement>(null);
@@ -270,7 +274,9 @@ export function MyFacts({
     if (!id || !load) return;
     let live = true;
     load(id).then((f) => {
-      if (!live || !f?.facts.length) return;
+      if (!live) return;
+      setTried(id);
+      if (!f?.facts.length) return;
       setGot({ id, facts: f });
       // the first time, they come out by themselves, then go back in
       let shown = false;
@@ -287,6 +293,7 @@ export function MyFacts({
 
   const facts = got && got.id === id ? got.facts : null;
   const n = facts?.facts.length ?? 0;
+  const busy = asking || (!!id && tried !== id);
 
   const close = () => {
     setPulling(true);
@@ -308,30 +315,58 @@ export function MyFacts({
 
   useEffect(() => onOpen?.(open || pulling), [open, pulling, onOpen]);
 
-  if (!facts || !post) return null;
+  // the star is there as soon as you've posted; if the facts didn't come,
+  // tapping it asks again
+  const tap = async () => {
+    setAuto(false);
+    if (open) return close();
+    if (facts) return setOpen(true);
+    if (!id || !load || busy) return;
+    setAsking(true);
+    const f = await load(id).catch(() => null);
+    setAsking(false);
+    if (f?.facts.length) {
+      setGot({ id, facts: f });
+      setOpen(true);
+    } else {
+      setNone(true);
+      setTimeout(() => setNone(false), 2600);
+    }
+  };
+
+  if (!post || !load) return null;
   return (
     <>
       {starHost &&
         createPortal(
-          <StarButton
-            starRef={star}
-            pulling={pulling}
-            open={open}
-            dark={dark}
-            label={open ? "Put the facts about your song away" : "Facts about your song"}
-            onClick={() => {
-              setAuto(false);
-              if (open) close();
-              else setOpen(true);
-            }}
-          />,
+          <div className="relative">
+            <StarButton
+              starRef={star}
+              pulling={pulling}
+              busy={busy}
+              open={open}
+              dark={dark}
+              label={open ? "Put the facts about your song away" : "Facts about your song"}
+              onClick={tap}
+            />
+            {none && (
+              <span
+                className="rise-in absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px]"
+                style={glass(dark)}
+              >
+                Nothing on this one yet
+              </span>
+            )}
+          </div>,
           starHost,
         )}
-      <Flight open={open} star={star}>
-        <div className="mb-2">
-          <FactsCard post={post} facts={facts} />
-        </div>
-      </Flight>
+      {facts && (
+        <Flight open={open} star={star}>
+          <div className="mb-2">
+            <FactsCard post={post} facts={facts} />
+          </div>
+        </Flight>
+      )}
     </>
   );
 }
