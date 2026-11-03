@@ -194,6 +194,51 @@ preview.
    (name plus their Spotify account's email). In development mode Spotify
    lets up to 5 people connect.
 
+## Part 4d: Move the site and its sign-in emails to mytoptrack.io
+
+Sign-in emails already go through Resend (Supabase custom SMTP, API key
+"Supabase SOTD"). Yahoo and AOL (both run by Yahoo) are much stricter than
+Gmail: they want the sending domain to pass SPF and DKIM and to publish a
+DMARC record, or they quietly drop the email. These steps move the site, and
+the sender, to `mytoptrack.io` with all of that in place.
+
+**1. Move the site (once)**
+
+1. In Vercel, add `mytoptrack.io` under the project's **Settings → Domains**,
+   and set `mysong.day` to redirect to it so old links keep working.
+2. In Supabase **Authentication → URL Configuration**, set **Site URL** to
+   `https://mytoptrack.io` and add `https://mytoptrack.io/auth/callback` to
+   **Redirect URLs**.
+3. In the Spotify developer dashboard, add
+   `https://mytoptrack.io/spotify/callback` as a Redirect URI.
+
+Everyone signs in once more on the new address, since sign-ins are per domain.
+
+**2. Verify the domain in Resend**
+
+1. In Resend, open **Domains → Add Domain** and add `mytoptrack.io`.
+2. Add the records it shows (MX and TXT on `send`, TXT on
+   `resend._domainkey`) in **vercel.com → Domains → mytoptrack.io → DNS
+   Records**, plus a TXT record named `_dmarc` with `v=DMARC1; p=none;`.
+3. Click **Verify DNS Records** and wait for it to turn green.
+
+**3. Change the sender in Supabase**
+
+In **Authentication → Emails → SMTP Settings**, keep the Resend host, port,
+username and key, and change **Sender email** to `hello@mytoptrack.io` and
+**Sender name** to `TopTrack`. Save.
+
+**4. If a Yahoo or AOL address still gets nothing**
+
+- Open Resend **Emails** and search for the address. **Delivered** means it's
+  in their Bulk folder. **Bounced** or **Suppressed** means Resend stopped
+  sending to it after an earlier failure: remove it under **Suppressions** and
+  try again. No entry at all means Supabase never sent it; check
+  **Authentication → Rate Limits** (raise "sending emails" to about 100 an
+  hour).
+
+---
+
 ## Part 5: Try it
 
 1. Open your site, click **Get started**, and enter the email you invited.
@@ -223,10 +268,8 @@ clicking it they only see an "invite only, for now" page.
 
 ## Good to know
 
-- **Sign-in emails are limited.** Supabase's built-in email sender only sends a
-  few emails an hour. That's fine while it's you and a few friends. When more
-  people join, we'll hook up a proper email service (like Resend, also free to
-  start).
+- **Sign-in emails go through Resend.** Part 4d covers the sending domain
+  and what to check when an address gets nothing.
 - **Every change goes live on its own.** Each time a pull request is merged
   into `main`, Vercel rebuilds the site in a minute or two.
 - **Pull requests get preview links.** Vercel comments a preview link on each
