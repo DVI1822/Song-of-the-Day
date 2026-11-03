@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, buttonClass, inputClass } from "@/components/Shell";
 import { newHandoff } from "@/lib/handoff";
 import { createClient, createLinkClient } from "@/lib/supabase/client";
@@ -15,13 +15,43 @@ import { createClient, createLinkClient } from "@/lib/supabase/client";
 // screen app. NEXT_PUBLIC_EMAIL_CODE=off hides the code box.
 const withCode = process.env.NEXT_PUBLIC_EMAIL_CODE !== "off";
 
+// Supabase lets one address ask for a new email once a minute.
+const RESEND_SECONDS = 60;
+
+// Turns Supabase's sign-in email errors into words a person can act on.
+function sendErrorMessage(error: { message: string; status?: number; code?: string }) {
+  const msg = error.message.toLowerCase();
+  if (error.code === "over_email_send_rate_limit" || msg.includes("rate limit")) {
+    return "We've hit our limit on sign-in emails for the moment. Try again in a little while.";
+  }
+  if (error.code === "over_request_rate_limit" || error.status === 429 || msg.includes("security purposes")) {
+    return "Hang on a minute before asking for another email.";
+  }
+  if (msg.includes("not authorized")) {
+    return "Our email sender can't reach that address yet. We're fixing it, so try again later.";
+  }
+  if (error.code === "email_address_invalid" || msg.includes("invalid")) {
+    return "That email address doesn't look right. Check it and try again.";
+  }
+  return error.message;
+}
+
 export function LoginForm({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState(initialError);
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
+  const [wait, setWait] = useState(0);
+  const [resent, setResent] = useState(false);
   const router = useRouter();
+
+  // Counts down until "Send it again" can be pressed.
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
 
   // The same email carries a code, for when the link would open in another
   // browser (like a home-screen app on a phone): type it here instead.
@@ -39,20 +69,34 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     router.refresh();
   }
 
+  function send() {
+    return createLinkClient().auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?h=${newHandoff()}` },
+    });
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setState("sending");
     setError(undefined);
-    const { error } = await createLinkClient().auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?h=${newHandoff()}` },
-    });
+    const { error } = await send();
     if (error) {
-      setError(error.message);
+      setError(sendErrorMessage(error));
       setState("idle");
     } else {
       setState("sent");
+      setResent(false);
+      setWait(RESEND_SECONDS);
     }
+  }
+
+  async function resend() {
+    setError(undefined);
+    setWait(RESEND_SECONDS);
+    const { error } = await send();
+    if (error) setError(sendErrorMessage(error));
+    else setResent(true);
   }
 
   if (state === "sent") {
@@ -91,6 +135,21 @@ export function LoginForm({ initialError }: { initialError?: string }) {
             </button>
           </form>
         )}
+        {!withCode && error && <p className="mt-3 text-sm text-accent-deep">{error}</p>}
+        <div className="mt-5 border-t border-line pt-4 text-xs text-card-muted">
+          <p>
+            Not there? Give it a minute, then check Spam. Yahoo and AOL call it <strong>Bulk</strong>.
+            {resent && " We sent a new one, so use the newest email."}
+          </p>
+          <button
+            type="button"
+            onClick={resend}
+            disabled={wait > 0}
+            className="mt-2 font-semibold text-accent-deep disabled:text-card-muted"
+          >
+            {wait > 0 ? `Send it again in ${wait}s` : "Send it again"}
+          </button>
+        </div>
       </Card>
     );
   }
