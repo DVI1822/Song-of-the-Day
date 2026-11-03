@@ -24,7 +24,7 @@ const UA = "TopTrack/1.0 (https://www.mytoptrack.io)";
 const RETRY_EMPTY_MS = 6 * 3_600_000;
 // Bumped when the way facts are made changes, so empty answers from before
 // are tried again.
-const VERSION = "v5";
+const VERSION = "v6";
 
 // --- the song's key: one row per song, whatever version was posted ---------
 
@@ -237,41 +237,96 @@ export async function findPhoto(art: Page | null, key: string): Promise<ArtistPh
   };
 }
 
-// The picture an article shows when it's shared (its og:image), from the
-// pages the facts came from, artist facts first. Not from Wikipedia (that's
-// Commons above) or Bandcamp (where it's the album cover, already on screen).
-const NOT_ARTICLE_PHOTO = /logo|favicon|default|placeholder|avatar|icon|sprite|blank/i;
+// Photos from the articles the facts came from: each page's share picture
+// (og:image) and the big pictures in its body. Those are often the album
+// cover, so Claude looks at them and keeps only a real photo of the artist,
+// best of all one of them playing. Not from Wikipedia (that's Commons above)
+// or Bandcamp (album art). With no good one, no photo: never the cover again.
+const NOT_ARTICLE_PHOTO = /logo|favicon|default|placeholder|avatar|icon|sprite|blank|cover|artwork|album/i;
 
-async function pagePhoto(facts: SongFact[]): Promise<ArtistPhoto | null> {
+type Shot = { url: string; page: string; width: number };
+
+export function shotsIn(html: string, page: string): Shot[] {
+  const out: Shot[] = [];
+  const add = (src: string | undefined, width: number) => {
+    if (!src) return;
+    try {
+      const url = new URL(src.replace(/&amp;/g, "&"), page);
+      if (url.protocol === "https:" && !NOT_ARTICLE_PHOTO.test(url.pathname) && !/\.(svg|gif)$/i.test(url.pathname))
+        out.push({ url: url.href, page, width });
+    } catch {}
+  };
+  for (const tag of html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)(?::url)?["'][^>]*>/gi) ?? [])
+    add(tag.match(/content=["']([^"']+)["']/i)?.[1], 1200);
+  for (const tag of html.match(/<img\b[^>]*>/gi) ?? []) {
+    // the biggest size in srcset, or the plain src when it says it's big
+    const set = tag.match(/\bsrcset=["']([^"']+)["']/i)?.[1];
+    const best = set
+      ?.split(",")
+      .map((x) => x.trim().split(/\s+/))
+      .map(([u, w]) => ({ u, w: parseInt(w) || 0 }))
+      .sort((x, y) => y.w - x.w)[0];
+    if (best && best.w >= 800) add(best.u, best.w);
+    else {
+      const w = parseInt(tag.match(/\bwidth=["']?(\d+)/i)?.[1] ?? "0");
+      if (w >= 600) add(tag.match(/\b(?:data-src|src)=["']([^"']+)["']/i)?.[1], w);
+    }
+  }
+  return out;
+}
+
+async function pagePhoto(facts: SongFact[], artist: string): Promise<ArtistPhoto | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
   const pages = [...facts]
     .sort((a, b) => (a.about === b.about ? 0 : a.about === "artist" ? -1 : 1))
     .map((f) => f.source?.url)
     .filter((u): u is string => !!u && !/wikipedia\.org|bandcamp\.com/i.test(u));
-  // look at each page's photo and keep the biggest (press photos, usually 1200px or more)
-  const shots = await Promise.all(
-    [...new Set(pages)].slice(0, 4).map(async (page): Promise<ArtistPhoto | null> => {
+  const found = await Promise.all(
+    [...new Set(pages)].slice(0, 4).map(async (page) => {
       const res = await fetch(page, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(6000) }).catch(() => null);
-      if (!res?.ok) return null;
-      const head = (await res.text()).slice(0, 200_000);
-      const tag = head.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)(?::url)?["'][^>]*>/i)?.[0];
-      const src = tag?.match(/content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&");
-      if (!src) return null;
-      let url: URL;
-      try {
-        url = new URL(src, page);
-      } catch {
-        return null;
-      }
-      if (url.protocol !== "https:" || NOT_ARTICLE_PHOTO.test(url.pathname)) return null;
-      const num = (prop: string) => Number(head.match(new RegExp(`<meta[^>]+property=["']og:image:${prop}["'][^>]+content=["'](\\d+)`, "i"))?.[1]) || 0;
-      const width = num("width");
-      const height = num("height");
-      if (width && width < 600) return null;
-      return { url: url.href, width: width || 1200, height: height || 800, page, credit: siteName(page), license: "" };
+      return res?.ok ? shotsIn((await res.text()).slice(0, 400_000), page) : [];
     }),
   );
-  const ok = shots.filter((p): p is ArtistPhoto => !!p);
-  return ok.sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? null;
+  const seen = new Set<string>();
+  const each = found.flat().filter((x) => !seen.has(x.url) && seen.add(x.url));
+  // only pictures that really load, as images
+  const ok = (
+    await Promise.all(
+      each.slice(0, 12).map(async (x) => {
+        const res = await fetch(x.url, { method: "HEAD", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(4000) }).catch(() => null);
+        return res?.ok && /^image\/(jpeg|png|webp)/i.test(res.headers.get("content-type") ?? "") ? x : null;
+      }),
+    )
+  )
+    .filter((x): x is Shot => !!x)
+    .slice(0, 8);
+  if (!ok.length) return null;
+  const client = new Anthropic({ timeout: 45_000, maxRetries: 1 });
+  const res = await client.messages.create({
+    model: MODEL,
+    max_tokens: 2000,
+    output_config: { effort: "low" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          ...ok.flatMap((x, i) => [
+            { type: "text" as const, text: `Image ${i + 1}:` },
+            { type: "image" as const, source: { type: "url" as const, url: x.url } },
+          ]),
+          {
+            type: "text",
+            text: `These pictures come from articles about the musician ${artist}. Which one is the best photo of ${artist} themselves: a real photo of the person, ideally playing or performing, otherwise a good portrait? Never an album or single cover, artwork, a logo, text, or a photo of someone else. Prefer sharp, well-lit, high-resolution photos. Answer with just the image number, or NONE if no picture is a photo of the artist.`,
+          },
+        ],
+      },
+    ],
+  });
+  const said = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join(" ");
+  const pick = ok[Number(said.match(/\d+/)?.[0] ?? 0) - 1];
+  console.log(`song facts: ${ok.length} article pictures for ${artist}, Claude picked: ${said.trim().slice(0, 40)}`);
+  if (!pick || /none/i.test(said)) return null;
+  return { url: pick.url, width: Math.max(pick.width, 1200), height: 800, page: pick.page, credit: siteName(pick.page), license: "" };
 }
 
 // --- picking the facts ---------------------------------------------------------
@@ -517,7 +572,7 @@ async function make(title: string, artist: string): Promise<SongFacts & { keep: 
   // the facts came from, shown like a link preview and credited to it
   const pic =
     photo ??
-    (await pagePhoto(facts).catch((e) => {
+    (await pagePhoto(facts, mainArtist(artist)).catch((e) => {
       console.error("song facts: article photo failed", e);
       return null;
     }));
@@ -544,7 +599,8 @@ export async function factsFor(title: string, artist: string): Promise<SongFacts
     // facts made before the Anthropic key was added are made again with it
     const upgrade = process.env.ANTHROPIC_API_KEY && String(data?.made_by).startsWith("wikipedia");
     // kept before article photos existed and without a photo: made again once
-    const noPhoto = data?.facts?.length && !data.photo && !String(data.made_by).endsWith(VERSION);
+    // kept before photos were checked: made again once (the article photo may be a cover)
+    const noPhoto = data?.facts?.length && (!data.photo || !data.photo.license) && !String(data.made_by).endsWith(VERSION);
     if (data && !upgrade && !noPhoto && (data.facts?.length || fresh))
       return { facts: data.facts ?? [], photo: data.photo ?? null };
   }
