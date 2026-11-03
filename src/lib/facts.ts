@@ -24,7 +24,7 @@ const UA = "TopTrack/1.0 (https://www.mytoptrack.io)";
 const RETRY_EMPTY_MS = 6 * 3_600_000;
 // Bumped when the way facts are made changes, so empty answers from before
 // are tried again.
-const VERSION = "v3";
+const VERSION = "v4";
 
 // --- the song's key: one row per song, whatever version was posted ---------
 
@@ -294,9 +294,9 @@ You may get Wikipedia articles about the song and its artist, and you can search
 Rules:
 - Every fact must come from a source you were given or found, and be cited. Do not add anything from your own knowledge, even if you're sure it's true.
 - Each fact is one sentence of at most 140 characters, plain and conversational, no emoji, no exclamation marks.
-- Write nothing but the facts, each on its own line, in this form:
-FACT (song): <the fact>
-FACT (artist): <the fact>
+- Write nothing but the facts, each on its own line, ending with the address of the page it came from (for the Wikipedia articles, write SOURCE: wikipedia):
+FACT (song): <the fact> [SOURCE: <url>]
+FACT (artist): <the fact> [SOURCE: <url>]
 - Fewer facts is fine. If nothing is worth saying, write NONE.`;
 
 // Added when the music press had nothing: the search may go anywhere then.
@@ -305,17 +305,27 @@ const WIDER = `The music sites had nothing on this one, so now you can search th
 type Cite = { url: string; title: string };
 
 // Claude's answer arrives as text pieces, each with the passages it cites.
-// Put the pieces back into lines and keep the FACT lines that cite something.
+// Put the pieces back into lines and keep the FACT lines with a real source:
+// a citation the API attached, or else the page Claude names at the end of
+// the line, as long as that page really came back from its search (so it
+// can't make one up).
+const where = (url: string) => url.trim().replace(/^https?:\/\/(www\.)?/i, "").replace(/[/#?]+$/, "").toLowerCase();
+
 export function factsFrom(
   blocks: { type: string; text?: string; citations?: unknown[] | null }[],
   docs: Page[],
 ): SongFact[] {
+  // every page address the searches brought back
+  const found = new Map<string, string>();
+  for (const b of blocks)
+    if (b.type !== "text")
+      for (const u of JSON.stringify(b).match(/https?:\/\/[^"\\\s]+/g) ?? []) found.set(where(u), u);
   const lines: { text: string; cites: Cite[] }[] = [{ text: "", cites: [] }];
   for (const b of blocks) {
     if (b.type !== "text" || !b.text) continue;
     const cites: Cite[] = [];
     for (const c of (b.citations ?? []) as { type: string; url?: string; title?: string; document_index?: number }[]) {
-      if (c.type === "web_search_result_location" && c.url) cites.push({ url: c.url, title: c.title ?? "" });
+      if (c.url) cites.push({ url: c.url, title: c.title ?? "" });
       else if (c.type === "char_location" && c.document_index !== undefined && docs[c.document_index])
         cites.push({ url: docs[c.document_index].url, title: docs[c.document_index].title });
     }
@@ -330,13 +340,26 @@ export function factsFrom(
   const out: SongFact[] = [];
   const seen = new Set<string>();
   for (const l of lines) {
-    const m = l.text.trim().match(/^FACT \((song|artist)\):\s*(.+)$/i);
-    if (!m || !l.cites.length) continue;
-    const text = m[2].trim();
+    const m = l.text
+      .trim()
+      .replace(/^[-*•\s]+/, "")
+      .replace(/\*\*/g, "")
+      .match(/^FACT \((song|artist)\):\s*(.+)$/i);
+    if (!m) continue;
+    let text = m[2].trim();
+    const named = text.match(/\s*\[?\(?SOURCE:\s*([^\]\)]+)[\]\)]?\s*$/i);
+    if (named) text = text.slice(0, named.index).trim();
+    text = text.replace(/[*_]/g, "").trim();
+    let url: string | undefined = l.cites[0]?.url;
+    if (!url && named) {
+      const said = named[1].trim();
+      if (/^wikipedia$/i.test(said) && docs.length) url = docs[0].url;
+      else url = found.get(where(said));
+    }
+    if (!url) continue;
     if (text.length < 12 || text.length > 180 || seen.has(bare(text))) continue;
     seen.add(bare(text));
-    const c = l.cites[0];
-    out.push({ text, about: m[1].toLowerCase() === "artist" ? "artist" : "song", source: { name: siteName(c.url), url: c.url } });
+    out.push({ text, about: m[1].toLowerCase() === "artist" ? "artist" : "song", source: { name: siteName(url), url } });
   }
   return out.slice(0, 3);
 }
