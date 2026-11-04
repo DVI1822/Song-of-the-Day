@@ -139,10 +139,10 @@ export function Feature({
   }, [toast]);
 
   // the hint when a song opens: the cover sits like it's floating on water,
-  // dips, gets tossed up toward you, spins over and over (hanging a moment on
-  // its back, so you see the caption and photo), drops back down and rocks
-  // in the water until it settles. Tells you there's more behind it and that
-  // it's there to tap.
+  // dips, gets tossed up toward you, flips once and plops down on its back,
+  // where it rests a moment so you see the caption and photo. Then a second
+  // toss flips it back to the front, and it rocks in the water until it
+  // settles. Tells you there's more behind it and that it's there to tap.
   const spinner = useRef<HTMLDivElement>(null);
   const hint = useRef<Animation | null>(null);
   useEffect(() => {
@@ -151,19 +151,25 @@ export function Feature({
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // [ms, lift (px, up is -), toward you (px), tilt forward, turn, easing]
     type K = [number, number, number, number, number, string?];
+    const UP = "cubic-bezier(.15,.8,.35,1)", // launched, slowing to the top
+      DOWN = "cubic-bezier(.55,0,.85,.4)", // falling, faster and faster
+      ROCK = "ease-in-out";
+    // one toss from the turn `from` to `from + 180`, starting at `t`
+    const toss = (t: number, from: number): K[] => [
+      [t, 7, -36, 4, from, UP], // dips
+      [t + 520, -60, 140, -6, from + 115, DOWN], // up, turning over
+      [t + 950, 9, -30, 6, from + 180, ROCK], // plop
+      [t + 1300, -2, 6, -5, from + 186, ROCK], // rocks on the water
+      [t + 1650, 1, -3, 3, from + 176.5, ROCK],
+      [t + 2000, 0, 1, -1.5, from + 181.5, ROCK],
+      [t + 2300, 0, 0, 0, from + 180, ROCK],
+    ];
     const keys: K[] = [
-      [0, 0, 0, 0, 0, "ease-in-out"], // floating
-      [450, 1, -6, 3, -3, "ease-in-out"],
-      [900, -1, 0, -2, 2.5, "ease-in-out"],
-      [1250, 7, -36, 4, 0, "cubic-bezier(.15,.8,.35,1)"], // dips, then launches
-      [1800, -64, 150, -8, 520, "cubic-bezier(.3,0,.7,1)"], // up and spinning
-      [2350, -72, 165, -4, 575, "cubic-bezier(.55,0,.85,.4)"], // hangs on its back
-      [2850, 10, -30, 6, 720, "cubic-bezier(.2,.7,.4,1)"], // splashes down
-      [3250, -2, 6, -5, 726, "ease-in-out"], // rocks on the water
-      [3650, 2, -4, 3.5, 716.5, "ease-in-out"],
-      [4050, -1, 2, -2, 722, "ease-in-out"],
-      [4450, 0, -1, 1, 719, "ease-in-out"],
-      [4850, 0, 0, 0, 720],
+      [0, 0, 0, 0, 0, ROCK], // floating
+      [400, 1, -5, 2.5, -2.5, ROCK],
+      [750, -1, 0, -1.5, 2, ROCK],
+      ...toss(1000, 0), // lands on its back by 1950, rocks, then rests
+      ...toss(4100, 180), // back over to the front
     ];
     const total = keys[keys.length - 1][0];
     const a = el.animate(
