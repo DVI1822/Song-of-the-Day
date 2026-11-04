@@ -149,14 +149,13 @@ export function Feature({
     if (!el || !el.animate) return;
     const keys: Toss = [
       [0, 0, 0, 0, 0, ROCK], // floating
-      [400, 1, -5, 2.5, -2.5, ROCK],
-      [750, -1, 0, -1.5, 2, ROCK],
-      [1000, 0, 0, 0, 0, "ease-in"], // dips before the toss
-      ...toss(1250, 0), // lands on its back by about 2000, rocks, then rests
-      [3900, 0, 0, 0, 180, "ease-in"],
-      ...toss(4150, 180), // back over to the front
+      [250, 1, -5, 2.5, -2.5, ROCK],
+      [400, 0, 0, 0, 0, "ease-in"], // dips before the toss
+      ...toss(550, 0), // lands on its back by about 1150, rocks, then rests
+      [2150, 0, 0, 0, 180, "ease-in"],
+      ...toss(2300, 180), // back over to the front, all done by about 4s
     ];
-    const a = play(el, keys, 700);
+    const a = play(el, keys, 250);
     hint.current = a;
     return () => a.cancel();
   }, []);
@@ -399,7 +398,7 @@ export function Feature({
 // [ms, lift (px, up is -), toward you (px), tilt forward, turn, easing].
 type Toss = [number, number, number, number, number, string?][];
 const ROCK = "ease-in-out";
-const FLY = 720,
+const FLY = 600,
   STEP = 40;
 // one toss from the turn `from` to `from + 180`, starting at `t`: a dip, then
 // the flight, worked out in small steps so it moves in one smooth arc (up and
@@ -417,10 +416,10 @@ function toss(t: number, from: number): Toss {
   const end = t + FLY;
   return [
     ...k, // plop
-    [end + 350, -2, 6, -5, from + 186, ROCK],
-    [end + 700, 1, -3, 3, from + 176.5, ROCK],
-    [end + 1050, 0, 1, -1.5, from + 181.5, ROCK],
-    [end + 1350, 0, 0, 0, from + 180, ROCK],
+    [end + 250, -2, 6, -5, from + 186, ROCK],
+    [end + 500, 1, -3, 3, from + 176.5, ROCK],
+    [end + 700, 0, 1, -1.5, from + 181.5, ROCK],
+    [end + 900, 0, 0, 0, from + 180, ROCK],
   ];
 }
 function play(el: HTMLElement, keys: Toss, delay: number) {
