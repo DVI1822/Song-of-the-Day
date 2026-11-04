@@ -23,18 +23,24 @@ export function useReactions(api: GlobeApi, postId: string) {
   return [r, setR] as const;
 }
 
+// The buttons' colours: the app's coral, a dark blue and a light green.
+const CORAL_HEX = "#ff5e57",
+  BLUE_HEX = "#1f4f8f",
+  GREEN_HEX = "#6fdc9f";
+const CORE_RINGS = ["255,94,87", "111,220,159", "160,236,196"];
+
 // The like: three level bars that jump up when it's tapped. Under an opened
 // song (`dance`), once liked they keep bouncing like an equaliser to music,
-// each bar its own colour from the core's neon.
+// each bar its own colour: coral, dark blue, light green.
 const BARS: [number, number, number][] = [
   [3.5, 12, 8 / 12],
   [10, 18, 13 / 18],
   [16.5, 14.5, 7 / 14.5],
 ];
 const EQ: [string, string][] = [
-  ["#2fd0ea", "eq-a .82s"],
-  ["#8b7bff", "eq-b 1.04s"],
-  ["#ff4fc4", "eq-c .9s"],
+  [CORAL_HEX, "eq-a .82s"],
+  [BLUE_HEX, "eq-b 1.04s"],
+  [GREEN_HEX, "eq-c .9s"],
 ];
 export const LevelsIcon = ({ on, size = 22, stroke = 1.8, dance }: { on?: boolean; size?: number; stroke?: number; dance?: boolean }) => (
   <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinejoin="round" overflow="visible">
@@ -70,9 +76,8 @@ const LINE_PX = 1.4; // on screen
 const LINE = (LINE_PX * 24) / ICON; // in the 24-unit drawing
 
 // Notes: a speech bubble with a little music note in it. Tapping it lights it
-// up and jingles the note (`ring` restarts that); once you've left a note it
-// stays softly lit in violet.
-const VIOLET = "#8b7bff";
+// up in light green and jingles the note (`ring` restarts that); once you've
+// left a note it stays softly lit.
 const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
   <svg
     key={ring}
@@ -81,7 +86,7 @@ const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
     height={ICON}
     viewBox="0 0 24 24"
     fill="none"
-    stroke={on ? VIOLET : "currentColor"}
+    stroke="currentColor"
     strokeWidth={LINE}
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -89,7 +94,7 @@ const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
   >
     <path
       d="M12 3.5c4.9 0 8.5 3.3 8.5 7.6s-3.6 7.6-8.5 7.6c-1 0-2-.1-2.9-.4L4.5 20.5l1.3-3.8C4.3 15.3 3.5 13.3 3.5 11.1c0-4.3 3.6-7.6 8.5-7.6z"
-      fill={ring || on ? `${VIOLET}26` : "none"}
+      fill={ring || on ? `${GREEN_HEX}66` : "none"}
       style={{ transition: "fill .3s" }}
     />
     <g
@@ -100,26 +105,26 @@ const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
       }}
     >
       <path d="M11 13.5V8.2l3.2-.8" />
-      <circle cx="9.9" cy="13.6" r="1.4" fill={on ? VIOLET : "currentColor"} stroke="none" />
+      <circle cx="9.9" cy="13.6" r="1.4" fill="currentColor" stroke="none" />
     </g>
   </svg>
 );
 
 // Your core: a circle holding three sound waves, with a plus tucked at its
 // bottom right. Once the song is in your core it lights up as a mini version of
-// the real thing: the neon Signal core spinning inside a dark glass orb, with
-// the plus turned to a tick.
+// the real thing: the Signal core spinning in coral and green inside a dark
+// blue glass orb, with the plus turned to a tick.
 const CoreIcon = ({ on }: { on?: boolean }) => (
   <span className="relative block" style={{ width: ICON, height: ICON }}>
     {on ? (
       <span
         className="absolute inset-[2px] overflow-hidden rounded-full"
         style={{
-          background: "radial-gradient(circle at 38% 32%, #1f3a5c 0%, #0b1726 62%, #050b14 100%)",
-          boxShadow: "0 0 0 1px rgba(155,140,255,0.55), 0 0 14px 1px rgba(94,242,255,0.45), 0 0 26px 4px rgba(255,95,210,0.25), inset 0 0 10px rgba(94,242,255,0.25)",
+          background: "radial-gradient(circle at 38% 32%, #2a5a96 0%, #143563 58%, #0b1f3d 100%)",
+          boxShadow: "0 0 0 1px rgba(111,220,159,0.6), 0 0 14px 1px rgba(111,220,159,0.45), 0 0 26px 4px rgba(255,94,87,0.3), inset 0 0 10px rgba(111,220,159,0.25)",
         }}
       >
-        <SignalCore rings={7} moving speed={2.2} className="absolute inset-[3px] h-[calc(100%-6px)] w-[calc(100%-6px)]" />
+        <SignalCore rings={7} moving speed={2.2} palette={CORE_RINGS} className="absolute inset-[3px] h-[calc(100%-6px)] w-[calc(100%-6px)]" />
         <span
           className="pointer-events-none absolute inset-0 rounded-full"
           style={{ background: "radial-gradient(circle at 32% 24%, rgba(255,255,255,0.35), transparent 38%)" }}
@@ -134,8 +139,8 @@ const CoreIcon = ({ on }: { on?: boolean }) => (
       </svg>
     )}
     <svg aria-hidden width={ICON} height={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" className="absolute inset-0">
-      <circle cx="19.4" cy="19.4" r="3.6" fill={on ? "#5ef2ff" : "white"} stroke={on ? "#0b1726" : "currentColor"} />
-      <path d={on ? "M17.8 19.5l1.1 1.1 2.1-2.3" : "M19.4 17.8v3.2M17.8 19.4h3.2"} stroke={on ? "#0b1726" : "currentColor"} />
+      <circle cx="19.4" cy="19.4" r="3.6" fill={on ? GREEN_HEX : "white"} stroke={on ? "#0b1f3d" : "currentColor"} />
+      <path d={on ? "M17.8 19.5l1.1 1.1 2.1-2.3" : "M19.4 17.8v3.2M17.8 19.4h3.2"} stroke={on ? "#0b1f3d" : "currentColor"} />
     </svg>
   </span>
 );

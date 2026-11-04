@@ -16,6 +16,7 @@ export function SignalCore({
   tint,
   moving,
   speed = 1,
+  palette,
 }: {
   className?: string;
   rings?: number;
@@ -23,6 +24,7 @@ export function SignalCore({
   tint?: string;
   moving?: boolean;
   speed?: number;
+  palette?: string[]; // "r,g,b" per ring, in turn
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -58,8 +60,9 @@ export function SignalCore({
               ctx.stroke();
             };
             // a faint glow, then the line, so it reads on light glass and dark sky alike
-            const col = (a: number) => (tint ? `rgba(${tint},${a})` : coreColor(i * (3.6 / n) + t * 0.08, 0, a));
-            line(col(tint ? (front ? 0.12 : 0.04) : front ? 0.25 : 0.08), w * 3);
+            const own = palette ? palette[i % palette.length] : tint;
+            const col = (a: number) => (own ? `rgba(${own},${a})` : coreColor(i * (3.6 / n) + t * 0.08, 0, a));
+            line(col(own ? (front ? 0.2 : 0.06) : front ? 0.25 : 0.08), w * 3);
             line(col(front ? 1 : 0.4), front ? w : w * 0.7);
           }
         });
@@ -67,6 +70,6 @@ export function SignalCore({
     };
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [rings, still, tint, moving, speed]);
+  }, [rings, still, tint, moving, speed, palette]);
   return <canvas ref={ref} aria-hidden className={className} />;
 }
