@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type Ref } from "react";
-import { formatTime, initials } from "@/lib/day";
+import { formatTime } from "@/lib/day";
 import type { Note, Post, Reactions } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { SignalCore } from "./SignalCore";
-import { CloseIcon } from "./ui";
+import { CloseIcon, Face } from "./ui";
 
 // Liking a song and the notes people leave on it. The like is a set of level
 // bars that jump up and light up when tapped, with the count beside it;
@@ -270,13 +270,7 @@ export function NotesSheet({
         <div className="flex items-center gap-2.5 px-5 pb-3">
           <div className="flex -space-x-2">
             {feels.slice(0, 5).map((f) => (
-              <span
-                key={f.user.id}
-                className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[9px] font-semibold"
-                style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-              >
-                {initials(f.user.display_name)}
-              </span>
+              <Face key={f.user.id} p={f.user} size={28} className="border-2 border-white" />
             ))}
           </div>
           {feels.length > 0 && (
@@ -388,12 +382,7 @@ export function LikesSheet({ r, meId, title, onClose }: { r: Reactions | null; m
           {r === null && <div className="py-3 text-sm text-muted">Loading…</div>}
           {feels.map((f) => (
             <div key={f.user.id} className="flex items-center gap-3 py-2">
-              <span
-                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[11px] font-semibold"
-                style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-              >
-                {initials(f.user.display_name)}
-              </span>
+              <Face p={f.user} size={36} />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-sm font-semibold">{f.user.id === meId ? "You" : f.user.display_name}</span>
                 <span className="truncate text-xs text-muted">@{f.user.username}</span>

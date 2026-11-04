@@ -127,7 +127,7 @@ const supabaseChat: ChatApi = {
   },
   async people(ids) {
     if (!ids.length) return [];
-    const { data } = await createClient().from("profiles").select("id, username, display_name, timezone, created_at").in("id", ids);
+    const { data } = await createClient().from("profiles").select("id, username, display_name, timezone, created_at, avatar_url").in("id", ids);
     return data ?? [];
   },
   listen(on) {

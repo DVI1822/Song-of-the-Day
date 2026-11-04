@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
+import { formatDay, formatTime, todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, MayKnow, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
 import { SignalCore } from "./SignalCore";
 import { SongPlayer } from "./Preview";
 import { LevelsIcon } from "./Reactions";
-import { Cover, SearchIcon, coverRadius } from "./ui";
+import { Cover, Face, SearchIcon, coverRadius } from "./ui";
 
 const Kicker = ({ children }: { children: React.ReactNode }) => (
   <div className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">{children}</div>
@@ -71,7 +71,7 @@ export function FriendsPanel({
         return (
           <div key={f.id} className="flex h-[54px] items-center gap-1 pl-2">
             <PersonButton p={f} onCore={onCore}>
-              <Avatar name={f.display_name} />
+              <Avatar p={f} />
               <div className="flex min-w-0 flex-1 flex-col gap-px">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold">{f.display_name}</span>
@@ -131,7 +131,7 @@ function OnYourSong({ activity, isNew, onMine }: { activity: Activity[]; isNew(a
           className="flex min-h-[50px] w-full items-center gap-3 rounded-[14px] px-2 py-1.5 text-left hover:bg-card-ink/5"
         >
           <span className="relative flex-none">
-            <Avatar name={a.user.display_name} />
+            <Avatar p={a.user} />
             {a.kind === "feel" && (
               <span className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-accent shadow-[0_1px_3px_rgba(13,42,63,0.25)]">
                 <LevelsIcon on size={11} />
@@ -178,7 +178,7 @@ function Hidden({
       {people.map((f) => (
         <div key={f.id} className="flex h-[50px] items-center gap-3 px-2">
           <PersonButton p={f} onCore={onCore}>
-            <Avatar name={f.display_name} muted />
+            <Avatar p={f} muted />
             <div className="min-w-0 flex-1 truncate text-sm text-muted">{f.display_name}</div>
           </PersonButton>
           <button
@@ -197,13 +197,8 @@ function Hidden({
   );
 }
 
-const Avatar = ({ name, muted = false }: { name: string; muted?: boolean }) => (
-  <div
-    className={`flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[11px] font-semibold ${muted ? "opacity-50" : ""}`}
-    style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-  >
-    {initials(name)}
-  </div>
+const Avatar = ({ p, muted = false }: { p: Profile; muted?: boolean }) => (
+  <Face p={p} className={muted ? "opacity-50" : ""} />
 );
 
 // Tapping a person opens their core: every song they've shared, by month.
@@ -290,7 +285,7 @@ function PersonRow({
           aria-label={`Open ${p.display_name}'s core`}
           className="relative flex-none"
         >
-          <Avatar name={p.display_name} />
+          <Avatar p={p} />
           {/* the little core says: tap for their core */}
           <span className="absolute -bottom-0.5 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-card shadow-[0_1px_4px_rgba(13,42,63,0.25)]">
             <SignalCore className="h-3 w-3" />
@@ -337,12 +332,7 @@ function PersonRow({
                 aria-label={`Open ${m.display_name}'s core`}
                 className="flex h-8 items-center gap-1.5 rounded-full border border-card-ink/10 bg-card-ink/[0.03] pl-1 pr-3 text-xs font-medium"
               >
-                <span
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold"
-                  style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-                >
-                  {initials(m.display_name)}
-                </span>
+                <Face p={m} size={24} />
                 {m.display_name}
               </button>
             ))}
