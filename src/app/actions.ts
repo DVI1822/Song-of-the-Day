@@ -169,6 +169,7 @@ export async function createPost(input: NewPost): Promise<{ post?: Post; error?:
   const caption = input.caption.trim();
   if (!parseSongUrl(input.songUrl)) return { error: "That link doesn't look like a song." };
   if (!title) return { error: "The song needs a title." };
+  if (!caption) return { error: "Add a comment to post." };
   if (caption.length > 100) return { error: "Keep the comment to 100 characters." };
 
   // Photos must be ones this person uploaded to their own folder.

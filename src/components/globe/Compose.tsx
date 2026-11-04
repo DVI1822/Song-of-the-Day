@@ -15,7 +15,7 @@ const LinkIcon = () => (
 );
 
 // The sheet for today's song: paste a link, the song fills itself in, add an
-// optional comment and photo, post.
+// a comment (needed to post) and an optional photo, post.
 export function Compose({
   api,
   userId,
@@ -71,7 +71,7 @@ export function Compose({
   };
 
   const post = async () => {
-    if (!song) return;
+    if (!song || !draft.trim()) return;
     setStep("posting");
     setError(null);
     let photoUrl: string | null = null;
@@ -198,7 +198,8 @@ export function Compose({
                   onChange={(e) => setDraft(e.target.value.slice(0, 100))}
                   maxLength={100}
                   placeholder="Add a comment"
-                  aria-label="Comment, optional, up to 100 characters"
+                  aria-label="Comment, needed to post, up to 100 characters"
+                  required
                   className="block h-[52px] w-full resize-none bg-transparent text-base leading-snug outline-none placeholder:text-muted sm:text-sm"
                 />
                 <div className="absolute bottom-2 right-3 text-[10px] text-muted">{draft.length}/100</div>
@@ -248,8 +249,8 @@ export function Compose({
             <button
               type="button"
               onClick={post}
-              disabled={step === "posting"}
-              className="h-[52px] rounded-[26px] bg-accent text-[15px] font-semibold text-white disabled:opacity-70"
+              disabled={step === "posting" || !draft.trim()}
+              className="h-[52px] rounded-[26px] bg-accent text-[15px] font-semibold text-white transition-opacity disabled:opacity-45"
             >
               {step === "posting" ? "Posting…" : "Post"}
             </button>
