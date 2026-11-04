@@ -5,7 +5,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCore, getNews, getReactions, getSaved, getSession, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
-import type { Core, Friend, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
+import type { Core, Friend, MayKnow, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
 import { INVITE_COOKIE, cleanInvite } from "@/lib/invite";
 import { accessToken, spotifyApi } from "@/lib/spotify";
@@ -254,6 +254,46 @@ export async function searchPeople(q: string): Promise<(Profile & { following: b
     : query.order("created_at", { ascending: false });
   const { data } = await query;
   return ((data ?? []) as Profile[]).map((p) => ({ ...p, following: followed.has(p.id) }));
+}
+
+// People you may know: anyone not on your globe yet who knows at least one
+// person on your globe (either of them added the other), most shared friends
+// first. Each comes with those shared friends, so you can see who links you.
+// People who added you come back too, so their row can say who you share.
+export async function mayKnow(): Promise<MayKnow[]> {
+  const { supabase, userId } = await getSession();
+  if (!userId) return [];
+  const { data: mine } = await supabase.from("follows").select("following_id").eq("follower_id", userId).limit(300);
+  const globe = (mine ?? []).map((f) => f.following_id as string);
+  if (!globe.length) return [];
+  const onGlobe = new Set(globe);
+  // the follows table only shows people you haven't blocked (or been blocked by)
+  const [{ data: out }, { data: inn }] = await Promise.all([
+    supabase.from("follows").select("follower_id, following_id").in("follower_id", globe).limit(1000),
+    supabase.from("follows").select("follower_id, following_id").in("following_id", globe).limit(1000),
+  ]);
+  const shared = new Map<string, Set<string>>();
+  const link = (friend: string, other: string) => {
+    if (other === userId || onGlobe.has(other)) return;
+    let s = shared.get(other);
+    if (!s) shared.set(other, (s = new Set()));
+    s.add(friend);
+  };
+  for (const f of out ?? []) link(f.follower_id as string, f.following_id as string);
+  for (const f of inn ?? []) link(f.following_id as string, f.follower_id as string);
+  const top = [...shared.entries()].sort((a, b) => b[1].size - a[1].size).slice(0, 60);
+  if (!top.length) return [];
+  const ids = new Set(top.flatMap(([id, s]) => [id, ...s]));
+  const { data: people } = await supabase.from("profiles").select("*").in("id", [...ids]);
+  const byId = new Map(((people ?? []) as Profile[]).map((p) => [p.id, p]));
+  return top
+    .filter(([id]) => byId.has(id))
+    .map(([id, s]) => ({
+      ...byId.get(id)!,
+      mutuals: [...s].map((m) => byId.get(m)).filter((p): p is Profile => Boolean(p)),
+    }))
+    .filter((p) => p.mutuals.length > 0)
+    .sort((a, b) => b.mutuals.length - a.mutuals.length || a.display_name.localeCompare(b.display_name));
 }
 
 // Follow someone and hand back their tile for the Globe.

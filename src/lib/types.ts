@@ -39,6 +39,9 @@ export type Friend = Profile & { post: Post | null; followed_at: string; followe
 // Someone who added you that you haven't added back.
 export type AddedMe = Profile & { added_at: string };
 
+// Someone not on your globe yet, and the people on your globe they know.
+export type MayKnow = Profile & { mutuals: Profile[] };
+
 // Everything shown when you fly into someone's core.
 export type Core = {
   profile: Profile;

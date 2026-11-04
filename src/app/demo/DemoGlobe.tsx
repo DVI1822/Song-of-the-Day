@@ -264,6 +264,16 @@ const demoApi: GlobeApi = {
     const p = profile(100 + j, POOL[j]);
     return { friend: { ...p, followed_at: new Date().toISOString(), followed_back_at: null, follows_me: true, hidden: false, post: song(200 + j, p.id, TODAY, 2) } };
   },
+  async mayKnow() {
+    await new Promise((r) => setTimeout(r, 300));
+    // everyone in the pool knows a few of your friends; more for the first ones
+    return POOL.map((name, j) => ({
+      ...profile(100 + j, name),
+      mutuals: FRIENDS.filter((_, i) => rnd(i, j + 40) < 0.55 / (1 + j * 0.45)).slice(0, 9 - j),
+    }))
+      .filter((p) => p.mutuals.length)
+      .sort((a, b) => b.mutuals.length - a.mutuals.length);
+  },
   async matchContacts(emails) {
     // pretend the first picked contact is already here
     return emails.slice(0, 1).map((email, j) => ({ ...profile(100 + j, POOL[j]), email, following: false }));

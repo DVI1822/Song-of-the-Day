@@ -8,6 +8,7 @@ import {
   hideSongs,
   loadCore,
   loadNews,
+  mayKnow,
   loadReactions,
   feelSong,
   saveSong,
@@ -34,7 +35,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, Message, Note, Post, Profile, Reactions, SavedSong, SongFacts } from "@/lib/types";
+import type { Core, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, SongFacts } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -46,6 +47,8 @@ export type GlobeApi = {
   searchPeople(q: string): Promise<(Profile & { following: boolean })[]>;
   follow(profileId: string): Promise<{ friend?: Friend; error?: string }>;
   matchContacts(emails: string[]): Promise<ContactMatch[]>;
+  // people not on your globe who know someone on it, most shared friends first
+  mayKnow?(): Promise<MayKnow[]>;
   loadCore(userId: string): Promise<Core | null>;
   report(input: { reportedId: string; postId?: string | null; reason: ReportReason; note?: string }): Promise<{ error?: string }>;
   block(profileId: string): Promise<{ error?: string }>;
@@ -157,6 +160,7 @@ export const serverApi: GlobeApi = {
   searchPeople,
   follow,
   matchContacts,
+  mayKnow,
   loadCore,
   report: reportUser,
   block: blockUser,
