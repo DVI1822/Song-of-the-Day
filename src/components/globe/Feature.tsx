@@ -138,6 +138,74 @@ export function Feature({
     return () => clearTimeout(t);
   }, [toast]);
 
+  // the hint when a song opens: the cover sits like it's floating on water,
+  // dips, gets tossed up toward you, flips once and plops down on its back,
+  // where it rests a moment so you see the caption and photo. Then a second
+  // toss flips it back to the front, and it rocks in the water until it
+  // settles. Tells you there's more behind it and that it's there to tap.
+  const spinner = useRef<HTMLDivElement>(null);
+  const hint = useRef<Animation | null>(null);
+  useEffect(() => {
+    const el = spinner.current;
+    if (!el || !el.animate) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // [ms, lift (px, up is -), toward you (px), tilt forward, turn, easing]
+    type K = [number, number, number, number, number, string?];
+    const ROCK = "ease-in-out";
+    // one toss from the turn `from` to `from + 180`, starting at `t`: a dip,
+    // then the flight, worked out in small steps so it moves in one smooth
+    // arc (up and down like a thrown thing, turning at a steady pace the
+    // whole way with no stall at the top), then a plop and a rock
+    const FLY = 720,
+      STEP = 40;
+    const toss = (t: number, from: number): K[] => {
+      const k: K[] = [[t, 7, -36, 4, from, "linear"]];
+      for (let ms = STEP; ms <= FLY; ms += STEP) {
+        const u = Math.min(1, ms / FLY),
+          arc = 4 * u * (1 - u), // 0 at take-off and landing, 1 at the top
+          spin = 0.65 * u + 0.35 * u * u * (3 - 2 * u); // steady, eased at the ends a touch
+        k.push([t + ms, 7 + 2 * u - 72 * arc, -36 + 6 * u + 185 * arc, 4 + 2 * u - 11 * arc, from + 180 * spin, "linear"]);
+      }
+      k[k.length - 1][5] = ROCK;
+      const end = t + FLY;
+      return [
+        ...k, // plop
+        [end + 350, -2, 6, -5, from + 186, ROCK], // rocks on the water
+        [end + 700, 1, -3, 3, from + 176.5, ROCK],
+        [end + 1050, 0, 1, -1.5, from + 181.5, ROCK],
+        [end + 1350, 0, 0, 0, from + 180, ROCK],
+      ];
+    };
+    const keys: K[] = [
+      [0, 0, 0, 0, 0, ROCK], // floating
+      [400, 1, -5, 2.5, -2.5, ROCK],
+      [750, -1, 0, -1.5, 2, ROCK],
+      [1000, 0, 0, 0, 0, "ease-in"], // dips before the toss
+      ...toss(1250, 0), // lands on its back by about 2000, rocks, then rests
+      [3900, 0, 0, 0, 180, "ease-in"],
+      ...toss(4150, 180), // back over to the front
+    ];
+    const total = keys[keys.length - 1][0];
+    const a = el.animate(
+      keys.map(([ms, y, z, x, turn, easing]) => ({
+        offset: ms / total,
+        transform: `translateY(${y}px) translateZ(${z}px) rotateX(${x}deg) rotateY(${turn}deg)`,
+        ...(easing ? { easing } : {}),
+      })),
+      { duration: total, delay: 700 },
+    );
+    hint.current = a;
+    return () => a.cancel();
+  }, []);
+  // a tap, or opening the ⋯ menu, ends the hint where you are
+  const tapCover = () => {
+    hint.current?.cancel();
+    onFlip();
+  };
+  useEffect(() => {
+    if (flagging) hint.current?.cancel();
+  }, [flagging]);
+
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
       <div ref={backdropRef} className="absolute inset-0" />
@@ -219,12 +287,13 @@ export function Feature({
         ) : (
           <button
             type="button"
-            onClick={onFlip}
+            onClick={tapCover}
             aria-label={flipped ? "Flip back to the cover" : "Flip the cover"}
             className="relative block"
             style={{ width: cover, height: cover, perspective: 1400 }}
           >
             <div
+              ref={spinner}
               className="preserve-3d relative h-full w-full transition-transform duration-[800ms] ease-[cubic-bezier(.2,.75,.25,1)]"
               style={{ transform: `rotateY(${flipped ? 180 : 0}deg)` }}
             >
