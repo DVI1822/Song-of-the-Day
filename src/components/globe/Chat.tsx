@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type Ref } from "react";
-import { formatTime, initials } from "@/lib/day";
+import { formatTime } from "@/lib/day";
 import type { AddedMe, Friend, Message, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
-import { BackIcon, CloseIcon, glass } from "./ui";
+import { BackIcon, CloseIcon, Face, glass } from "./ui";
 
 // The globe chat: a tab on the right edge that pulls out a live chat with
 // your mutual friends: people you've added who have added you back. Only they
@@ -225,7 +225,7 @@ export function Chat({
               aria-label={`Open ${view.with.display_name}'s core`}
               className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
             >
-              <Avatar name={view.with.display_name} />
+              <Avatar p={view.with} />
               <span className="display truncate text-lg">{view.with.display_name}</span>
             </button>
             <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 flex-none items-center justify-center">
@@ -375,7 +375,7 @@ function Thread({
                 onClick={() => who && onCore(who)}
                 className="mb-1 flex items-center gap-1.5 pl-0.5 text-[11px] font-semibold text-muted"
               >
-                <Avatar name={who?.display_name ?? "?"} small />
+                <Avatar p={who} small />
                 {who?.display_name.split(" ")[0] ?? "Someone"}
                 <span className="font-normal">· {formatTime(m.created_at, tz)}</span>
               </button>
@@ -497,7 +497,7 @@ function Inbox({
             onClick={() => onOpen(p)}
             className="flex items-center gap-3 px-[18px] py-2.5 text-left hover:bg-card-ink/[0.04]"
           >
-            <Avatar name={p.display_name} />
+            <Avatar p={p} />
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex items-baseline gap-2">
                 <span className={`truncate text-sm ${unread ? "font-bold" : "font-semibold"}`}>{p.display_name}</span>
@@ -520,13 +520,8 @@ function Inbox({
   );
 }
 
-const Avatar = ({ name, small = false }: { name: string; small?: boolean }) => (
-  <span
-    className={`flex flex-none items-center justify-center rounded-full font-semibold ${small ? "h-5 w-5 text-[8px]" : "h-[34px] w-[34px] text-[11px]"}`}
-    style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-  >
-    {initials(name)}
-  </span>
+const Avatar = ({ p, small = false }: { p: Profile | null | undefined; small?: boolean }) => (
+  <Face p={p} size={small ? 20 : 34} />
 );
 
 export const ChatIcon = ({ size = 18 }: { size?: number }) => (

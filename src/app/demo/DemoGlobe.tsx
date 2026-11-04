@@ -73,7 +73,16 @@ function profile(i: number, name: string): Profile {
     display_name: name,
     timezone: TZ,
     created_at: now.toISOString(),
+    // about half have a picture, so lists show both kinds
+    avatar_url: i % 2 ? demoFace(i) : null,
   };
+}
+
+// A made-up profile picture: a soft sky and a head-and-shoulders shape.
+function demoFace(i: number) {
+  const h = Math.floor(rnd(i, 9) * 360);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${h},70%,72%)"/><stop offset="1" stop-color="hsl(${(h + 50) % 360},60%,48%)"/></linearGradient></defs><rect width="64" height="64" fill="url(#g)"/><circle cx="32" cy="26" r="11" fill="hsl(${(h + 180) % 360},30%,28%)"/><ellipse cx="32" cy="60" rx="21" ry="17" fill="hsl(${(h + 180) % 360},30%,28%)"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 function song(i: number, user: string, day: string, hoursAgo: number): Post {
@@ -263,6 +272,16 @@ const demoApi: GlobeApi = {
     const j = Number(id.slice(1)) - 100;
     const p = profile(100 + j, POOL[j]);
     return { friend: { ...p, followed_at: new Date().toISOString(), followed_back_at: null, follows_me: true, hidden: false, post: song(200 + j, p.id, TODAY, 2) } };
+  },
+  async mayKnow() {
+    await new Promise((r) => setTimeout(r, 300));
+    // everyone in the pool knows a few of your friends; more for the first ones
+    return POOL.map((name, j) => ({
+      ...profile(100 + j, name),
+      mutuals: FRIENDS.filter((_, i) => rnd(i, j + 40) < 0.55 / (1 + j * 0.45)).slice(0, 9 - j),
+    }))
+      .filter((p) => p.mutuals.length)
+      .sort((a, b) => b.mutuals.length - a.mutuals.length);
   },
   async matchContacts(emails) {
     // pretend the first picked contact is already here

@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { paintedCover } from "./math";
+import { initials } from "@/lib/day";
 
 // Album covers everywhere share the tiles' rounded-square shape.
 export const coverRadius = (px: number) => Math.max(2, Math.round(0.26 * px));
@@ -68,3 +69,37 @@ export const SearchIcon = () => (
     <path d="M15 15l5.5 5.5" />
   </svg>
 );
+
+// Someone's little circle in a list: their picture if they've chosen one,
+// otherwise their initials.
+export function Face({
+  p,
+  size = 34,
+  tone = "coral",
+  className = "",
+}: {
+  p: { display_name: string; avatar_url?: string | null } | null | undefined;
+  size?: number;
+  tone?: "coral" | "sea";
+  className?: string;
+}) {
+  const name = p?.display_name ?? "?";
+  const url = p?.avatar_url;
+  const bg = tone === "sea" ? "linear-gradient(135deg, #DDE3F5, #A9DCD6)" : "linear-gradient(135deg, #FFE1D6, #F6A9A0)";
+  return (
+    <span
+      className={`flex flex-none items-center justify-center overflow-hidden rounded-full font-semibold ${className}`}
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.max(8, Math.round(size * 0.32)),
+        background: url ? `center / cover no-repeat url("${url}"), ${bg}` : bg,
+        color: tone === "sea" ? "#245866" : "#8A2A22",
+      }}
+      role={url ? "img" : undefined}
+      aria-label={url ? name : undefined}
+    >
+      {!url && initials(name)}
+    </span>
+  );
+}

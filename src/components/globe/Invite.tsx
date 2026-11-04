@@ -4,7 +4,8 @@ import { useState, useSyncExternalStore } from "react";
 import type { ContactMatch } from "@/app/actions";
 import { initials } from "@/lib/day";
 import { inviteUrl } from "@/lib/invite";
-import type { Friend } from "@/lib/types";
+import type { Friend, Profile } from "@/lib/types";
+import { Face } from "./ui";
 import type { GlobeApi } from "./api";
 
 // Top of Find a friend: your invite link, and (where the phone allows it)
@@ -148,7 +149,7 @@ export function InviteCard({
             const on = p.following || friends.some((f) => f.id === p.id);
             return (
               <div key={p.id} className="flex h-[54px] items-center gap-3">
-                <Avatar name={p.display_name} />
+                <Avatar p={p} />
                 <div className="flex min-w-0 flex-1 flex-col gap-px">
                   <div className="truncate text-sm font-semibold">{p.display_name}</div>
                   <div className="truncate text-xs text-muted">@{p.username}</div>
@@ -194,14 +195,7 @@ export function InviteCard({
   );
 }
 
-const Avatar = ({ name }: { name: string }) => (
-  <div
-    className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[11px] font-semibold"
-    style={{ background: "linear-gradient(135deg, #DDE3F5, #A9DCD6)", color: "#245866" }}
-  >
-    {initials(name)}
-  </div>
-);
+const Avatar = ({ p }: { p: Profile }) => <Face p={p} size={36} tone="sea" />;
 
 const ShareIcon = () => (
   <svg

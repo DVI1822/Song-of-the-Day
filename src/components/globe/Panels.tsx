@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatDay, formatTime, initials, todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Post, Profile } from "@/lib/types";
+import { formatDay, formatTime, todayIn } from "@/lib/day";
+import type { Activity, AddedMe, Friend, MayKnow, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { InviteCard } from "./Invite";
 import { SignalCore } from "./SignalCore";
 import { SongPlayer } from "./Preview";
 import { LevelsIcon } from "./Reactions";
-import { Cover, SearchIcon, coverRadius } from "./ui";
+import { Cover, Face, SearchIcon, coverRadius } from "./ui";
 
 const Kicker = ({ children }: { children: React.ReactNode }) => (
   <div className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">{children}</div>
@@ -71,7 +71,7 @@ export function FriendsPanel({
         return (
           <div key={f.id} className="flex h-[54px] items-center gap-1 pl-2">
             <PersonButton p={f} onCore={onCore}>
-              <Avatar name={f.display_name} />
+              <Avatar p={f} />
               <div className="flex min-w-0 flex-1 flex-col gap-px">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold">{f.display_name}</span>
@@ -131,7 +131,7 @@ function OnYourSong({ activity, isNew, onMine }: { activity: Activity[]; isNew(a
           className="flex min-h-[50px] w-full items-center gap-3 rounded-[14px] px-2 py-1.5 text-left hover:bg-card-ink/5"
         >
           <span className="relative flex-none">
-            <Avatar name={a.user.display_name} />
+            <Avatar p={a.user} />
             {a.kind === "feel" && (
               <span className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-accent shadow-[0_1px_3px_rgba(13,42,63,0.25)]">
                 <LevelsIcon on size={11} />
@@ -178,7 +178,7 @@ function Hidden({
       {people.map((f) => (
         <div key={f.id} className="flex h-[50px] items-center gap-3 px-2">
           <PersonButton p={f} onCore={onCore}>
-            <Avatar name={f.display_name} muted />
+            <Avatar p={f} muted />
             <div className="min-w-0 flex-1 truncate text-sm text-muted">{f.display_name}</div>
           </PersonButton>
           <button
@@ -197,13 +197,8 @@ function Hidden({
   );
 }
 
-const Avatar = ({ name, muted = false }: { name: string; muted?: boolean }) => (
-  <div
-    className={`flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[11px] font-semibold ${muted ? "opacity-50" : ""}`}
-    style={{ background: "linear-gradient(135deg, #FFE1D6, #F6A9A0)", color: "#8A2A22" }}
-  >
-    {initials(name)}
-  </div>
+const Avatar = ({ p, muted = false }: { p: Profile; muted?: boolean }) => (
+  <Face p={p} className={muted ? "opacity-50" : ""} />
 );
 
 // Tapping a person opens their core: every song they've shared, by month.
@@ -234,65 +229,133 @@ const localZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const NewDot = () => <span aria-hidden className="h-2 w-2 flex-none rounded-full bg-accent" />;
 
-// People who added you and you haven't added back, each with an "Add back".
-function AddedYou({
-  people,
-  isNew,
-  onAddBack,
+const PlusIcon = () => (
+  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+const Chevron = ({ open }: { open: boolean }) => (
+  <svg
+    aria-hidden
+    width="10"
+    height="10"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="3"
+    className={`flex-none transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+  >
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);
+
+const mutualText = (n: number) => `${n} mutual friend${n === 1 ? "" : "s"}`;
+
+// One person you could add. Their picture and the core beside them open their
+// core (anyone's core can be opened, friend or not). If you share friends,
+// tapping their name shows who.
+function PersonRow({
+  p,
+  sub,
+  mutuals = [],
+  dot = false,
+  addLabel,
+  busy,
+  onAdd,
   onCore,
 }: {
-  people: AddedMe[];
-  isNew(at: string): boolean;
-  onAddBack(p: AddedMe): Promise<string | null>;
+  p: Profile;
+  sub: string;
+  mutuals?: Profile[];
+  dot?: boolean;
+  addLabel: string;
+  busy: boolean;
+  onAdd(): void;
   onCore(p: Profile): void;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const add = async (p: AddedMe) => {
-    setBusy(p.id);
-    setError(null);
-    const e = await onAddBack(p);
-    setBusy(null);
-    if (e) setError(e);
-  };
+  const [open, setOpen] = useState(false);
+  const has = mutuals.length > 0;
   return (
-    <div className="pb-2.5">
-      <Kicker>Added you · {people.length}</Kicker>
-      {people.map((p) => (
-        <div key={p.id} className="flex h-[54px] items-center gap-3 px-2">
-          <PersonButton p={p} onCore={onCore}>
-            <Avatar name={p.display_name} />
-            <div className="flex min-w-0 flex-1 flex-col gap-px">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-semibold">{p.display_name}</span>
-                {isNew(p.added_at) && <NewDot />}
-              </div>
-              <div className="truncate text-[11px] text-muted">added you · {formatDay(p.added_at.slice(0, 10))}</div>
-            </div>
-          </PersonButton>
+    <div className={`rounded-[18px] transition-colors ${open ? "bg-card-ink/[0.045]" : ""}`}>
+      <div className="flex h-[54px] items-center gap-2.5 px-2">
+        <button
+          type="button"
+          onClick={() => onCore(p)}
+          aria-label={`Open ${p.display_name}'s core`}
+          className="relative flex-none"
+        >
+          <Avatar p={p} />
+          {/* the little core says: tap for their core */}
+          <span className="absolute -bottom-0.5 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-card shadow-[0_1px_4px_rgba(13,42,63,0.25)]">
+            <SignalCore className="h-3 w-3" />
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => (has ? setOpen(!open) : onCore(p))}
+          aria-expanded={has ? open : undefined}
+          aria-label={has ? `${p.display_name}, ${mutualText(mutuals.length)}. Show who` : `Open ${p.display_name}'s core`}
+          className="flex min-w-0 flex-1 flex-col gap-px self-stretch justify-center pl-1 text-left"
+        >
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{p.display_name}</span>
+            {dot && <NewDot />}
+          </span>
+          <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted">
+            <span className="truncate">{sub}</span>
+            {has && <Chevron open={open} />}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={busy}
+          aria-label={`${addLabel} ${p.display_name}`}
+          className="flex h-[34px] flex-none items-center gap-1.5 rounded-[17px] bg-accent px-3.5 text-xs font-semibold text-white disabled:opacity-60"
+        >
+          <PlusIcon />
+          {addLabel}
+        </button>
+      </div>
+      {open && (
+        <div className="rise-in px-3 pb-3 pt-0.5">
+          <div className="pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Friends with you both
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {mutuals.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onCore(m)}
+                aria-label={`Open ${m.display_name}'s core`}
+                className="flex h-8 items-center gap-1.5 rounded-full border border-card-ink/10 bg-card-ink/[0.03] pl-1 pr-3 text-xs font-medium"
+              >
+                <Face p={m} size={24} />
+                {m.display_name}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
-            onClick={() => add(p)}
-            disabled={busy === p.id}
-            aria-label={`Add ${p.display_name} back`}
-            className="flex h-[34px] flex-none items-center gap-1.5 rounded-[17px] bg-accent px-3.5 text-xs font-semibold text-white disabled:opacity-60"
+            onClick={() => onCore(p)}
+            className="mt-2.5 flex h-9 items-center gap-2 rounded-full pr-2 text-xs font-semibold text-accent"
           >
-            <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Add back
+            <SignalCore className="h-4 w-4" />
+            See {p.display_name.split(" ")[0]}&apos;s core
           </button>
         </div>
-      ))}
-      {error && <p className="px-2 pt-1 text-xs text-accent-deep">{error}</p>}
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Find a friend: people who added you, your invite link, and new people to
-// add, newest first, or search by username. Anyone already on your globe
-// lives in My friends instead.
+// Find a friend. On top, "Added you": people who want to be your friend.
+// Below, "You may know": people who know someone on your globe, most shared
+// friends first; tap a name to see who you share. Then your invite link.
+// Searching by username swaps all of that for the results.
 // ---------------------------------------------------------------------------
 
 type Found = Profile & { following: boolean };
@@ -318,28 +381,40 @@ export function FindPanel({
 }) {
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Found[] | null>(null);
+  const [known, setKnown] = useState<MayKnow[] | null>(api.mayKnow ? null : []);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isNew = (at: string) => Date.parse(at) > seenBefore;
+  const searching = Boolean(q.trim());
 
   useEffect(() => {
     let live = true;
+    api.mayKnow?.().then((r) => live && setKnown(r)).catch(() => live && setKnown([]));
+    return () => {
+      live = false;
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (!searching) return;
+    let live = true;
     const t = setTimeout(() => {
       api.searchPeople(q).then((r) => live && setFound(r));
-    }, q ? 250 : 0);
+    }, 250);
     return () => {
       live = false;
       clearTimeout(t);
     };
-  }, [q, api]);
+  }, [q, searching, api]);
 
-  const searching = Boolean(q.trim());
   const onGlobe = new Set(friends.map((f) => f.id));
   const asked = new Map(addedMe.map((p) => [p.id, p]));
-  // people who added you are listed above, so the newest-people list skips them
-  const people = found?.filter((p) => !p.following && !onGlobe.has(p.id) && (searching || !asked.has(p.id)));
+  const shared = new Map((known ?? []).map((p) => [p.id, p.mutuals]));
+  // people who added you are listed above, so "You may know" skips them
+  const mayKnow = (known ?? []).filter((p) => !onGlobe.has(p.id) && !asked.has(p.id));
+  const results = found?.filter((p) => !p.following && !onGlobe.has(p.id));
 
-  const add = async (p: Found) => {
+  const add = async (p: Profile) => {
     setBusy(p.id);
     setError(null);
     const them = asked.get(p.id);
@@ -353,6 +428,24 @@ export function FindPanel({
     setBusy(null);
     if (r.friend) onFollowed(r.friend);
     else setError(r.error ?? "Couldn't add them. Try again.");
+  };
+
+  const row = (p: Profile, sub: string) => (
+    <PersonRow
+      key={p.id}
+      p={p}
+      sub={sub}
+      mutuals={shared.get(p.id)}
+      dot={asked.has(p.id) && isNew(asked.get(p.id)!.added_at)}
+      addLabel={asked.has(p.id) ? "Add back" : "Add"}
+      busy={busy === p.id}
+      onAdd={() => add(p)}
+      onCore={onCore}
+    />
+  );
+  const withMutuals = (first: string, id: string) => {
+    const n = shared.get(id)?.length ?? 0;
+    return n ? `${first} · ${mutualText(n)}` : first;
   };
 
   return (
@@ -375,9 +468,43 @@ export function FindPanel({
         {error && <p className="px-2 pt-2 text-xs text-accent-deep">{error}</p>}
       </div>
       <div className="flex-1 overflow-y-auto px-2.5 pb-4">
-        {!searching && (
+        {searching ? (
           <>
-            {addedMe.length > 0 && <AddedYou people={addedMe} isNew={isNew} onAddBack={onAddBack} onCore={onCore} />}
+            {results?.map((p) =>
+              row(p, withMutuals(asked.has(p.id) ? `@${p.username} · added you` : `@${p.username}`, p.id)),
+            )}
+            {results && !results.length && (
+              <div className="px-2.5 py-[18px] text-[13px] text-muted">
+                {found?.length ? "They're already on your globe" : "No one by that name yet"}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {addedMe.length > 0 && (
+              <div className="pb-2.5">
+                <Kicker>Added you · {addedMe.length}</Kicker>
+                {addedMe.map((p) => {
+                  // the header already says they added you, so the line says who you share
+                  const n = shared.get(p.id)?.length ?? 0;
+                  return row(p, n ? mutualText(n) : `added you ${formatDay(p.added_at.slice(0, 10))}`);
+                })}
+              </div>
+            )}
+            <div className="pb-2.5">
+              <Kicker>You may know{mayKnow.length ? ` · ${mayKnow.length}` : ""}</Kicker>
+              {known === null ? (
+                <div className="px-2 py-3 text-[13px] text-muted">Looking…</div>
+              ) : mayKnow.length ? (
+                mayKnow.map((p) => row(p, mutualText(p.mutuals.length)))
+              ) : (
+                <div className="px-2 pb-2 pt-1 text-[13px] leading-snug text-muted">
+                  {friends.length
+                    ? "No one yet. When your friends add people, they'll show up here."
+                    : "Add a friend, and the people they know show up here."}
+                </div>
+              )}
+            </div>
             <div className="-mx-2.5 pb-2">
               <InviteCard
                 api={api}
@@ -387,44 +514,7 @@ export function FindPanel({
                 onFollowed={onFollowed}
               />
             </div>
-            {people && people.length > 0 && <Kicker>New people</Kicker>}
           </>
-        )}
-        {people?.map((p) => (
-          <div key={p.id} className="flex h-[54px] items-center gap-3 px-2">
-            <PersonButton p={p} onCore={onCore}>
-              <div
-                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[11px] font-semibold"
-                style={{ background: "linear-gradient(135deg, #DDE3F5, #A9DCD6)", color: "#245866" }}
-              >
-                {initials(p.display_name)}
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-px">
-                <div className="truncate text-sm font-semibold">{p.display_name}</div>
-                <div className="truncate text-xs text-muted">
-                  @{p.username}
-                  {asked.has(p.id) && " · added you"}
-                </div>
-              </div>
-            </PersonButton>
-            <button
-              type="button"
-              onClick={() => add(p)}
-              disabled={busy === p.id}
-              aria-label={`Add ${p.display_name} to your globe`}
-              className="flex h-[34px] items-center gap-1.5 rounded-[17px] bg-accent px-3.5 text-xs font-semibold text-white disabled:opacity-60"
-            >
-              <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              {asked.has(p.id) ? "Add back" : "Add"}
-            </button>
-          </div>
-        ))}
-        {people && !people.length && searching && (
-          <div className="px-2.5 py-[18px] text-[13px] text-muted">
-            {found?.length ? "They're already on your globe" : "No one by that name yet"}
-          </div>
         )}
       </div>
     </>
