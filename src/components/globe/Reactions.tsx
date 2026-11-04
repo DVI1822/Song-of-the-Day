@@ -112,11 +112,12 @@ const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
 // Your core: a circle holding three sound waves, with a plus tucked at its
 // bottom right. Once the song is in your core it lights up as a mini version of
 // the real thing: the globe's own Signal core, same rings, colours and spin,
-// with the plus turned to a tick.
+// with a band of coral running up and down through the rings, and the plus
+// turned to a tick.
 const CoreIcon = ({ on }: { on?: boolean }) => (
   <span className="relative block" style={{ width: ICON, height: ICON }}>
     {on ? (
-      <SignalCore rings={13} moving className="absolute inset-0 h-full w-full" />
+      <SignalCore rings={13} moving sweep="255,94,87" className="absolute inset-0 h-full w-full" />
     ) : (
       <svg aria-hidden width={ICON} height={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" className="absolute inset-0">
         <circle cx="12" cy="12" r="8.6" />
