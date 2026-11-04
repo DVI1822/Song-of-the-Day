@@ -31,18 +31,44 @@ function FactsCard({ post, facts, fit }: { post: Post; facts: Facts; fit?: numbe
   const [big, setBig] = useState(false);
   const n = facts.facts.length;
 
-  const next = () => {
+  // step to the next fact (or back, with -1)
+  const go = (by = 1) => {
     if (n < 2 || fading) return;
     setFading(true);
     setTimeout(() => {
-      setI((x) => (x + 1) % n);
+      setI((x) => (((x + by) % n) + n) % n);
       setFading(false);
     }, FADE);
+  };
+  const next = () => go(1);
+  // swipe left for the next fact, right for the one before; a swipe
+  // isn't also a tap
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(false);
+  const swipeProps = {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.stopPropagation();
+      swipe.current = { x: e.clientX, y: e.clientY };
+      swiped.current = false;
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      e.stopPropagation();
+      const s0 = swipe.current;
+      swipe.current = null;
+      if (!s0) return;
+      const dx = e.clientX - s0.x,
+        dy = e.clientY - s0.y;
+      if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        swiped.current = true;
+        go(dx < 0 ? 1 : -1);
+      }
+    },
+    onPointerCancel: () => (swipe.current = null),
   };
 
   useEffect(() => {
     if (n < 2) return;
-    const t = setTimeout(next, EVERY);
+    const t = setTimeout(() => go(1), EVERY);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i, n]);
@@ -71,7 +97,8 @@ function FactsCard({ post, facts, fit }: { post: Post; facts: Facts; fit?: numbe
     <>
       <div
         ref={card}
-        className={`pointer-events-auto flex gap-3 overflow-hidden rounded-[18px] ${fit ? "w-full" : photo ? "w-[min(320px,calc(100vw-88px))]" : "w-[min(300px,calc(100vw-88px))]"} ${photo ? "p-2 pr-4" : "px-4 pb-2.5 pt-2.5"}`}
+        {...swipeProps}
+        className={`pointer-events-auto flex touch-pan-y select-none gap-3 overflow-hidden rounded-[18px] ${fit ? "w-full" : photo ? "w-[min(320px,calc(100vw-88px))]" : "w-[min(300px,calc(100vw-88px))]"} ${photo ? "p-2 pr-4" : "px-4 pb-2.5 pt-2.5"}`}
         style={{ ...glass(false), ...(fit ? { maxHeight: fit } : {}) }}
       >
         {photo && (
@@ -100,7 +127,10 @@ function FactsCard({ post, facts, fit }: { post: Post; facts: Facts; fit?: numbe
           </div>
           <button
             type="button"
-            onClick={next}
+            onClick={() => {
+              if (swiped.current) swiped.current = false;
+              else next();
+            }}
             aria-label={n > 1 ? `${fact.text} Next fact` : fact.text}
             data-fact
             className={`block w-full text-left leading-[1.36] transition-opacity ${fit ? "" : "min-h-[54px]"}`}
