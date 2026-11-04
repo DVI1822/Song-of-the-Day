@@ -138,6 +138,48 @@ export function Feature({
     return () => clearTimeout(t);
   }, [toast]);
 
+  // the hint when a song opens: a second in, the cover turns all the way
+  // round (a look at the back, then on to the front again), then wiggles,
+  // so you know there's more behind it and that it's there to tap
+  const spinner = useRef<HTMLDivElement>(null);
+  const hint = useRef<Animation | null>(null);
+  useEffect(() => {
+    const el = spinner.current;
+    if (!el || !el.animate) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const turn = 800,
+      hold = 1000,
+      wiggle = 650,
+      total = turn + hold + turn + wiggle;
+    const at = (ms: number) => ms / total;
+    const flip = "cubic-bezier(.2,.75,.25,1)";
+    const t = (y: number, z = 0) => `rotateY(${y}deg) rotateZ(${z}deg)`;
+    const w0 = turn * 2 + hold;
+    const a = el.animate(
+      [
+        { offset: 0, transform: t(0), easing: flip },
+        { offset: at(turn), transform: t(180) },
+        { offset: at(turn + hold), transform: t(180), easing: flip },
+        { offset: at(w0), transform: t(360), easing: "ease-in-out" },
+        { offset: at(w0 + wiggle * 0.2), transform: t(360, -4), easing: "ease-in-out" },
+        { offset: at(w0 + wiggle * 0.45), transform: t(360, 3.5), easing: "ease-in-out" },
+        { offset: at(w0 + wiggle * 0.7), transform: t(360, -2), easing: "ease-in-out" },
+        { offset: 1, transform: t(360, 0) },
+      ],
+      { duration: total, delay: 1000 },
+    );
+    hint.current = a;
+    return () => a.cancel();
+  }, []);
+  // a tap, or opening the ⋯ menu, ends the hint where you are
+  const tapCover = () => {
+    hint.current?.cancel();
+    onFlip();
+  };
+  useEffect(() => {
+    if (flagging) hint.current?.cancel();
+  }, [flagging]);
+
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
       <div ref={backdropRef} className="absolute inset-0" />
@@ -219,12 +261,13 @@ export function Feature({
         ) : (
           <button
             type="button"
-            onClick={onFlip}
+            onClick={tapCover}
             aria-label={flipped ? "Flip back to the cover" : "Flip the cover"}
             className="relative block"
             style={{ width: cover, height: cover, perspective: 1400 }}
           >
             <div
+              ref={spinner}
               className="preserve-3d relative h-full w-full transition-transform duration-[800ms] ease-[cubic-bezier(.2,.75,.25,1)]"
               style={{ transform: `rotateY(${flipped ? 180 : 0}deg)` }}
             >
