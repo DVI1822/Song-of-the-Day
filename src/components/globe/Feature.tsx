@@ -151,25 +151,39 @@ export function Feature({
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // [ms, lift (px, up is -), toward you (px), tilt forward, turn, easing]
     type K = [number, number, number, number, number, string?];
-    const UP = "cubic-bezier(.15,.8,.35,1)", // launched, slowing to the top
-      DOWN = "cubic-bezier(.55,0,.85,.4)", // falling, faster and faster
-      ROCK = "ease-in-out";
-    // one toss from the turn `from` to `from + 180`, starting at `t`
-    const toss = (t: number, from: number): K[] => [
-      [t, 7, -36, 4, from, UP], // dips
-      [t + 520, -60, 140, -6, from + 115, DOWN], // up, turning over
-      [t + 950, 9, -30, 6, from + 180, ROCK], // plop
-      [t + 1300, -2, 6, -5, from + 186, ROCK], // rocks on the water
-      [t + 1650, 1, -3, 3, from + 176.5, ROCK],
-      [t + 2000, 0, 1, -1.5, from + 181.5, ROCK],
-      [t + 2300, 0, 0, 0, from + 180, ROCK],
-    ];
+    const ROCK = "ease-in-out";
+    // one toss from the turn `from` to `from + 180`, starting at `t`: a dip,
+    // then the flight, worked out in small steps so it moves in one smooth
+    // arc (up and down like a thrown thing, turning at a steady pace the
+    // whole way with no stall at the top), then a plop and a rock
+    const FLY = 720,
+      STEP = 40;
+    const toss = (t: number, from: number): K[] => {
+      const k: K[] = [[t, 7, -36, 4, from, "linear"]];
+      for (let ms = STEP; ms <= FLY; ms += STEP) {
+        const u = Math.min(1, ms / FLY),
+          arc = 4 * u * (1 - u), // 0 at take-off and landing, 1 at the top
+          spin = 0.65 * u + 0.35 * u * u * (3 - 2 * u); // steady, eased at the ends a touch
+        k.push([t + ms, 7 + 2 * u - 72 * arc, -36 + 6 * u + 185 * arc, 4 + 2 * u - 11 * arc, from + 180 * spin, "linear"]);
+      }
+      k[k.length - 1][5] = ROCK;
+      const end = t + FLY;
+      return [
+        ...k, // plop
+        [end + 350, -2, 6, -5, from + 186, ROCK], // rocks on the water
+        [end + 700, 1, -3, 3, from + 176.5, ROCK],
+        [end + 1050, 0, 1, -1.5, from + 181.5, ROCK],
+        [end + 1350, 0, 0, 0, from + 180, ROCK],
+      ];
+    };
     const keys: K[] = [
       [0, 0, 0, 0, 0, ROCK], // floating
       [400, 1, -5, 2.5, -2.5, ROCK],
       [750, -1, 0, -1.5, 2, ROCK],
-      ...toss(1000, 0), // lands on its back by 1950, rocks, then rests
-      ...toss(4100, 180), // back over to the front
+      [1000, 0, 0, 0, 0, "ease-in"], // dips before the toss
+      ...toss(1250, 0), // lands on its back by about 2000, rocks, then rests
+      [3900, 0, 0, 0, 180, "ease-in"],
+      ...toss(4150, 180), // back over to the front
     ];
     const total = keys[keys.length - 1][0];
     const a = el.animate(
