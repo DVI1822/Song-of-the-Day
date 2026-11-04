@@ -124,9 +124,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  /* anything inside [data-motion] keeps moving (the song's buttons) */
+  *:not([data-motion], [data-motion] *),
+  *:not([data-motion] *)::before,
+  *:not([data-motion] *)::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
@@ -219,4 +220,45 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* The buttons under an opened song (Reactions.tsx). */
+/* liked: the level bars dance like an equaliser, each to its own beat */
+@keyframes eq-a {
+  0%, 100% { transform: scaleY(0.55); }
+  30% { transform: scaleY(1); }
+  60% { transform: scaleY(0.4); }
+  80% { transform: scaleY(0.85); }
+}
+@keyframes eq-b {
+  0%, 100% { transform: scaleY(0.9); }
+  25% { transform: scaleY(0.45); }
+  55% { transform: scaleY(1); }
+  75% { transform: scaleY(0.6); }
+}
+@keyframes eq-c {
+  0%, 100% { transform: scaleY(0.4); }
+  35% { transform: scaleY(0.8); }
+  50% { transform: scaleY(0.55); }
+  70% { transform: scaleY(1); }
+}
+/* the note: the bubble lights up and the little music note jingles */
+@keyframes note-glow {
+  0% { filter: drop-shadow(0 0 0 rgba(111, 220, 159, 0)); }
+  25% { filter: drop-shadow(0 0 7px rgba(111, 220, 159, 0.95)); }
+  100% { filter: drop-shadow(0 0 0 rgba(111, 220, 159, 0)); }
+}
+@keyframes note-jingle {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  15% { transform: rotate(-16deg) translateY(-1px); }
+  30% { transform: rotate(13deg) translateY(-1.5px); }
+  45% { transform: rotate(-10deg) translateY(-1px); }
+  60% { transform: rotate(7deg); }
+  75% { transform: rotate(-4deg); }
+}
+/* the core: lights up and swells as it starts to spin */
+@keyframes core-light {
+  0% { transform: scale(0.6); filter: brightness(2.2); }
+  45% { transform: scale(1.18); filter: brightness(1.5); }
+  100% { transform: scale(1); filter: brightness(1); }
 }
