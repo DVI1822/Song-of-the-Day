@@ -138,35 +138,41 @@ export function Feature({
     return () => clearTimeout(t);
   }, [toast]);
 
-  // the hint when a song opens: a second in, the cover turns all the way
-  // round (a look at the back, then on to the front again), then wiggles,
-  // so you know there's more behind it and that it's there to tap
+  // the hint when a song opens: the cover sits like it's floating on water,
+  // dips, gets tossed up toward you, spins over and over (hanging a moment on
+  // its back, so you see the caption and photo), drops back down and rocks
+  // in the water until it settles. Tells you there's more behind it and that
+  // it's there to tap.
   const spinner = useRef<HTMLDivElement>(null);
   const hint = useRef<Animation | null>(null);
   useEffect(() => {
     const el = spinner.current;
     if (!el || !el.animate) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const turn = 800,
-      hold = 1000,
-      wiggle = 650,
-      total = turn + hold + turn + wiggle;
-    const at = (ms: number) => ms / total;
-    const flip = "cubic-bezier(.2,.75,.25,1)";
-    const t = (y: number, z = 0) => `rotateY(${y}deg) rotateZ(${z}deg)`;
-    const w0 = turn * 2 + hold;
+    // [ms, lift (px, up is -), toward you (px), tilt forward, turn, easing]
+    type K = [number, number, number, number, number, string?];
+    const keys: K[] = [
+      [0, 0, 0, 0, 0, "ease-in-out"], // floating
+      [450, 1, -6, 3, -3, "ease-in-out"],
+      [900, -1, 0, -2, 2.5, "ease-in-out"],
+      [1250, 7, -36, 4, 0, "cubic-bezier(.15,.8,.35,1)"], // dips, then launches
+      [1800, -64, 150, -8, 520, "cubic-bezier(.3,0,.7,1)"], // up and spinning
+      [2350, -72, 165, -4, 575, "cubic-bezier(.55,0,.85,.4)"], // hangs on its back
+      [2850, 10, -30, 6, 720, "cubic-bezier(.2,.7,.4,1)"], // splashes down
+      [3250, -2, 6, -5, 726, "ease-in-out"], // rocks on the water
+      [3650, 2, -4, 3.5, 716.5, "ease-in-out"],
+      [4050, -1, 2, -2, 722, "ease-in-out"],
+      [4450, 0, -1, 1, 719, "ease-in-out"],
+      [4850, 0, 0, 0, 720],
+    ];
+    const total = keys[keys.length - 1][0];
     const a = el.animate(
-      [
-        { offset: 0, transform: t(0), easing: flip },
-        { offset: at(turn), transform: t(180) },
-        { offset: at(turn + hold), transform: t(180), easing: flip },
-        { offset: at(w0), transform: t(360), easing: "ease-in-out" },
-        { offset: at(w0 + wiggle * 0.2), transform: t(360, -4), easing: "ease-in-out" },
-        { offset: at(w0 + wiggle * 0.45), transform: t(360, 3.5), easing: "ease-in-out" },
-        { offset: at(w0 + wiggle * 0.7), transform: t(360, -2), easing: "ease-in-out" },
-        { offset: 1, transform: t(360, 0) },
-      ],
-      { duration: total, delay: 1000 },
+      keys.map(([ms, y, z, x, turn, easing]) => ({
+        offset: ms / total,
+        transform: `translateY(${y}px) translateZ(${z}px) rotateX(${x}deg) rotateY(${turn}deg)`,
+        ...(easing ? { easing } : {}),
+      })),
+      { duration: total, delay: 700 },
     );
     hint.current = a;
     return () => a.cancel();
