@@ -23,6 +23,8 @@ import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
 import { SignalCore } from "./SignalCore";
 import { HalloweenScene } from "./HalloweenScene";
+import { SettingScene, settingFor } from "./setting";
+import { settingOverride, type SettingKind } from "@/lib/setting";
 import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
@@ -160,6 +162,7 @@ function newMotion(posted: boolean) {
     mt: 0,
     last: 0,
     wxShow: 0,
+    setShow: 0,
     look: { overcast: 0, wet: 0, frost: 0 } as Look,
     cam: { yaw: 0, pitch: 0, roll: 0 } as Camera,
     target: null as null | { yaw: number; pitch: number },
@@ -220,6 +223,8 @@ function newEls() {
     day: null as HTMLDivElement | null,
     sunShadow: null as HTMLDivElement | null,
     wxSky: null as HTMLCanvasElement | null,
+    setStill: null as HTMLCanvasElement | null,
+    setLive: null as HTMLCanvasElement | null,
     wxBack: null as HTMLCanvasElement | null,
     wxFront: null as HTMLCanvasElement | null,
     wxFlash: null as HTMLDivElement | null,
@@ -317,9 +322,19 @@ function Globe({
   const sim = useRef(new TileSim());
   const els = useRef(new Map<number, TileEls>());
   const R = useRef(newEls());
+  // the kind of place you're in, shown behind the globe (setting.ts)
+  const setting = useRef({ scene: null as SettingScene | null, kind: null as SettingKind | null, at: "" });
+  useEffect(() => {
+    const o = settingOverride();
+    if (o) setting.current.kind = o === "off" ? null : o;
+  }, []);
   const weather = useWeather((lat, lon) => {
     m.current.geo = { lat, lon };
     m.current.sunAt = 0;
+    const at = `${lat.toFixed(1)},${lon.toFixed(1)}`;
+    if (settingOverride() || setting.current.at === at) return;
+    setting.current.at = at;
+    settingFor(lat, lon).then((k) => void (setting.current.kind = k));
   });
   const wx = useRef({ weather, dark: false, scene: null as Scene | null, failed: false, season: "autumn" as Season, seasonAt: -Infinity });
   useLayoutEffect(() => {
@@ -801,13 +816,45 @@ function Globe({
         if (el.wxFront) el.wxFront.style.opacity = show.toFixed(3);
         s.look = w.scene.look;
       }
+      // the place you're in, behind it all
+      const st = setting.current;
+      if (!st.scene && el.setStill && el.setLive)
+        try {
+          st.scene = new SettingScene(el.setStill, el.setLive);
+        } catch {}
+      if (st.scene) {
+        st.scene.set(s.haunt ? null : st.kind);
+        const { L: Lw } = live.current;
+        const hide = s.lens !== null || s.coreOn || s.featOn;
+        s.setShow += ((hide ? 0 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.setShow) * ease(0.1, dt);
+        const d = clockNow();
+        st.scene.step(dt, w.weather, {
+          show: s.setShow,
+          w: Lw.w,
+          h: Lw.h,
+          cx: Lw.cx,
+          cy: Lw.cy,
+          R: Lw.R,
+          dk: s.dk,
+          day: s.sun.day,
+          warm: s.sky?.warm ?? 0,
+          warmC: s.sky?.warmC ?? [1, 1, 1],
+          el: s.sun.el,
+          az: s.sun.az,
+          season: w.scene ? w.season : (seasonOverride() ?? seasonAt(d, s.geo.lat)),
+          hour: d.getHours() + d.getMinutes() / 60,
+          temp: tempOverride() ?? w.weather?.temp ?? null,
+        });
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     const w = wx.current;
+    const st = setting.current;
     return () => {
       cancelAnimationFrame(raf);
       w.scene = null;
+      st.scene = null;
     };
   }, []);
 
@@ -1137,6 +1184,9 @@ function Globe({
         {size && hw && <HalloweenScene name={hw.name} layer="back" w={L.w} h={L.h} cx={L.cx} cy={L.cy} R={L.R} />}
         {/* clouds, then the weather and seasons further away than the globe's middle */}
         <canvas ref={(el) => void (R.current.wxSky = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* where you are: a skyline, a mountain village (setting.ts) */}
+        <canvas ref={(el) => void (R.current.setStill = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <canvas ref={(el) => void (R.current.setLive = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div

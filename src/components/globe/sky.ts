@@ -48,15 +48,20 @@ export type SkyLook = {
 };
 
 // el: the sun's height in degrees. az: from north, clockwise, radians.
-export function skyAt(el: number, az: number): SkyLook {
-  const rising = az < Math.PI;
-  const stops = rising ? MORNING : EVENING;
+// The sky's top, middle and horizon colours (0..255) for the sun's height.
+export function skyBands(el: number, az: number): [V3, V3, V3] {
+  const stops = az < Math.PI ? MORNING : EVENING;
   let i = 0;
   while (i < stops.length - 2 && el > stops[i + 1][0]) i++;
   const [e0, ...c0] = stops[i],
     [e1, ...c1] = stops[i + 1];
   const t = smooth(e0, e1, el);
-  const [top, mid, low] = [0, 1, 2].map((j) => mix(hex(c0[j]), hex(c1[j]), t));
+  return [0, 1, 2].map((j) => mix(hex(c0[j]), hex(c1[j]), t)) as [V3, V3, V3];
+}
+
+export function skyAt(el: number, az: number): SkyLook {
+  const rising = az < Math.PI;
+  const [top, mid, low] = skyBands(el, az);
 
   // the low sun's glow, soft, on whichever side it's on (you face north:
   // east is to the right); no disc, just the warmth spreading up the sky
