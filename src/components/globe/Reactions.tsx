@@ -27,7 +27,7 @@ export function useReactions(api: GlobeApi, postId: string) {
 const CORAL_HEX = "#ff5e57",
   BLUE_HEX = "#1f4f8f",
   GREEN_HEX = "#6fdc9f";
-const CORE_RINGS = ["255,94,87", "111,220,159", "160,236,196"];
+const CORE_RINGS = ["255,94,87", "31,79,143", "111,220,159"];
 
 // The like: three level bars that jump up when it's tapped. Under an opened
 // song (`dance`), once liked they keep bouncing like an equaliser to music,
@@ -112,24 +112,12 @@ const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
 
 // Your core: a circle holding three sound waves, with a plus tucked at its
 // bottom right. Once the song is in your core it lights up as a mini version of
-// the real thing: the Signal core spinning in coral and green inside a dark
-// blue glass orb, with the plus turned to a tick.
+// the real thing: the Signal core spinning in coral, dark blue and green,
+// with the plus turned to a tick.
 const CoreIcon = ({ on }: { on?: boolean }) => (
   <span className="relative block" style={{ width: ICON, height: ICON }}>
     {on ? (
-      <span
-        className="absolute inset-[2px] overflow-hidden rounded-full"
-        style={{
-          background: "radial-gradient(circle at 38% 32%, #2a5a96 0%, #143563 58%, #0b1f3d 100%)",
-          boxShadow: "0 0 0 1px rgba(111,220,159,0.6), 0 0 14px 1px rgba(111,220,159,0.45), 0 0 26px 4px rgba(255,94,87,0.3), inset 0 0 10px rgba(111,220,159,0.25)",
-        }}
-      >
-        <SignalCore rings={7} moving speed={2.2} palette={CORE_RINGS} className="absolute inset-[3px] h-[calc(100%-6px)] w-[calc(100%-6px)]" />
-        <span
-          className="pointer-events-none absolute inset-0 rounded-full"
-          style={{ background: "radial-gradient(circle at 32% 24%, rgba(255,255,255,0.35), transparent 38%)" }}
-        />
-      </span>
+      <SignalCore rings={9} moving speed={2.2} palette={CORE_RINGS} weight={1.4} className="absolute inset-0 h-full w-full" />
     ) : (
       <svg aria-hidden width={ICON} height={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" className="absolute inset-0">
         <circle cx="12" cy="12" r="8.6" />

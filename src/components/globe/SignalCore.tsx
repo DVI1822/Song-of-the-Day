@@ -17,6 +17,7 @@ export function SignalCore({
   moving,
   speed = 1,
   palette,
+  weight = 1,
 }: {
   className?: string;
   rings?: number;
@@ -25,6 +26,7 @@ export function SignalCore({
   moving?: boolean;
   speed?: number;
   palette?: string[]; // "r,g,b" per ring, in turn
+  weight?: number; // line thickness, times
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -46,7 +48,7 @@ export function SignalCore({
       const t = ((now - t0) / 1000) * speed;
       const n = rings ?? (size < 24 ? 5 : size < 60 ? 8 : 13);
       const Rc = size * 0.4;
-      const w = Math.max(1.1, size / 50);
+      const w = Math.max(1.1, size / 50) * weight;
       const all = corePoints(n, Rc, { yaw: t * 0.35, pitch: -0.35 + 0.1 * Math.sin(t * 0.3), roll: 0 }, t, size < 24 ? 0.1 : 0.13, size < 24 ? 60 : 120);
       for (const front of [false, true])
         all.forEach((pts, i) => {
@@ -70,6 +72,6 @@ export function SignalCore({
     };
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [rings, still, tint, moving, speed, palette]);
+  }, [rings, still, tint, moving, speed, palette, weight]);
   return <canvas ref={ref} aria-hidden className={className} />;
 }
