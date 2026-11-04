@@ -146,7 +146,7 @@ export function Feature({
   const hint = useRef<Animation | null>(null);
   useEffect(() => {
     const el = spinner.current;
-    if (!el || !el.animate || calm()) return;
+    if (!el || !el.animate) return;
     const keys: Toss = [
       [0, 0, 0, 0, 0, ROCK], // floating
       [400, 1, -5, 2.5, -2.5, ROCK],
@@ -165,7 +165,7 @@ export function Feature({
   const tapCover = () => {
     hint.current?.cancel();
     const el = spinner.current;
-    if (el?.animate && !calm()) {
+    if (el?.animate) {
       const from = flipped ? 180 : 0;
       hint.current = play(el, [[0, 0, 0, 0, from, "ease-in"], ...toss(150, from)], 0);
     }
@@ -434,8 +434,6 @@ function play(el: HTMLElement, keys: Toss, delay: number) {
     { duration: total, delay },
   );
 }
-// people who've asked their phone for less motion get the plain flip
-const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // The caption on the back of the cover: smaller as it gets longer, and on a
 // smaller cover, so all 100 characters fit inside the square.
