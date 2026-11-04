@@ -315,7 +315,7 @@ export function Feature({
           </button>
           )}
           {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && <FactsButton post={post} load={api.facts} />}
+          {!flagging && <FactsButton post={post} load={api.facts} cover={cover} />}
         </div>
         {/* "Added to core", a moment over the bottom of the cover */}
         {toast > 0 && (
