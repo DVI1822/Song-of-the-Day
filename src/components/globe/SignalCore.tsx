@@ -7,13 +7,29 @@ import { coreColor, corePoints, nearFar } from "./signal";
 // for the Core tab, core buttons and anywhere else the core stands for
 // someone. `rings` thins it out for tiny sizes; `tint` ("r,g,b") draws it in
 // one colour instead of the neon spectrum.
-export function SignalCore({ className, rings, still, tint }: { className?: string; rings?: number; still?: boolean; tint?: string }) {
+// `moving` keeps it turning even when the phone asks for less motion, and
+// `speed` turns it faster.
+export function SignalCore({
+  className,
+  rings,
+  still,
+  tint,
+  moving,
+  speed = 1,
+}: {
+  className?: string;
+  rings?: number;
+  still?: boolean;
+  tint?: string;
+  moving?: boolean;
+  speed?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
     const ctx = cv?.getContext("2d");
     if (!cv || !ctx) return;
-    const calm = still || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const calm = still || (!moving && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     let raf = 0;
     const t0 = performance.now() - Math.random() * 20000;
     const paint = (now: number) => {
@@ -25,7 +41,7 @@ export function SignalCore({ className, rings, still, tint }: { className?: stri
       ctx.clearRect(0, 0, W, W);
       ctx.setTransform(dpr, 0, 0, dpr, (size / 2) * dpr, (size / 2) * dpr);
       ctx.lineJoin = "round";
-      const t = (now - t0) / 1000;
+      const t = ((now - t0) / 1000) * speed;
       const n = rings ?? (size < 24 ? 5 : size < 60 ? 8 : 13);
       const Rc = size * 0.4;
       const w = Math.max(1.1, size / 50);
@@ -51,6 +67,6 @@ export function SignalCore({ className, rings, still, tint }: { className?: stri
     };
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [rings, still, tint]);
+  }, [rings, still, tint, moving, speed]);
   return <canvas ref={ref} aria-hidden className={className} />;
 }
