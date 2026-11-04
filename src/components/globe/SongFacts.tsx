@@ -23,7 +23,9 @@ const SEEN = "toptrack.factsShown.";
 
 // --- the card -------------------------------------------------------------------
 
-function FactsCard({ post, facts }: { post: Post; facts: Facts }) {
+// `fit`: the card fills its box's width and is never taller than this many
+// pixels (the fact's text shrinks a little to fit) — over an opened song's cover
+function FactsCard({ post, facts, fit }: { post: Post; facts: Facts; fit?: number }) {
   const [i, setI] = useState(0);
   const [fading, setFading] = useState(false);
   const [big, setBig] = useState(false);
@@ -46,6 +48,21 @@ function FactsCard({ post, facts }: { post: Post; facts: Facts }) {
   }, [i, n]);
 
   const fact = facts.facts[i % n];
+  const card = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState(13);
+  useLayoutEffect(() => {
+    const el = card.current;
+    if (!fit || !el) return;
+    let px = 13;
+    const text = el.querySelector<HTMLElement>("[data-fact]");
+    if (!text) return;
+    text.style.fontSize = `${px}px`;
+    while (px > 10 && el.scrollHeight > fit) {
+      px -= 0.5;
+      text.style.fontSize = `${px}px`;
+    }
+    setSize(px);
+  }, [fit, fact.text]);
   const source = fact.source ?? null;
   const photo = facts.photo ?? null;
   const credit = photo && `Photo: ${photo.credit}${photo.license ? `, ${photo.license}` : ""}`;
@@ -53,8 +70,9 @@ function FactsCard({ post, facts }: { post: Post; facts: Facts }) {
   return (
     <>
       <div
-        className={`pointer-events-auto flex gap-3 rounded-[18px] ${photo ? "w-[min(320px,calc(100vw-88px))] p-2 pr-4" : "w-[min(300px,calc(100vw-88px))] px-4 pb-2.5 pt-2.5"}`}
-        style={glass(false)}
+        ref={card}
+        className={`pointer-events-auto flex gap-3 overflow-hidden rounded-[18px] ${fit ? "w-full" : photo ? "w-[min(320px,calc(100vw-88px))]" : "w-[min(300px,calc(100vw-88px))]"} ${photo ? "p-2 pr-4" : "px-4 pb-2.5 pt-2.5"}`}
+        style={{ ...glass(false), ...(fit ? { maxHeight: fit } : {}) }}
       >
         {photo && (
           <button
@@ -84,8 +102,9 @@ function FactsCard({ post, facts }: { post: Post; facts: Facts }) {
             type="button"
             onClick={next}
             aria-label={n > 1 ? `${fact.text} Next fact` : fact.text}
-            className="block min-h-[54px] w-full text-left text-[13px] leading-[1.36] transition-opacity"
-            style={{ opacity: fading ? 0 : 1, transitionDuration: `${FADE}ms` }}
+            data-fact
+            className={`block w-full text-left leading-[1.36] transition-opacity ${fit ? "" : "min-h-[54px]"}`}
+            style={{ opacity: fading ? 0 : 1, transitionDuration: `${FADE}ms`, fontSize: size }}
           >
             {fact.text}
           </button>
@@ -376,7 +395,9 @@ export function MyFacts({
 // The star sits on the bottom right of the album cover; the card comes out
 // above the song, where there's room, and the facts are only asked for once
 // you tap.
-export function FactsButton({ post, load }: { post: Post; load?: Load }) {
+// `cover`: the size of the opened song's cover the star sits on; the facts
+// then open over the top half of that cover instead of at the top of the screen
+export function FactsButton({ post, load, cover }: { post: Post; load?: Load; cover?: number }) {
   const [facts, setFacts] = useState<Facts | null>(null);
   const [busy, setBusy] = useState(false);
   const [none, setNone] = useState(false);
@@ -407,7 +428,14 @@ export function FactsButton({ post, load }: { post: Post; load?: Load }) {
 
   return (
     <>
-      {facts &&
+      {facts && cover ? (
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-[3]">
+          <Flight open={open} star={star}>
+            <FactsCard post={post} facts={facts} fit={Math.round(cover / 2) - 12} />
+          </Flight>
+        </div>
+      ) : (
+        facts &&
         createPortal(
           <div className="pointer-events-none fixed inset-x-0 top-[max(20px,env(safe-area-inset-top))] z-[490] flex justify-center">
             <Flight open={open} star={star}>
@@ -415,7 +443,8 @@ export function FactsButton({ post, load }: { post: Post; load?: Load }) {
             </Flight>
           </div>,
           document.body,
-        )}
+        )
+      )}
       <div className="absolute bottom-3 right-3 z-[2] flex flex-row-reverse items-center gap-2">
         <StarButton
           starRef={star}
