@@ -18,7 +18,13 @@ import type { ArtistPhoto, SongFact, SongFacts } from "./types";
 // by five friends is only looked up once.
 
 
-const MODEL = "claude-opus-5-5";
+// Haiku 5.5 is about 40 times cheaper per token than Opus 5.5. The web
+// searches (about a cent each) are now most of what a new song costs.
+// FACTS_MODEL in Vercel switches it back (e.g. claude-opus-5-5) without a deploy.
+const MODEL = process.env.FACTS_MODEL || "claude-haiku-5-5";
+// Haiku has the basic web search and no server-side refusal fallback;
+// the newer search and the fallback are for Sonnet and Opus.
+const BIG = /opus|sonnet/.test(MODEL);
 const UA = "TopTrack/1.0 (https://www.mytoptrack.io)";
 // A song nobody found anything on is looked for again after this long.
 const RETRY_EMPTY_MS = 6 * 3_600_000;
@@ -484,14 +490,16 @@ async function withClaude(title: string, artist: string, song: Page | null, art:
       client.beta.messages.create({
         model: MODEL,
         max_tokens: 8000,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
+        ...(BIG ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
         output_config: { effort: "low" },
         system: SYSTEM,
         tools: [
-          open
-            ? { type: "web_search_20260209", name: "web_search", max_uses: 3 }
-            : { type: "web_search_20260209", name: "web_search", max_uses: 3, allowed_domains: sites },
+          {
+            type: BIG ? "web_search_20260209" : "web_search_20250305",
+            name: "web_search",
+            max_uses: 3,
+            ...(open ? {} : { allowed_domains: sites }),
+          } as Anthropic.Beta.BetaToolUnion,
         ],
         messages,
       });
