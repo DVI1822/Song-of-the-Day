@@ -61,17 +61,10 @@ type Props = {
   redoUsed: boolean;
   addedMe?: AddedMe[];
   activity?: Activity[]; // feels and notes on your song today
-  spotifyLinked?: boolean;
   api?: GlobeApi;
 };
 
 export function GlobeApp(props: Props) {
-  const spotify = (props.api ?? serverApi).spotify;
-  const linked = Boolean(props.spotifyLinked);
-  const connect = useMemo(() => (spotify ? { ...spotify, linked } : null), [spotify, linked]);
-  // the player lives in the root layout and stays with you after you leave
-  const { setConnect } = usePreview();
-  useEffect(() => setConnect(connect), [connect, setConnect]);
   return <Globe {...props} />;
 }
 
@@ -329,7 +322,7 @@ function Globe({
 
   // The song that's playing gets a stream from the core (signal.ts). It
   // bursts on the song's hits only while the site can hear it (its preview;
-  // see beat.ts); a whole song on Spotify can't be heard, so it just flows.
+  // see beat.ts).
   const playingPost = pv.shuffle?.now ?? pv.track?.post ?? null;
   const playingPaused = pv.shuffle ? pv.shuffle.paused : Boolean(pv.track?.paused);
   const [beat, setBeat] = useState<{ url: string; b: Beat | null } | null>(null);

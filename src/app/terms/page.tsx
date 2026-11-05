@@ -11,7 +11,7 @@ export default function TermsPage() {
         <li>Share songs, captions and photos you&apos;re allowed to share, and be kind. Nothing hateful or illegal.</li>
         <li>Keep your sign-in to yourself. You&apos;re responsible for what&apos;s posted from your account.</li>
         <li>
-          Music plays through the services it comes from, like Spotify, under their own terms. We don&apos;t host or
+          Songs play as short samples from the services they come from, like Spotify and Apple Music, under their own terms, and open in your own music app. We don&apos;t host or
           sell any music. Song details and covers belong to their owners.
         </li>
         <li>
