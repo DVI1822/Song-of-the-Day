@@ -846,6 +846,7 @@ function Globe({
           season: w.scene ? w.season : (seasonOverride() ?? seasonAt(d, s.geo.lat)),
           hour: d.getHours() + d.getMinutes() / 60,
           temp: tempOverride() ?? w.weather?.temp ?? null,
+          yaw: s.yaw,
         });
       }
       raf = requestAnimationFrame(tick);

@@ -2,13 +2,15 @@ import type { Weather } from "@/lib/weather";
 import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
-import { livePixels, paintPixels, pixLayout, type Comp, type PixLayout } from "./pixel";
+import { drawPano, livePixels, paintPano, panoOffset, pixLayout, type Comp, type Pano, type PixLayout } from "./pixel";
 
 // ?pix=1|2|3 picks a pixel style while we try them out
-function pixComp(): Comp {
-  if (typeof window === "undefined") return "hill";
-  const q = new URLSearchParams(window.location.search).get("scene");
-  return q === "lake" || q === "train" || q === "stage" ? q : "hill";
+// the stretches the loop is made of, in order; ?scene= shows just one
+function pixComps(): Comp[] {
+  const all: Comp[] = ["hill", "lake", "train", "stage"];
+  if (typeof window === "undefined") return all;
+  const q = new URLSearchParams(window.location.search).get("scene") as Comp | null;
+  return q && all.includes(q) ? [q] : all;
 }
 function pixStyle() {
   if (typeof window === "undefined") return 2;
@@ -52,6 +54,7 @@ export type SettingFrame = {
   season: Season;
   hour: number;
   temp: number | null;
+  yaw?: number; // how far the globe has turned; the pixel world turns with it
 };
 
 export type C = [number, number, number];
@@ -789,7 +792,9 @@ export class SettingScene {
   private live: CanvasRenderingContext2D;
   private kind: "city" | "mountain" | null = null;
   private lay: CityLayout | MtnLayout | null = null;
-  private pix: PixLayout | null = null;
+  private pix: PixLayout[] | null = null;
+  private pano: Pano | null = null;
+  private panoKey = "";
   private size = "";
   private key = "";
   private L: Light | null = null;
@@ -841,7 +846,7 @@ export class SettingScene {
         cv.height = Math.round(f.h * this.dpr);
       }
       this.lay = this.kind === "city" ? cityLayout(f.w, f.h, 7) : mountainLayout(f.w, f.h, 11);
-      this.pix = this.kind === "mountain" ? pixLayout(f.w, f.h, 11, pixStyle(), pixComp()) : null;
+      this.pix = this.kind === "mountain" ? pixComps().map((c, i) => pixLayout(f.w, f.h, 11 + i * 7, pixStyle(), c)) : null;
       this.key = "";
     }
     // repaint the still layer only when the light has really changed
@@ -864,7 +869,26 @@ export class SettingScene {
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       g.clearRect(0, 0, f.w, f.h);
       if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
-      else if (this.pix) paintPixels(g, this.pix, f.w, f.h, this.L, f.season);
+      else if (this.pix) this.pano = paintPano(this.pix, this.L, f.season);
+      if (!this.pix) this.aura(g, f);
+      this.panoKey = "";
+    }
+    // the pixel world turns with the globe: redrawn whenever a layer has
+    // moved by a whole pixel
+    const pk = this.pano ? [0, 1, 2].map((k) => panoOffset(this.pano!, f.yaw ?? 0, f.R, k)).join(",") + `|${f.cx},${f.cy},${f.R}` : "";
+    if (this.pix && this.pano && pk !== this.panoKey) {
+      this.panoKey = pk;
+      const g = this.still;
+      g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      g.clearRect(0, 0, f.w, f.h);
+      drawPano(g, this.pano, f.yaw ?? 0, f.R);
+      this.aura(g, f);
+    }
+    this.frame(dt, f);
+  }
+
+  private aura(g: CanvasRenderingContext2D, f: SettingFrame) {
+    if (this.L) {
       // the air thickens round the globe so the songs stay easy to read
       const r = f.R * 1.3;
       const aura = g.createRadialGradient(f.cx, f.cy, f.R * 0.3, f.cx, f.cy, r);
@@ -874,6 +898,10 @@ export class SettingScene {
       g.fillStyle = aura;
       g.fillRect(f.cx - r, f.cy - r, r * 2, r * 2);
     }
+  }
+
+  private frame(dt: number, f: SettingFrame) {
+    if (!this.lay) return;
     // the moving things, at up to 30 a second
     this.acc += dt;
     if (this.acc < 1 / 30) return;
@@ -882,7 +910,10 @@ export class SettingScene {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, f.w, f.h);
     if (this.lay.kind === "city") this.liveCity(g, this.lay, f);
-    else if (this.pix) livePixels(g, this.pix, this.L!, this.t);
+    else if (this.pix && this.pano) {
+      const off = panoOffset(this.pano, f.yaw ?? 0, f.R, 2);
+      this.pix.forEach((lay, i) => livePixels(g, lay, this.L!, this.t + i * 23, i * lay.W - off, this.pano!.W, i === 0));
+    }
   }
 
   private liveCity(g: CanvasRenderingContext2D, lay: CityLayout, f: SettingFrame) {

@@ -191,6 +191,19 @@ export function pixLayout(w: number, h: number, seed: number, style = 2, comp: C
     if (comp === "lake") e = H * 0.785;
     edge.push(Math.round(e));
   }
+  // ease every skyline to the same height at both ends, so layouts placed
+  // side by side join up without a seam
+  const B = 16;
+  for (let x = 0; x < W; x++) {
+    const d = Math.min(x, W - 1 - x);
+    if (d >= B) continue;
+    const k = (d / B) * (d / B) * (3 - (2 * d) / B);
+    const to = (arr: number[], v: number) => (arr[x] = Math.round(v + (arr[x] - v) * k));
+    to(range, H * 0.66);
+    to(ridge, H * 0.71);
+    to(near, H * 0.76);
+    to(edge, H * 0.8);
+  }
   const valley = Math.min(...edge);
   const river: PixLayout["river"] = [];
   for (let y = valley; y < H; y++) {
@@ -367,11 +380,16 @@ function poplar(b: Buf, S: Shade, x: number, base: number, h: number, depth: num
   }
 }
 
-export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: number, h: number, L: Light, season: Season) {
+// paints one layout into three layers, far (the range), middle (the far
+// forest) and near (everything else), so they can slide past each other
+function paintLayers(lay: PixLayout, L: Light, season: Season): [Buf, Buf, Buf] {
   const { W, H } = lay;
   R = lay.style >= 2 ? PASTEL : NATURAL;
   const S = shadeFor(L, season);
-  const b = new Buf(W, H);
+  const far = new Buf(W, H),
+    midB = new Buf(W, H),
+    nearB = new Buf(W, H);
+  let b = far;
   const snowy = L.snow > 0.45;
 
   // the far range: each peak has a sunny face and a shaded face split down a
@@ -390,7 +408,7 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
         best = p;
       }
     }
-    for (let y = y0; y < lay.ridge[x] + 2; y++) {
+    for (let y = y0; y < lay.ridge[x] + 16; y++) {
       const dy = y - best.top;
       const spine = best.x + dy * 0.12 * (best.x < W / 2 ? 1 : -1) + noise1(dy / 6, best.x) * 1.2;
       const face = x < spine ? -1 : 1;
@@ -436,7 +454,9 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
       }
     }
   };
-  forest(lay.ridge, (x) => lay.near[x] + 3, 0.5, R.forest, 3);
+  b = midB;
+  forest(lay.ridge, (x) => lay.near[x] + 14, 0.5, R.forest, 3);
+  b = nearB;
   forest(lay.near, (x) => lay.edge[x] + 2, 0.28, R.pine, 8);
 
   // the valley floor: broad fields in flat colours, the river through it
@@ -482,7 +502,15 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
   if (lay.lake) {
     const { cx, cy, rx, ry } = lay.lake;
     const top = Math.round(cy - ry);
-    const src = new Uint8ClampedArray(b.d);
+    // what the lake sees: all three layers as they stand
+    const src = new Uint8ClampedArray(far.d);
+    for (const l of [midB, nearB])
+      for (let i = 0; i < src.length; i += 4)
+        if (l.d[i + 3]) {
+          src[i] = l.d[i];
+          src[i + 1] = l.d[i + 1];
+          src[i + 2] = l.d[i + 2];
+        }
     for (let y = top - 2; y <= cy + ry + 2; y++)
       for (let x = Math.floor(cx - rx - 3); x <= cx + rx + 3; x++) {
         const e = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
@@ -513,7 +541,7 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
   // the railway trestle: a deck on criss-crossed legs, spanning the valley
   if (lay.trestle !== null) {
     const ty = lay.trestle;
-    for (let x = 0; x < W; x++) {
+    for (let x = Math.round(W * 0.1); x < W * 0.9; x++) {
       const ground = Math.min(H - 1, ty + 12);
       b.set(x, ty - 1, col(S, R.roof, 0.9, x, ty - 1, 0.15));
       b.set(x, ty, col(S, R.wood, 0.75, x, ty, 0.15));
@@ -575,24 +603,68 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
     else pine(b, S, t.x, t.y, t.h, t.depth, snowy);
   }
 
-  // onto the canvas, blown up with hard edges
-  const cv = document.createElement("canvas");
-  cv.width = W;
-  cv.height = H;
-  cv.getContext("2d")!.putImageData(new ImageData(b.d, W, H), 0, 0);
+  return [far, midB, nearB];
+}
+
+// The world as one long loop: each layout side by side, painted into three
+// strips that wrap around. The globe's turn slides them past.
+export type Pano = { W: number; H: number; layers: HTMLCanvasElement[]; lays: PixLayout[] };
+
+export function paintPano(lays: PixLayout[], L: Light, season: Season): Pano {
+  const { W, H } = lays[0];
+  const PW = W * lays.length;
+  const datas = [0, 1, 2].map(() => new Uint8ClampedArray(PW * H * 4) as Uint8ClampedArray<ArrayBuffer>);
+  lays.forEach((lay, n) => {
+    const bufs = paintLayers(lay, L, season);
+    bufs.forEach((bf, k) => {
+      for (let y = 0; y < H; y++) datas[k].set(bf.d.subarray(y * W * 4, (y + 1) * W * 4), (y * PW + n * W) * 4);
+    });
+  });
+  const layers = datas.map((d) => {
+    const cv = document.createElement("canvas");
+    cv.width = PW;
+    cv.height = H;
+    cv.getContext("2d")!.putImageData(new ImageData(d, PW, H), 0, 0);
+    return cv;
+  });
+  return { W: PW, H, layers, lays };
+}
+
+// how far each layer slides per radian the globe turns, as a share of the
+// globe's own radius: the meadow keeps pace with the globe's face, the
+// forest behind a little slower, the peaks slower still
+export const PARALLAX = [0.3, 0.6, 1];
+
+export function drawPano(g: CanvasRenderingContext2D, pano: Pano, yaw: number, R: number) {
   g.imageSmoothingEnabled = false;
-  g.drawImage(cv, 0, 0, W * PIX, H * PIX);
+  pano.layers.forEach((cv, k) => {
+    const off = panoOffset(pano, yaw, R, k);
+    g.drawImage(cv, -off * PIX, 0, pano.W * PIX, pano.H * PIX);
+    g.drawImage(cv, (pano.W - off) * PIX, 0, pano.W * PIX, pano.H * PIX);
+  });
+}
+
+// the layer's scroll, in pixels, snapped so it stays crisp
+export function panoOffset(pano: Pano, yaw: number, R: number, k: number) {
+  const px = (-yaw * R * PARALLAX[k]) / PIX;
+  return (((Math.round(px) % pano.W) + pano.W) % pano.W) as number;
 }
 
 // the moving bits, snapped to the pixel grid: the river glinting, smoke from
 // both chimneys, deer wandering across the meadow (leaving tracks in snow),
 // a trout jumping, a hawk circling by day, fireflies at night
-export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light, t: number) {
+export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light, t: number, ox = 0, wrap = 0, first = true) {
   const P = PIX;
-  const dot = (x: number, y: number, c: string) => {
-    g.fillStyle = c;
-    g.fillRect(Math.round(x) * P, Math.round(y) * P, P, P);
+  // x in the layout, to x on screen: shifted along the loop and wrapped
+  const sx = (x: number) => {
+    const X = Math.round(x) + ox;
+    return wrap ? ((X % wrap) + wrap) % wrap : X;
   };
+  const rect = (x: number, y: number, s: number, c: string) => {
+    g.fillStyle = c;
+    g.fillRect(sx(x) * P, Math.round(y) * P, s * P, s * P);
+  };
+  const dot = (x: number, y: number, c: string) => rect(x, y, 1, c);
   const night = L.night > 0.5;
   // glints drifting down the river
   for (let i = 0; i < 26; i++) {
@@ -612,8 +684,7 @@ export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light
       const y = cy - 1 - age * 18;
       const a = (1 - age) * Math.min(1, age * 6) * 0.5;
       const s = age < 0.4 ? 1 : 2;
-      g.fillStyle = night ? `rgba(150,160,190,${a})` : `rgba(240,238,244,${a})`;
-      g.fillRect(Math.round(x) * P, Math.round(y) * P, s * P, s * P);
+      rect(x, y, s, night ? `rgba(150,160,190,${a})` : `rgba(240,238,244,${a})`);
     }
   }
   // deer: a doe and a fawn walk across the meadow, stopping now and then to
@@ -727,34 +798,38 @@ export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light
   if (lay.trestle !== null) {
     const ty = lay.trestle - 2;
     const run = (t % 40) / 22; // on screen for the first 22 seconds
+    // only on the trestle itself
+    const tdot = (x: number, y: number, c: string) => {
+      if (x >= lay.W * 0.1 && x < lay.W * 0.9) dot(x, y, c);
+    };
     if (run < 1) {
-      const x = -24 + run * (lay.W + 40);
+      const x = lay.W * 0.1 - 7 + run * (lay.W * 0.8 + 38);
       const eng = night ? "rgba(60,60,80,1)" : "rgba(52,70,96,1)";
       const car = night ? "rgba(120,70,80,1)" : "rgba(214,112,100,1)";
       const win = night ? "rgba(255,210,130,1)" : "rgba(250,240,220,1)";
       for (let c = 0; c < 3; c++) {
         const x0 = x - 8 - c * 8;
-        for (let i = 0; i < 7; i++) for (let k = 0; k < 4; k++) dot(x0 + i, ty - k, car);
-        for (let i = 1; i < 6; i += 2) dot(x0 + i, ty - 2, win);
+        for (let i = 0; i < 7; i++) for (let k = 0; k < 4; k++) tdot(x0 + i, ty - k, car);
+        for (let i = 1; i < 6; i += 2) tdot(x0 + i, ty - 2, win);
       }
-      for (let i = 0; i < 7; i++) for (let k = 0; k < 3; k++) dot(x + i, ty - k, eng);
-      for (let k = 3; k < 6; k++) dot(x + 1, ty - k, eng);
-      dot(x + 2, ty - 5, eng);
-      dot(x + 5, ty - 3, eng);
-      dot(x + 5, ty - 4, eng);
-      dot(x + 7, ty - 1, night ? "rgba(255,230,160,1)" : "rgba(250,220,120,1)");
+      for (let i = 0; i < 7; i++) for (let k = 0; k < 3; k++) tdot(x + i, ty - k, eng);
+      for (let k = 3; k < 6; k++) tdot(x + 1, ty - k, eng);
+      tdot(x + 2, ty - 5, eng);
+      tdot(x + 5, ty - 3, eng);
+      tdot(x + 5, ty - 4, eng);
+      tdot(x + 7, ty - 1, night ? "rgba(255,230,160,1)" : "rgba(250,220,120,1)");
       for (let k = 0; k < 6; k++) {
         const age = (t * 0.9 + k / 6) % 1;
         const a = (1 - age) * 0.6;
-        const sx = x + 5 - age * 14,
+        const sx2 = x + 5 - age * 14,
           sy = ty - 6 - age * 7;
-        g.fillStyle = night ? `rgba(160,170,200,${a})` : `rgba(250,250,255,${a})`;
-        const z = age < 0.4 ? 1 : 2;
-        g.fillRect(Math.round(sx) * P, Math.round(sy) * P, z * P, z * P);
+        rect(sx2, sy, age < 0.4 ? 1 : 2, night ? `rgba(160,170,200,${a})` : `rgba(250,250,255,${a})`);
       }
     }
   }
-  if (!night) {
+  if (!first) {
+    // the hawk and the fireflies belong to the first stretch only
+  } else if (!night) {
     // a hawk circling high over the valley
     const a = t * 0.3;
     const hx = lay.W / 2 + Math.cos(a) * 18,
