@@ -122,110 +122,175 @@ function col(S: Shade, ramp: Ramp, v: number, x: number, y: number, depth: numbe
 // the layout
 // ---------------------------------------------------------------------------
 
+export type Comp = "hill" | "lake" | "train" | "stage";
+type Tree = { x: number; y: number; h: number; depth: number; kind: "pine" | "cotton" | "poplar" };
+
 export type PixLayout = {
   W: number;
   H: number;
+  comp: Comp;
   style: number; // 1 natural, 2 pastel, 3 pastel with trees in rows
   range: number[]; // top of the far range per column
   peaks: { x: number; top: number; half: number }[];
   ridge: number[]; // the far forested ridge's top edge
   near: number[]; // the near forested ridge's top edge
-  edge: number[]; // where the meadow starts, per column
+  edge: number[]; // where the meadow starts, per column (a hill is just a raised edge)
   valley: number; // the meadow's highest point
-  river: { c: number; hw: number }[]; // the river's centre and half-width per row (from valley down)
-  trees: { x: number; y: number; h: number; depth: number; kind: "pine" | "cotton" | "poplar" }[];
+  river: { c: number; hw: number }[]; // the river's centre and half-width per row from valley down (hw < 0: no water)
+  lake: { cx: number; cy: number; rx: number; ry: number } | null;
+  dock: { x0: number; x1: number; y: number } | null;
+  trestle: number | null; // the railway deck's row
+  trees: Tree[];
   houses: { x: number; y: number; chimney: [number, number] }[];
   fence: { x0: number; x1: number; y: number }[];
-  bridge: number; // the footbridge's row
+  bridge: number | null; // the footbridge's row
+  deerY: number; // the row the deer walk along
+  fish: [number, number][]; // places a trout might jump
 };
 
-// Everything is mirrored about the middle, like a stage set: the tallest
-// peak straight up behind the globe, the river running dead centre toward
-// you, twin cabins, twin pines.
-export function pixLayout(w: number, h: number, seed: number, style = 1): PixLayout {
+// The scene sits low: the peaks rise only a little above the globe's
+// bottom half, so most of the screen stays sky.
+//   hill:  one cabin up on a knoll at the left, the river sweeping out to
+//          the right, a single big peak off-centre
+//   lake:  a still lake mirroring the peaks, a dock and a canoe
+//   train: a railway trestle across the valley, a little train crossing it
+//   stage: the mirrored, dead-centre version
+export function pixLayout(w: number, h: number, seed: number, style = 2, comp: Comp = "hill"): PixLayout {
   const W = Math.ceil(w / PIX),
     H = Math.ceil(h / PIX);
   const mid = (W - 1) / 2;
-  const m = (x: number) => Math.abs(x - mid); // distance from the middle
-  const peaks: PixLayout["peaks"] = [
-    { x: 0.0, top: 0.27, half: 0.3 },
-    { x: 0.24, top: 0.44, half: 0.17 },
-    { x: 0.5, top: 0.35, half: 0.2 },
-    { x: 0.76, top: 0.44, half: 0.17 },
-    { x: 1.0, top: 0.27, half: 0.3 },
-  ].map((p) => ({ x: p.x * (W - 1), top: p.top * H, half: p.half * W }));
+  const sym = comp === "stage";
+  const P = (x: number, top: number, half: number) => ({ x: x * (W - 1), top: top * H, half: half * W });
+  const peaks =
+    comp === "hill"
+      ? [P(0.08, 0.6, 0.18), P(0.34, 0.63, 0.14), P(0.68, 0.5, 0.24), P(1.02, 0.59, 0.2)]
+      : comp === "lake"
+        ? [P(-0.02, 0.58, 0.2), P(0.3, 0.52, 0.2), P(0.58, 0.55, 0.18), P(0.86, 0.6, 0.16), P(1.04, 0.57, 0.2)]
+        : comp === "train"
+          ? [P(0.12, 0.62, 0.18), P(0.47, 0.49, 0.22), P(0.8, 0.6, 0.18)]
+          : [P(0, 0.56, 0.3), P(0.24, 0.6, 0.17), P(0.5, 0.52, 0.2), P(0.76, 0.6, 0.17), P(1, 0.56, 0.3)];
   const range: number[] = [],
     ridge: number[] = [],
     near: number[] = [],
     edge: number[] = [];
+  const knoll = (x: number) => {
+    // the hill the cabin sits on, left of centre
+    const d = (x / W - 0.2) / 0.3;
+    return Math.abs(d) < 1 ? Math.cos(d * Math.PI * 0.5) ** 1.6 : 0;
+  };
   for (let x = 0; x < W; x++) {
     let y = H;
     for (const p of peaks) y = Math.min(y, p.top + Math.abs(x - p.x) * SLOPE);
-    const d = m(x),
-      u = d / W;
-    range.push(Math.round(y + fbm(d / 7, seed + 5, 3) * 3));
-    ridge.push(Math.round(H * (0.62 - 0.035 * Math.cos(u * 10)) + fbm(d / 22, seed + 9) * H * 0.03));
-    near.push(Math.round(H * (0.69 - 0.05 * u * u * 4) + fbm(d / 30 + 4, seed + 13) * H * 0.02));
-    edge.push(Math.round(H * (0.77 - 0.02 * Math.cos(u * 6.8))));
+    const d = sym ? Math.abs(x - mid) : x,
+      u = (sym ? Math.abs(x - mid) : x - mid) / W;
+    range.push(Math.round(y + fbm(d / 7, seed + 5, 3) * 2.5));
+    ridge.push(Math.round(H * (0.71 - 0.02 * Math.cos(u * 10)) + fbm(d / 22, seed + 9) * H * 0.02));
+    near.push(Math.round(H * (0.76 - 0.03 * u * u * 4) + fbm(d / 30 + 4, seed + 13) * H * 0.012));
+    let e = H * (0.8 - 0.012 * Math.cos(u * 6.8));
+    if (comp === "hill") e -= knoll(x) * H * 0.075;
+    if (comp === "lake") e = H * 0.785;
+    edge.push(Math.round(e));
   }
   const valley = Math.min(...edge);
-  // the river: dead straight down the middle, widening toward you
   const river: PixLayout["river"] = [];
   for (let y = valley; y < H; y++) {
-    const t = (y - valley) / (H - valley);
-    river.push({ c: mid, hw: 0.8 + t * t * W * 0.1 });
-  }
-  const trees: PixLayout["trees"] = [];
-  const pair = (x: number, t: Omit<PixLayout["trees"][number], "x">) => {
-    trees.push({ ...t, x: Math.round(mid - x) });
-    trees.push({ ...t, x: Math.round(mid + x) });
-  };
-  if (style === 3) {
-    // a perfect row of identical pines along the forest edge
-    for (let x = 4; x < mid - 3; x += 7) pair(x, { y: edge[Math.round(mid - x)] + 1, h: 8, depth: 0.6, kind: "pine" });
-    // poplars standing in pairs down the river, smaller as they go back
-    for (let y = valley + 5; y < H - 4; y += 8 + Math.round(((y - valley) / (H - valley)) * 8)) {
-      const r = river[y - valley];
-      const t = (y - valley) / (H - valley);
-      pair(r.hw + 6 + t * W * 0.16, { y, h: Math.round(5 + t * 16), depth: 0.3 - t * 0.2, kind: "poplar" });
+    const t = (y - Math.round(H * 0.8)) / (H - H * 0.8);
+    if (t < 0) {
+      river.push({ c: mid, hw: -1 });
+      continue;
     }
+    let c = mid,
+      hw = 0.8 + t * t * W * 0.1;
+    if (comp === "hill") c = W * (0.46 + 0.42 * t ** 1.4) + Math.sin(t * 7) * 3; // out to the right
+    if (comp === "train") c = W * (0.62 - 0.4 * t ** 1.2) + Math.sin(t * 6 + 1) * 4; // out to the left
+    if (comp === "lake") hw = -1;
+    if (comp === "hill" || comp === "train") hw = 0.8 + t * t * W * 0.08;
+    river.push({ c, hw });
+  }
+  const trees: Tree[] = [];
+  const add = (x: number, t: Omit<Tree, "x">) => trees.push({ ...t, x: Math.round(x) });
+  const pair = (x: number, t: Omit<Tree, "x">) => {
+    add(mid - x, t);
+    add(mid + x, t);
+  };
+  const rowY = (x: number) => edge[Math.max(0, Math.min(W - 1, Math.round(x)))] + 1;
+  // the forest edge: a ragged line, or one perfectly spaced row in style 3
+  if (sym) {
+    for (let x = 2; x < mid - 2; x += style === 3 ? 7 : 3 + Math.floor(hash(x * 5 + seed) * 4)) pair(x, { y: rowY(mid - x), h: style === 3 ? 8 : 5 + Math.floor(hash(x * 9 + seed) * 5), depth: 0.6, kind: "pine" });
+  } else if (comp !== "hill") {
+    for (let x = 1; x < W; x += style === 3 ? 7 : 3 + Math.floor(hash(x * 5 + seed) * 4)) add(x, { y: rowY(x), h: style === 3 ? 8 : 5 + Math.floor(hash(x * 9 + seed) * 5), depth: 0.6, kind: "pine" });
   } else {
-    for (let x = 2; x < mid - 2; x += 3 + Math.floor(hash(x * 5 + seed) * 4)) pair(x, { y: edge[Math.round(mid - x)] + 1, h: 5 + Math.floor(hash(x * 9 + seed) * 5), depth: 0.6, kind: "pine" });
-    for (let i = 8; i < river.length; i += 2)
-      if (hash(i * 7 + seed) < 0.14) {
-        const r = river[i];
-        const t = i / river.length;
-        pair(r.hw + 5 + hash(i) * 10, { y: valley + i, h: Math.round(3 + t * 10), depth: 0.3 - t * 0.2, kind: "cotton" });
+    for (let x = W * 0.45; x < W; x += 3 + Math.floor(hash(x * 5 + seed) * 4)) add(x, { y: rowY(x), h: 5 + Math.floor(hash(x * 9 + seed) * 5), depth: 0.6, kind: "pine" });
+  }
+  // trees along the water
+  const rv = river.map((r, i) => ({ ...r, y: valley + i })).filter((r) => r.hw > 0);
+  for (let i = 4; i < rv.length; i += style === 3 ? 7 : 2) {
+    const r = rv[i];
+    const t = i / rv.length;
+    for (const side of [-1, 1])
+      if (style === 3 || hash(i * 7 + side + seed) < 0.12) {
+        const kind = style === 3 ? "poplar" : "cotton";
+        add(r.c + side * (r.hw + 6 + (style === 3 ? t * W * 0.06 : hash(i + side) * 10)), { y: r.y, h: Math.round((style === 3 ? 6 : 3) + t * (style === 3 ? 14 : 10)), depth: 0.3 - t * 0.2, kind });
       }
   }
-  // big pines framing the edges
-  pair(mid - 3, { y: H + 2, h: 48, depth: 0.02, kind: "pine" });
-  pair(mid - 12, { y: H + 2, h: 33, depth: 0.02, kind: "pine" });
+  // big pines framing the edges (only on one side for the hill)
+  if (sym) {
+    pair(mid - 3, { y: H + 2, h: 44, depth: 0.02, kind: "pine" });
+    pair(mid - 12, { y: H + 2, h: 30, depth: 0.02, kind: "pine" });
+  } else if (comp === "hill") {
+    add(W - 4, { y: H + 2, h: 46, depth: 0.02, kind: "pine" });
+    add(W - 13, { y: H + 2, h: 30, depth: 0.02, kind: "pine" });
+    // a few pines dotted down the knoll
+    for (const [fx, hh] of [
+      [0.04, 12],
+      [0.09, 9],
+      [0.33, 8],
+      [0.39, 11],
+    ])
+      add(fx * W, { y: rowY(fx * W) + 3, h: hh, depth: 0.25, kind: "pine" });
+  } else {
+    add(3, { y: H + 2, h: 42, depth: 0.02, kind: "pine" });
+    add(W - 5, { y: H + 2, h: 36, depth: 0.02, kind: "pine" });
+  }
   trees.sort((a, b) => a.y - b.y);
-  const hx = Math.round(W * 0.3),
-    hy = Math.round(H * 0.865);
-  return {
-    W,
-    H,
-    style,
-    range,
-    peaks,
-    ridge,
-    near,
-    edge,
-    valley,
-    river,
-    trees,
-    houses: [
-      { x: Math.round(mid - hx), y: hy, chimney: [Math.round(mid - hx) - 4, hy - 13] },
-      { x: Math.round(mid + hx), y: hy, chimney: [Math.round(mid + hx) + 3, hy - 13] },
-    ],
-    fence: [
-      { x0: Math.round(mid - W * 0.46), x1: Math.round(mid - W * 0.1), y: Math.round(H * 0.91) },
-      { x0: Math.round(mid + W * 0.1), x1: Math.round(mid + W * 0.46), y: Math.round(H * 0.91) },
-    ],
-    bridge: Math.round(H * 0.955),
-  };
+
+  const house = (x: number, y: number, chimneySide = 1) => ({ x: Math.round(x), y: Math.round(y), chimney: [Math.round(x) + chimneySide * 4 - (chimneySide < 0 ? 1 : 0), Math.round(y) - 13] as [number, number] });
+  let houses: PixLayout["houses"] = [];
+  let fence: PixLayout["fence"] = [];
+  let bridge: number | null = null,
+    lake: PixLayout["lake"] = null,
+    dock: PixLayout["dock"] = null,
+    trestle: number | null = null,
+    deerY = Math.round(H * 0.86);
+  const fish: [number, number][] = [];
+  for (const r of rv.slice(Math.floor(rv.length * 0.55))) if (r.hw > 2.5) fish.push([r.c, r.y]);
+  if (comp === "hill") {
+    const hx = W * 0.2;
+    houses = [house(hx, edge[Math.round(hx)] + 2, -1)];
+    fence = [{ x0: Math.round(W * 0.05), x1: Math.round(W * 0.36), y: Math.round(edge[Math.round(W * 0.2)] + 8) }];
+    deerY = Math.round(H * 0.875);
+  } else if (comp === "lake") {
+    lake = { cx: mid, cy: H * 0.835, rx: W * 0.44, ry: H * 0.042 };
+    dock = { x0: Math.round(W * 0.66), x1: Math.round(W * 0.86), y: Math.round(H * 0.82) };
+    houses = [house(W * 0.87, H * 0.8)];
+    for (let i = 0; i < 8; i++) fish.push([mid + (hash(i + 3) - 0.5) * W * 0.6, H * 0.835 + (hash(i + 8) - 0.5) * H * 0.04]);
+    deerY = Math.round(H * 0.905);
+  } else if (comp === "train") {
+    trestle = Math.round(H * 0.835);
+    houses = [house(W * 0.16, H * 0.95)];
+    fence = [{ x0: Math.round(W * 0.6), x1: Math.round(W * 0.96), y: Math.round(H * 0.93) }];
+    deerY = Math.round(H * 0.875);
+  } else {
+    const hx = W * 0.3,
+      hy = H * 0.885;
+    houses = [house(mid - hx, hy, -1), house(mid + hx, hy)];
+    fence = [
+      { x0: Math.round(mid - W * 0.46), x1: Math.round(mid - W * 0.1), y: Math.round(H * 0.925) },
+      { x0: Math.round(mid + W * 0.1), x1: Math.round(mid + W * 0.46), y: Math.round(H * 0.925) },
+    ];
+    bridge = Math.round(H * 0.96);
+  }
+  return { W, H, comp, style, range, peaks, ridge, near, edge, valley, river, lake, dock, trestle, trees, houses, fence, bridge, deerY, fish };
 }
 
 // ---------------------------------------------------------------------------
@@ -402,15 +467,65 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
           const patch = Math.floor(u / 22 + fbm(y / 40, 3) * 1.2 + (y - lay.valley) / 26);
           pv = [0.1, -0.06, 0.03, -0.12][((patch % 4) + 4) % 4];
         }
-        const bank = Math.abs(dx) - r.hw < 1.5;
+        const bank = r.hw > 0 && Math.abs(dx) - r.hw < 1.5;
         const rim = y - lay.edge[x] < 2;
-        const v = field + pv + (bank ? -0.28 : 0) + (rim ? -0.2 : 0);
+        // a hill's flanks: brighter on the side facing the sun
+        const sl = lay.edge[Math.min(W - 1, x + 2)] - lay.edge[Math.max(0, x - 2)];
+        const flank = y - lay.edge[x] < 18 ? Math.max(-0.16, Math.min(0.16, sl * sunSide * 0.05)) : 0;
+        const v = field + pv + flank + (bank ? -0.28 : 0) + (rim ? -0.2 : 0);
         b.set(x, y, col(S, grass, v, x, y, 0.22 - t * 0.22));
       }
     }
   }
   for (const t of lay.trees) if (t.depth > 0.5) pine(b, S, t.x, t.y, t.h, t.depth, snowy);
-  // the fences, the twin cabins, the footbridge
+  // the lake: a mirror of everything above it, broken by faint ripples
+  if (lay.lake) {
+    const { cx, cy, rx, ry } = lay.lake;
+    const top = Math.round(cy - ry);
+    const src = new Uint8ClampedArray(b.d);
+    for (let y = top - 2; y <= cy + ry + 2; y++)
+      for (let x = Math.floor(cx - rx - 3); x <= cx + rx + 3; x++) {
+        const e = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+        if (e > 1.25) continue;
+        if (e > 1) {
+          b.set(x, y, col(S, snowy ? R.snow : R.wood, light(S, [0, 1, 0.3]) * 0.6 + 0.1, x, y, 0.15)); // the shore
+          continue;
+        }
+        const ox = Math.round(Math.sin(y * 1.9) * (y - top) * 0.08);
+        const sy = Math.max(0, 2 * top - y);
+        const sx = Math.max(0, Math.min(W - 1, x + ox));
+        const i = (sy * W + sx) * 4;
+        let c: C = [src[i], src[i + 1], src[i + 2]];
+        c = mix(c, L.haze, 0.22 + (y - top) / (ry * 2) * 0.25);
+        c = [c[0] * 0.86, c[1] * 0.9, c[2] * 0.98];
+        if (((y - top) % 3 === 1 && dith(x, y) > 0.2) || snowy) c = mix(c, snowy ? [230, 236, 248] : [255, 255, 255], snowy ? 0.75 : 0.25);
+        b.set(x, y, c);
+      }
+  }
+  if (lay.dock) {
+    const { x0, x1, y } = lay.dock;
+    for (let x = x0; x <= x1; x++) {
+      b.set(x, y, col(S, R.wood, 0.85, x, y, 0.05));
+      b.set(x, y + 1, col(S, R.wood, 0.3, x, y + 1, 0.05));
+      if ((x - x0) % 5 === 0) for (let k = 2; k < 5; k++) b.set(x, y + k, col(S, R.wood, 0.2, x, y + k, 0.05));
+    }
+  }
+  // the railway trestle: a deck on criss-crossed legs, spanning the valley
+  if (lay.trestle !== null) {
+    const ty = lay.trestle;
+    for (let x = 0; x < W; x++) {
+      const ground = Math.min(H - 1, ty + 12);
+      b.set(x, ty - 1, col(S, R.roof, 0.9, x, ty - 1, 0.15));
+      b.set(x, ty, col(S, R.wood, 0.75, x, ty, 0.15));
+      b.set(x, ty + 1, col(S, R.wood, 0.3, x, ty + 1, 0.15));
+      const k = x % 12;
+      for (let y = ty + 2; y < ground; y++) {
+        const d = (y - ty - 2) * 1.5;
+        if (k === 0 || (d % 12 | 0) === k || (d % 12 | 0) === 11 - k) b.set(x, y, col(S, R.wood, k === 0 ? 0.45 : 0.25, x, y, 0.15));
+      }
+    }
+  }
+  // the fences, the cabins, the footbridge
   for (const f of lay.fence)
     for (let x = f.x0; x < f.x1; x++) {
       b.set(x, f.y - 3, col(S, R.white, 0.6, x, f.y - 3, 0.1));
@@ -438,7 +553,7 @@ export function paintPixels(g: CanvasRenderingContext2D, lay: PixLayout, w: numb
     const [chx, chy] = hs.chimney;
     for (let y = chy; y < chy + 5; y++) for (let x = chx; x < chx + 2; x++) b.set(x, y, col(S, R.white, 0.5, x, y, 0.1));
   }
-  {
+  if (lay.bridge !== null) {
     const y = lay.bridge;
     const r = lay.river[y - lay.valley];
     const half = Math.ceil(r.hw) + 3;
@@ -514,7 +629,7 @@ export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light
   const f = (ph - keys[k]) / (keys[k + 1] - keys[k]);
   const grazing = pos[k] === pos[k + 1];
   const along = pos[k] + (pos[k + 1] - pos[k]) * f;
-  const dy0 = Math.round(lay.H * 0.835);
+  const dy0 = lay.deerY;
   const x0 = -10,
     x1 = lay.W + 10;
   const brown = night ? "rgba(70,62,78,0.95)" : "rgba(146,98,62,1)";
@@ -554,15 +669,12 @@ export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light
   const step = Math.floor(t * 4) % 2 ? 1 : 0;
   deer(dxAt, dy0, 1, step, !grazing || Math.sin(t * 0.8) > 0.6);
   deer(dxAt - 9, dy0 + 2, 0.7, 1 - step, !grazing || Math.sin(t * 0.8 + 2) > 0.3);
-  // a trout jumping: every few seconds an arc out of the river and a splash
-  if (!snowy || L.snow < 0.9) {
+  // a trout jumping: every few seconds an arc out of the water and a splash
+  if (lay.fish.length && L.snow < 0.9) {
     const every = 6;
     const j = Math.floor(t / every);
     const jt = (t % every) / 1.1; // 0..1 while in the air
-    const row = Math.floor(lay.river.length * (0.82 + hash(j) * 0.14));
-    const r = lay.river[Math.min(lay.river.length - 1, row)];
-    const fy = lay.valley + row;
-    const fx = r.c + (hash(j + 3) - 0.5) * r.hw * 1.1;
+    const [fx, fy] = lay.fish[Math.floor(hash(j) * lay.fish.length)];
     const dir = hash(j + 7) > 0.5 ? 1 : -1;
     const fish = night ? "rgba(170,180,210,0.9)" : "rgba(214,150,140,1)";
     if (jt < 1) {
@@ -570,7 +682,7 @@ export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light
       const y = fy - Math.sin(jt * Math.PI) * 9;
       const tilt = jt < 0.5 ? -1 : 1;
       dot(x, y, fish);
-      dot(x + dir, y + tilt * 0, fish);
+      dot(x + dir, y, fish);
       dot(x - dir, y - tilt, fish);
       dot(x - dir * 2, y - tilt, "rgba(250,250,250,0.9)");
     }
@@ -585,6 +697,60 @@ export function livePixels(g: CanvasRenderingContext2D, lay: PixLayout, L: Light
         dot(sx - rr, fy, c);
         dot(sx + rr, fy, c);
         if (a < 0.4) dot(sx, fy - 1 - a * 4, c);
+      }
+    }
+  }
+  // the lake: sparkles, and a canoe paddling slowly back and forth
+  if (lay.lake) {
+    const { cx, cy, rx, ry } = lay.lake;
+    for (let i = 0; i < 14; i++) {
+      if (Math.sin(t * 2.2 + i * 1.7) < 0.4) continue;
+      dot(cx + (hash(i + 20) - 0.5) * rx * 1.6, cy + (hash(i + 30) - 0.5) * ry * 1.4, night ? "rgba(200,215,255,0.5)" : "rgba(255,255,255,0.8)");
+    }
+    if (L.snow < 0.6) {
+      const k = Math.sin(t * 0.06);
+      const x = cx + k * rx * 0.55,
+        y = cy + 1;
+      const hull = night ? "rgba(120,80,90,1)" : "rgba(220,110,96,1)";
+      for (let i = -3; i <= 3; i++) dot(x + i, y, hull);
+      dot(x - 4, y - 1, hull);
+      dot(x + 4, y - 1, hull);
+      dot(x, y - 1, night ? "rgba(60,60,80,1)" : "rgba(60,70,110,1)"); // the paddler
+      dot(x, y - 2, night ? "rgba(90,80,90,1)" : "rgba(240,200,170,1)");
+      const stroke = Math.sin(t * 2) > 0;
+      dot(x + (stroke ? 1 : -1), y - 1 + (stroke ? 1 : 0), "rgba(150,110,80,1)");
+      for (let i = 1; i < 4; i++) dot(x - Math.sign(Math.cos(t * 0.06)) * (4 + i * 2), y + 1, `rgba(255,255,255,${0.35 - i * 0.08})`);
+    }
+  }
+  // the train: a little engine and three cars crossing the trestle every
+  // forty seconds, puffing
+  if (lay.trestle !== null) {
+    const ty = lay.trestle - 2;
+    const run = (t % 40) / 22; // on screen for the first 22 seconds
+    if (run < 1) {
+      const x = -24 + run * (lay.W + 40);
+      const eng = night ? "rgba(60,60,80,1)" : "rgba(52,70,96,1)";
+      const car = night ? "rgba(120,70,80,1)" : "rgba(214,112,100,1)";
+      const win = night ? "rgba(255,210,130,1)" : "rgba(250,240,220,1)";
+      for (let c = 0; c < 3; c++) {
+        const x0 = x - 8 - c * 8;
+        for (let i = 0; i < 7; i++) for (let k = 0; k < 4; k++) dot(x0 + i, ty - k, car);
+        for (let i = 1; i < 6; i += 2) dot(x0 + i, ty - 2, win);
+      }
+      for (let i = 0; i < 7; i++) for (let k = 0; k < 3; k++) dot(x + i, ty - k, eng);
+      for (let k = 3; k < 6; k++) dot(x + 1, ty - k, eng);
+      dot(x + 2, ty - 5, eng);
+      dot(x + 5, ty - 3, eng);
+      dot(x + 5, ty - 4, eng);
+      dot(x + 7, ty - 1, night ? "rgba(255,230,160,1)" : "rgba(250,220,120,1)");
+      for (let k = 0; k < 6; k++) {
+        const age = (t * 0.9 + k / 6) % 1;
+        const a = (1 - age) * 0.6;
+        const sx = x + 5 - age * 14,
+          sy = ty - 6 - age * 7;
+        g.fillStyle = night ? `rgba(160,170,200,${a})` : `rgba(250,250,255,${a})`;
+        const z = age < 0.4 ? 1 : 2;
+        g.fillRect(Math.round(sx) * P, Math.round(sy) * P, z * P, z * P);
       }
     }
   }
