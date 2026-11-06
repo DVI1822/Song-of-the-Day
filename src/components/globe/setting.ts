@@ -2,6 +2,7 @@ import type { Weather } from "@/lib/weather";
 import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
+import { livePixels, paintPixels, pixLayout, type PixLayout } from "./pixel";
 import type { V3 } from "./math";
 
 // Where you are, alive behind the Globe (lib/setting.ts picks which).
@@ -41,7 +42,7 @@ export type SettingFrame = {
   temp: number | null;
 };
 
-type C = [number, number, number];
+export type C = [number, number, number];
 const TAU = Math.PI * 2;
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const smooth = (a: number, b: number, x: number) => {
@@ -89,7 +90,7 @@ const fbm = (x: number, seed: number, oct = 4) => {
 // the light
 // ---------------------------------------------------------------------------
 
-type Light = {
+export type Light = {
   sun: [number, number, number]; // toward the sun: x right (east), y up, z toward you (south)
   sunC: C; // 0..1, already scaled by how much gets through
   amb: C; // 0..1
@@ -776,6 +777,7 @@ export class SettingScene {
   private live: CanvasRenderingContext2D;
   private kind: "city" | "mountain" | null = null;
   private lay: CityLayout | MtnLayout | null = null;
+  private pix: PixLayout | null = null;
   private size = "";
   private key = "";
   private L: Light | null = null;
@@ -827,6 +829,7 @@ export class SettingScene {
         cv.height = Math.round(f.h * this.dpr);
       }
       this.lay = this.kind === "city" ? cityLayout(f.w, f.h, 7) : mountainLayout(f.w, f.h, 11);
+      this.pix = this.kind === "mountain" ? pixLayout(f.w, f.h, 11) : null;
       this.key = "";
     }
     // repaint the still layer only when the light has really changed
@@ -849,7 +852,7 @@ export class SettingScene {
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       g.clearRect(0, 0, f.w, f.h);
       if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
-      else paintMountain(g, this.lay, f.w, f.h, this.L, f.season);
+      else if (this.pix) paintPixels(g, this.pix, f.w, f.h, this.L, f.season);
       // the air thickens round the globe so the songs stay easy to read
       const r = f.R * 1.3;
       const aura = g.createRadialGradient(f.cx, f.cy, f.R * 0.3, f.cx, f.cy, r);
@@ -867,7 +870,7 @@ export class SettingScene {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, f.w, f.h);
     if (this.lay.kind === "city") this.liveCity(g, this.lay, f);
-    else this.liveMountain(g, this.lay, f);
+    else if (this.pix) livePixels(g, this.pix, this.L!, this.t);
   }
 
   private liveCity(g: CanvasRenderingContext2D, lay: CityLayout, f: SettingFrame) {
