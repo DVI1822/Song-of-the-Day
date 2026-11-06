@@ -887,10 +887,10 @@ export class SettingScene {
       g.clearRect(0, 0, f.w, f.h);
       const wk = this.world();
       if (wk) this.lpano = this.wpano = paintWorldPano(wk, f.w, f.h, this.L, f.season, lineStyle(), this.dpr);
-      if (process.env.NODE_ENV !== "production") (window as unknown as { __pano?: LinePano | null }).__pano = this.lpano;
       else if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
       else if (this.pix && this.art === "line") this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
       else if (this.pix) this.pano = paintPano(this.pix, this.L, f.season);
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __pano?: LinePano | null }).__pano = this.lpano;
       if (!this.pix && !wk) this.aura(g, f);
       this.panoKey = "";
     }
