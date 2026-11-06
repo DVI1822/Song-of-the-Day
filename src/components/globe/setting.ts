@@ -2,7 +2,8 @@ import type { Weather } from "@/lib/weather";
 import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
-import { drawPano, livePixels, paintPano, panoOffset, pixLayout, type Comp, type Pano, type PixLayout } from "./pixel";
+import { drawLinePano, lineOffset, liveLines, paintLinePano, type LinePano } from "./line";
+import { PIX, drawPano, livePixels, paintPano, panoOffset, pixLayout, type Comp, type Pano, type PixLayout } from "./pixel";
 
 // ?pix=1|2|3 picks a pixel style while we try them out
 // the stretches the loop is made of, in order; ?scene= shows just one
@@ -11,6 +12,16 @@ function pixComps(): Comp[] {
   if (typeof window === "undefined") return all;
   const q = new URLSearchParams(window.location.search).get("scene") as Comp | null;
   return q && all.includes(q) ? [q] : all;
+}
+// ?art=pixel brings back the pixel version; ?line=1|2|3 picks the line fill
+function artMode(): "line" | "pixel" {
+  if (typeof window === "undefined") return "line";
+  return new URLSearchParams(window.location.search).get("art") === "pixel" ? "pixel" : "line";
+}
+function lineStyle() {
+  if (typeof window === "undefined") return 1;
+  const q = Number(new URLSearchParams(window.location.search).get("line"));
+  return q >= 1 && q <= 3 ? q : 1;
 }
 function pixStyle() {
   if (typeof window === "undefined") return 2;
@@ -794,6 +805,8 @@ export class SettingScene {
   private lay: CityLayout | MtnLayout | null = null;
   private pix: PixLayout[] | null = null;
   private pano: Pano | null = null;
+  private lpano: LinePano | null = null;
+  private art = artMode();
   private panoKey = "";
   private size = "";
   private key = "";
@@ -869,14 +882,27 @@ export class SettingScene {
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       g.clearRect(0, 0, f.w, f.h);
       if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
+      else if (this.pix && this.art === "line") this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
       else if (this.pix) this.pano = paintPano(this.pix, this.L, f.season);
       if (!this.pix) this.aura(g, f);
       this.panoKey = "";
     }
     // the pixel world turns with the globe: redrawn whenever a layer has
     // moved by a whole pixel
-    const pk = this.pano ? [0, 1, 2].map((k) => panoOffset(this.pano!, f.yaw ?? 0, f.R, k)).join(",") + `|${f.cx},${f.cy},${f.R}` : "";
-    if (this.pix && this.pano && pk !== this.panoKey) {
+    const lp = this.lpano;
+    const pk = lp
+      ? [0, 1, 2].map((k) => lineOffset(lp, f.yaw ?? 0, f.R, k).toFixed(1)).join(",") + `|${f.cx},${f.cy},${f.R}`
+      : this.pano
+        ? [0, 1, 2].map((k) => panoOffset(this.pano!, f.yaw ?? 0, f.R, k)).join(",") + `|${f.cx},${f.cy},${f.R}`
+        : "";
+    if (this.pix && lp && pk !== this.panoKey) {
+      this.panoKey = pk;
+      const g = this.still;
+      g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      g.clearRect(0, 0, f.w, f.h);
+      drawLinePano(g, lp, f.yaw ?? 0, f.R);
+      this.aura(g, f);
+    } else if (this.pix && this.pano && pk !== this.panoKey) {
       this.panoKey = pk;
       const g = this.still;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -910,7 +936,11 @@ export class SettingScene {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, f.w, f.h);
     if (this.lay.kind === "city") this.liveCity(g, this.lay, f);
-    else if (this.pix && this.pano) {
+    else if (this.pix && this.lpano) {
+      const lp = this.lpano;
+      const off = lineOffset(lp, f.yaw ?? 0, f.R, 2);
+      this.pix.forEach((lay, i) => liveLines(g, lay, lp.I, this.L!, this.t + i * 23, i * lay.W * PIX - off, lp.W, i === 0));
+    } else if (this.pix && this.pano) {
       const off = panoOffset(this.pano, f.yaw ?? 0, f.R, 2);
       this.pix.forEach((lay, i) => livePixels(g, lay, this.L!, this.t + i * 23, i * lay.W - off, this.pano!.W, i === 0));
     }

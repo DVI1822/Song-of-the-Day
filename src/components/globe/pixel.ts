@@ -12,17 +12,17 @@ import type { C, Light } from "./setting";
 // the river in autumn.
 
 export const PIX = 3; // screen points per pixel
-const SLOPE = 0.95; // how steep the peaks are, pixels down per pixel across
+export const SLOPE = 0.95; // how steep the peaks are, pixels down per pixel across
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16 - 0.5);
 const dith = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const mix = (a: C, b: C, t: number): C => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const hash = (n: number) => {
+export const hash = (n: number) => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
 };
-function noise1(x: number, seed: number) {
+export function noise1(x: number, seed: number) {
   const i = Math.floor(x),
     f = x - i;
   const a = hash(i + seed * 101) * 2 - 1,
