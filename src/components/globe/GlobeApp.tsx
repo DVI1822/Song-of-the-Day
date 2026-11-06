@@ -14,6 +14,7 @@ import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
 import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
+import { Key, KeyButton } from "./Key";
 import { AppTour, InstallCard } from "./Install";
 import { NotifyCard } from "./Notify";
 import { CoreInside } from "./CoreInside";
@@ -29,7 +30,7 @@ import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
-import { BackIcon, coverRadius, glass } from "./ui";
+import { BackIcon, coverRadius, glass, RecenterIcon, TabIcon } from "./ui";
 import {
   PERSPECTIVE,
   RIPPLE_LIFE,
@@ -275,6 +276,7 @@ function Globe({
   const [chatOn, setChatOn] = useState(false);
   const welcomeSeen = useWelcomeSeen();
   const [help, setHelp] = useState(false);
+  const [keyOn, setKeyOn] = useState(false); // the key: what every button does
   const [tour, setTour] = useState(false); // the Get the app slideshow, from the ? card
   // a browser that already allowed nudges keeps its subscription fresh
   useEffect(() => void enablePush(api, false), [api]);
@@ -1227,11 +1229,7 @@ function Globe({
         className="absolute z-[6] flex h-10 w-10 items-center justify-center rounded-full"
         style={{ left: L.cx + L.R * 0.8 - 20, top: L.cy + L.R * 0.8 - 20, ...glass(darkOn) }}
       >
-        <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <circle cx="12" cy="12" r="6.5" />
-          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
-          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
-        </svg>
+        <RecenterIcon />
       </button>
 
       {/* the facts about your song: a compass star opposite the button above */}
@@ -1246,7 +1244,9 @@ function Globe({
 
       {/* what this is, any time */}
       <HelpButton dark={darkOn} onClick={() => setHelp(true)} buttonRef={(el) => void (R.current.chrome[5] = el)} />
-      {(!welcomeSeen || help) && !tour && (
+      {/* and what every button does, from the key opposite */}
+      <KeyButton dark={darkOn} onClick={() => setKeyOn(true)} buttonRef={(el) => void (R.current.chrome[7] = el)} />
+      {(!welcomeSeen || help) && !tour && !keyOn && (
         <Welcome
           api={api}
           onClose={() => setHelp(false)}
@@ -1254,11 +1254,16 @@ function Globe({
             setHelp(false);
             setTour(true);
           }}
+          onKey={() => {
+            setHelp(false);
+            setKeyOn(true);
+          }}
         />
       )}
       {tour && <AppTour onClose={() => setTour(false)} />}
-      {welcomeSeen && !help && !tour && <InstallCard />}
-      {welcomeSeen && !help && !tour && <NotifyCard api={api} />}
+      {keyOn && <Key onClose={() => setKeyOn(false)} />}
+      {welcomeSeen && !help && !tour && !keyOn && <InstallCard />}
+      {welcomeSeen && !help && !tour && !keyOn && <NotifyCard api={api} />}
 
       {/* left tabs */}
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
@@ -1993,32 +1998,5 @@ function Countdown({ color, timeZone }: { color: string; timeZone: string }) {
     >
       next song in {two(hh)}:{two(mm)}:{two(ss)}
     </div>
-  );
-}
-
-function TabIcon({ name }: { name: PanelName }) {
-  const p = { "aria-hidden": true, width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8 };
-  if (name === "friends")
-    return (
-      <svg {...p}>
-        <circle cx="9" cy="8" r="3.5" />
-        <path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5" />
-        <circle cx="17" cy="9" r="2.5" />
-        <path d="M16 14.5c2.6 0 4.6 1.6 5.5 4.5" />
-      </svg>
-    );
-  if (name === "find")
-    return (
-      <svg {...p}>
-        <circle cx="10.5" cy="10.5" r="6" />
-        <path d="M15 15l5.5 5.5" />
-      </svg>
-    );
-  return (
-    <svg {...p}>
-      <path d="M9 18V5l11-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="17" cy="16" r="3" />
-    </svg>
   );
 }
