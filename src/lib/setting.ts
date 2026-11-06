@@ -3,14 +3,14 @@
 //
 // Worked out on the server (app/api/setting) from free map data: OpenStreetMap
 // says how big the nearest town is, and Open-Meteo's elevation data says how
-// high and how steep the land around you is. Only city and mountains have a
-// scene so far; the rest keep the plain sky.
+// high and how steep the land around you is. City, mountains, coast and
+// countryside have a scene so far; towns keep the plain sky.
 
 export type SettingKind = "city" | "mountain" | "coast" | "town" | "country";
 export type SettingReply = { kind?: SettingKind; place?: string };
 
 // The ones with a scene to show.
-export const SCENES: SettingKind[] = ["city", "mountain"];
+export const SCENES: SettingKind[] = ["city", "mountain", "coast", "country"];
 
 // elevation in metres at the middle, and the gap between the highest and
 // lowest of the points around it (about 15 km out); population of the place

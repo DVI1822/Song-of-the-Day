@@ -3,6 +3,7 @@ import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
 import { drawLinePano, lineOffset, liveLines, paintLinePano, type LinePano } from "./line";
+import { liveWorld, paintWorldPano, type WorldKind, type WorldPano } from "./world";
 import { PIX, drawPano, livePixels, paintPano, panoOffset, pixLayout, type Comp, type Pano, type PixLayout } from "./pixel";
 
 // ?pix=1|2|3 picks a pixel style while we try them out
@@ -801,7 +802,8 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
 export class SettingScene {
   private still: CanvasRenderingContext2D;
   private live: CanvasRenderingContext2D;
-  private kind: "city" | "mountain" | null = null;
+  private kind: "city" | "mountain" | "coast" | "country" | null = null;
+  private wpano: WorldPano | null = null;
   private lay: CityLayout | MtnLayout | null = null;
   private pix: PixLayout[] | null = null;
   private pano: Pano | null = null;
@@ -826,10 +828,12 @@ export class SettingScene {
   }
 
   set(kind: SettingKind | null) {
-    const k = kind === "city" || kind === "mountain" ? kind : null;
+    const k = kind === "city" || kind === "mountain" || kind === "coast" || kind === "country" ? kind : null;
     if (k === this.kind) return;
     this.kind = k;
     this.lay = null;
+    this.lpano = null;
+    this.wpano = null;
     this.key = "";
     if (!k) {
       this.still.setTransform(1, 0, 0, 1, 0, 0);
@@ -881,10 +885,13 @@ export class SettingScene {
       const g = this.still;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       g.clearRect(0, 0, f.w, f.h);
-      if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
+      const wk = this.world();
+      if (wk) this.lpano = this.wpano = paintWorldPano(wk, f.w, f.h, this.L, f.season, lineStyle(), this.dpr);
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __pano?: LinePano | null }).__pano = this.lpano;
+      else if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
       else if (this.pix && this.art === "line") this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
       else if (this.pix) this.pano = paintPano(this.pix, this.L, f.season);
-      if (!this.pix) this.aura(g, f);
+      if (!this.pix && !wk) this.aura(g, f);
       this.panoKey = "";
     }
     // the pixel world turns with the globe: redrawn whenever a layer has
@@ -895,7 +902,7 @@ export class SettingScene {
       : this.pano
         ? [0, 1, 2].map((k) => panoOffset(this.pano!, f.yaw ?? 0, f.R, k)).join(",") + `|${f.cx},${f.cy},${f.R}`
         : "";
-    if (this.pix && lp && pk !== this.panoKey) {
+    if (lp && (this.pix || this.wpano) && pk !== this.panoKey) {
       this.panoKey = pk;
       const g = this.still;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -911,6 +918,11 @@ export class SettingScene {
       this.aura(g, f);
     }
     this.frame(dt, f);
+  }
+
+  // the line-drawn worlds beyond Montana
+  private world(): WorldKind | null {
+    return this.kind === "coast" ? "coast" : this.kind === "country" ? "farm" : null;
   }
 
   private aura(g: CanvasRenderingContext2D, f: SettingFrame) {
@@ -935,7 +947,9 @@ export class SettingScene {
     const g = this.live;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, f.w, f.h);
-    if (this.lay.kind === "city") this.liveCity(g, this.lay, f);
+    const wp = this.wpano;
+    if (wp) liveWorld(g, wp, [0, 1, 2].map((k) => lineOffset(wp, f.yaw ?? 0, f.R, k)), this.t);
+    else if (this.lay.kind === "city") this.liveCity(g, this.lay, f);
     else if (this.pix && this.lpano) {
       const lp = this.lpano;
       const off = lineOffset(lp, f.yaw ?? 0, f.R, 2);

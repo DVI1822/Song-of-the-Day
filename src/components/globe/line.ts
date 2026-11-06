@@ -16,11 +16,11 @@ import { PARALLAX, PIX, SLOPE, hash, noise1, type PixLayout } from "./pixel";
 //             water, red cabins), paler with distance
 // After dark the ink turns pale, like chalk.
 
-const mix = (a: C, b: C, t: number): C => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+export const mix = (a: C, b: C, t: number): C => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const mul = (c: C, k: C, t: number): C => [c[0] * (1 - t + t * k[0] * 1.3), c[1] * (1 - t + t * k[1] * 1.3), c[2] * (1 - t + t * k[2] * 1.3)];
-const css = (c: C, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+export const css = (c: C, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 
-type Inks = {
+export type Inks = {
   ink: string;
   inkC: C;
   fill: [C, C, C]; // far, middle, near
@@ -34,6 +34,9 @@ type Inks = {
   deer: C;
   boat: C;
   window: C;
+  // any colour, as this style would show it: k is how much air is between
+  // (0 up close, ~0.4 far away)
+  paint: (c: C, k: number) => C;
   style: number;
   night: number;
   lit: boolean;
@@ -41,7 +44,7 @@ type Inks = {
   season: Season;
 };
 
-function inksFor(L: Light, season: Season, style: number): Inks {
+export function inksFor(L: Light, season: Season, style: number): Inks {
   const n = L.night;
   // dark ink by day and through sunset; it only turns to chalk once it's
   // properly dark
@@ -51,6 +54,7 @@ function inksFor(L: Light, season: Season, style: number): Inks {
   const dim = (c: C) => mix(c, mix(sky, [16, 20, 40], 0.4), n * 0.8);
   let fill: [C, C, C];
   let snow: C, water: C, wall: C, roof: C, tree: C, meadow: C;
+  let paint: (c: C, k: number) => C = (c) => mix(sky, c, 0.2);
   let leaf: C | null = null,
     deer: C | null = null,
     boat: C | null = null;
@@ -70,11 +74,13 @@ function inksFor(L: Light, season: Season, style: number): Inks {
     leaf = air(season === "autumn" ? [232, 176, 54] : season === "winter" ? [150, 120, 96] : [110, 168, 70], 0.06);
     deer = air([170, 116, 70], 0.04);
     boat = air([228, 92, 64], 0.06);
+    paint = (c, k) => air(c, Math.max(0.04, k));
   } else if (style === 2) {
     const paper = dim(mix([248, 244, 234], sky, 0.18));
     fill = [paper, paper, paper];
     snow = water = wall = roof = tree = meadow = paper;
     water = dim(mix([236, 240, 244], sky, 0.3));
+    paint = () => paper;
   } else if (style === 3) {
     const wash = (c: C, k = 0.45) => dim(mix(c, sky, k));
     const grass: C = season === "autumn" || season === "winter" ? [226, 206, 150] : season === "spring" ? [190, 216, 160] : [196, 214, 150];
@@ -85,6 +91,7 @@ function inksFor(L: Light, season: Season, style: number): Inks {
     roof = wash([92, 130, 150], 0.3);
     tree = wash([96, 134, 108], 0.35);
     meadow = wash(grass, 0.3);
+    paint = (c, k) => wash(c, 0.3 + k);
   } else {
     const f = (k: number) => mix(sky, k > 0 ? [255, 255, 255] : [0, 0, 0], Math.abs(k));
     fill = [f(0.14), f(0.06), f(-0.03)];
@@ -94,10 +101,11 @@ function inksFor(L: Light, season: Season, style: number): Inks {
     roof = f(-0.06);
     tree = f(-0.03);
     meadow = f(0.02);
+    paint = (_c, k) => f(k > 0.3 ? 0.14 : k > 0.15 ? 0.06 : -0.02);
   }
   const snowy = L.snow > 0.45;
   if (snowy) meadow = snow;
-  return { ink: css(inkC, 0.92), inkC, fill, snow, water, wall, roof, tree, meadow, leaf: leaf ?? tree, deer: deer ?? meadow, boat: boat ?? wall, window: [255, 206, 120], style, night: n, lit: L.lights > 0.3 && n > 0.2, snowy, season };
+  return { ink: css(inkC, 0.92), inkC, fill, snow, water, wall, roof, tree, meadow, leaf: leaf ?? tree, deer: deer ?? meadow, boat: boat ?? wall, paint, window: [255, 206, 120], style, night: n, lit: L.lights > 0.3 && n > 0.2, snowy, season };
 }
 
 // a hand-drawn line: every point nudged a little, never ruler-straight
@@ -105,7 +113,7 @@ function wob(x: number, y: number, s: number): [number, number] {
   return [x + noise1(y * 0.13 + s, 3) * 0.7, y + noise1(x * 0.11 + s, 7) * 0.7];
 }
 
-class Pen {
+export class Pen {
   // a: how strong the ink is; farther layers are drawn fainter, like air
   constructor(
     public g: CanvasRenderingContext2D,
@@ -635,8 +643,10 @@ export function drawLinePano(g: CanvasRenderingContext2D, pano: LinePano, yaw: n
   pano.layers.forEach((cv, k) => {
     const off = lineOffset(pano, yaw, R, k);
     const h = pano.H - pano.top;
+    // the second copy tucks 1.5px under the first one's edge, so the soft
+    // edge pixels of the two don't leave a pale seam where they meet
     g.drawImage(cv, -off, pano.top, pano.W, h);
-    g.drawImage(cv, pano.W - off, pano.top, pano.W, h);
+    g.drawImage(cv, pano.W - off - 1.5, pano.top, pano.W, h);
   });
 }
 
