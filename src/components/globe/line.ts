@@ -12,9 +12,12 @@ import { PARALLAX, PIX, SLOPE, hash, noise1, type PixLayout } from "./pixel";
 //             the drawing reads as lines on the sky and changes with it
 //   2  paper: a warm sketchbook white, dimmed by the light
 //   3  wash:  a light watercolour wash of the real colours under the lines
+//   4  colour (default): each thing its own clear colour (green grass, blue
+//             water, red cabins), paler with distance
 // After dark the ink turns pale, like chalk.
 
 const mix = (a: C, b: C, t: number): C => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const mul = (c: C, k: C, t: number): C => [c[0] * (1 - t + t * k[0] * 1.3), c[1] * (1 - t + t * k[1] * 1.3), c[2] * (1 - t + t * k[2] * 1.3)];
 const css = (c: C, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 
 type Inks = {
@@ -27,6 +30,9 @@ type Inks = {
   roof: C;
   tree: C;
   meadow: C;
+  leaf: C; // leafy trees (cottonwoods, poplars)
+  deer: C;
+  boat: C;
   window: C;
   style: number;
   night: number;
@@ -45,7 +51,26 @@ function inksFor(L: Light, season: Season, style: number): Inks {
   const dim = (c: C) => mix(c, mix(sky, [16, 20, 40], 0.4), n * 0.8);
   let fill: [C, C, C];
   let snow: C, water: C, wall: C, roof: C, tree: C, meadow: C;
-  if (style === 2) {
+  let leaf: C | null = null,
+    deer: C | null = null,
+    boat: C | null = null;
+  if (style === 4) {
+    // real colours, clear up close and paler with distance, like air;
+    // shaded by the time of day and dimmed after dark
+    const air = (c: C, k: number) => dim(mix(mix(c, sky, k), mul(c, L.sunC, k), 0.15));
+    const grass: C =
+      season === "autumn" ? [196, 186, 104] : season === "winter" ? [186, 176, 128] : season === "spring" ? [140, 196, 104] : [122, 182, 92];
+    fill = [air([150, 156, 178], 0.42), air([76, 128, 104], 0.3), air([52, 108, 76], 0.14)];
+    snow = air([250, 252, 255], 0.08);
+    water = air([86, 160, 222], 0.1);
+    wall = air([214, 96, 78], 0.06);
+    roof = air([70, 82, 104], 0.06);
+    tree = air([46, 118, 74], 0.06);
+    meadow = air(grass, 0.08);
+    leaf = air(season === "autumn" ? [232, 176, 54] : season === "winter" ? [150, 120, 96] : [110, 168, 70], 0.06);
+    deer = air([170, 116, 70], 0.04);
+    boat = air([228, 92, 64], 0.06);
+  } else if (style === 2) {
     const paper = dim(mix([248, 244, 234], sky, 0.18));
     fill = [paper, paper, paper];
     snow = water = wall = roof = tree = meadow = paper;
@@ -72,7 +97,7 @@ function inksFor(L: Light, season: Season, style: number): Inks {
   }
   const snowy = L.snow > 0.45;
   if (snowy) meadow = snow;
-  return { ink: css(inkC, 0.92), inkC, fill, snow, water, wall, roof, tree, meadow, window: [255, 206, 120], style, night: n, lit: L.lights > 0.3 && n > 0.2, snowy, season };
+  return { ink: css(inkC, 0.92), inkC, fill, snow, water, wall, roof, tree, meadow, leaf: leaf ?? tree, deer: deer ?? meadow, boat: boat ?? wall, window: [255, 206, 120], style, night: n, lit: L.lights > 0.3 && n > 0.2, snowy, season };
 }
 
 // a hand-drawn line: every point nudged a little, never ruler-straight
@@ -181,8 +206,8 @@ function cotton(pen: Pen, x: number, base: number, h: number, poplar: boolean) {
     ],
     1.3,
   );
-  if (poplar) blob(pen, X, B - Hh * 0.6, Hh * 0.13, Hh * 0.4, pen.I.snowy ? pen.I.snow : pen.I.tree, x);
-  else blob(pen, X, B - Hh * 0.65, Hh * 0.38, Hh * 0.3, pen.I.snowy ? pen.I.snow : pen.I.tree, x);
+  if (poplar) blob(pen, X, B - Hh * 0.6, Hh * 0.13, Hh * 0.4, pen.I.snowy ? pen.I.snow : pen.I.leaf, x);
+  else blob(pen, X, B - Hh * 0.65, Hh * 0.38, Hh * 0.3, pen.I.snowy ? pen.I.snow : pen.I.leaf, x);
 }
 
 // one layout, drawn into the three layers (each a 2D context already moved
@@ -384,7 +409,7 @@ function things(pen: Pen, lay: PixLayout, I: Inks) {
         [x1 * P, (y + 1.2) * P],
         [x0 * P, (y + 1.2) * P],
       ],
-      I.wall,
+      I.deer,
       1.1,
     );
     for (let x = x0 + 1; x < x1; x += 4)
@@ -671,7 +696,7 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
   const [s0, s1] = lay.deerSpan;
   const dx0 = lay.W * (s0 + (s1 - s0) * along);
   const dir = back ? -1 : 1;
-  const fillC = css(I.meadow);
+  const fillC = css(I.deer);
   // drawn facing right around (0, 0), flipped when heading left
   const deer = (x: number, y: number, s: number, step: number, up: boolean) => {
     const bw = 6 * s;
@@ -777,7 +802,7 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
     const { cx, cy, rx } = lay.lake;
     const x = cx + Math.sin(t * 0.06) * rx * 0.55,
       y = cy + 1;
-    g.fillStyle = css(I.wall);
+    g.fillStyle = css(I.boat);
     g.beginPath();
     g.moveTo(X(x - 5), (y - 1) * P);
     g.quadraticCurveTo(X(x), (y + 1.6) * P, X(x + 5), (y - 1) * P);
@@ -785,7 +810,7 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
     g.fill();
     g.lineWidth = 1.2;
     g.stroke();
-    circle(x, y - 2.6, 0.6, css(I.wall), 1);
+    circle(x, y - 2.6, 0.6, css(I.boat), 1);
     const st = Math.sin(t * 2) > 0 ? 1 : -1;
     line(
       [
@@ -805,7 +830,7 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
       g.beginPath();
       g.rect(X(lay.W * 0.1) - 0.5, 0, lay.W * 0.8 * P + 1, 4000);
       if (X(lay.W * 0.1) < X(lay.W * 0.9)) g.clip();
-      g.fillStyle = css(I.wall);
+      g.fillStyle = css(I.boat);
       const box = (x0: number, w: number, h: number) => {
         g.beginPath();
         g.rect(X(x0), (ty - h) * P, w * P, h * P);

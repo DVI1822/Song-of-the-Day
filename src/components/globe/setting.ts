@@ -13,15 +13,15 @@ function pixComps(): Comp[] {
   const q = new URLSearchParams(window.location.search).get("scene") as Comp | null;
   return q && all.includes(q) ? [q] : all;
 }
-// ?art=pixel brings back the pixel version; ?line=1|2|3 picks the line fill
+// ?art=pixel brings back the pixel version; ?line=1|2|3|4 picks the line fill
 function artMode(): "line" | "pixel" {
   if (typeof window === "undefined") return "line";
   return new URLSearchParams(window.location.search).get("art") === "pixel" ? "pixel" : "line";
 }
 function lineStyle() {
-  if (typeof window === "undefined") return 1;
+  if (typeof window === "undefined") return 4;
   const q = Number(new URLSearchParams(window.location.search).get("line"));
-  return q >= 1 && q <= 3 ? q : 1;
+  return q >= 1 && q <= 4 ? q : 4;
 }
 function pixStyle() {
   if (typeof window === "undefined") return 2;
