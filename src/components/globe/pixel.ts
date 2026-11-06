@@ -145,6 +145,7 @@ export type PixLayout = {
   fence: { x0: number; x1: number; y: number }[];
   bridge: number | null; // the footbridge's row
   deerY: number; // the row the deer walk along
+  deerSpan: [number, number]; // from where to where (shares of the width)
   fish: [number, number][]; // places a trout might jump
 };
 
@@ -248,11 +249,9 @@ export function pixLayout(w: number, h: number, seed: number, style = 2, comp: C
   }
   // big pines framing the edges (only on one side for the hill)
   if (sym) {
-    pair(mid - 3, { y: H + 2, h: 44, depth: 0.02, kind: "pine" });
-    pair(mid - 12, { y: H + 2, h: 30, depth: 0.02, kind: "pine" });
+    pair(mid - 9, { y: H + 2, h: 40, depth: 0.02, kind: "pine" });
   } else if (comp === "hill") {
-    add(W - 4, { y: H + 2, h: 46, depth: 0.02, kind: "pine" });
-    add(W - 13, { y: H + 2, h: 30, depth: 0.02, kind: "pine" });
+    add(W - 10, { y: H + 2, h: 42, depth: 0.02, kind: "pine" });
     // a few pines dotted down the knoll
     for (const [fx, hh] of [
       [0.04, 12],
@@ -262,8 +261,7 @@ export function pixLayout(w: number, h: number, seed: number, style = 2, comp: C
     ])
       add(fx * W, { y: rowY(fx * W) + 3, h: hh, depth: 0.25, kind: "pine" });
   } else {
-    add(3, { y: H + 2, h: 42, depth: 0.02, kind: "pine" });
-    add(W - 5, { y: H + 2, h: 36, depth: 0.02, kind: "pine" });
+    add(W - 10, { y: H + 2, h: 38, depth: 0.02, kind: "pine" });
   }
   trees.sort((a, b) => a.y - b.y);
 
@@ -275,12 +273,14 @@ export function pixLayout(w: number, h: number, seed: number, style = 2, comp: C
     dock: PixLayout["dock"] = null,
     trestle: number | null = null,
     deerY = Math.round(H * 0.86);
+  let deerSpan: [number, number] = [0.08, 0.9];
   const fish: [number, number][] = [];
   for (const r of rv.slice(Math.floor(rv.length * 0.55))) if (r.hw > 2.5) fish.push([r.c, r.y]);
   if (comp === "hill") {
     const hx = W * 0.2;
     houses = [house(hx, edge[Math.round(hx)] + 2, -1)];
-    fence = [{ x0: Math.round(W * 0.05), x1: Math.round(W * 0.36), y: Math.round(edge[Math.round(W * 0.2)] + 8) }];
+    // a little paddock beside the cabin
+    fence = [{ x0: houses[0].x + 10, x1: houses[0].x + 21, y: houses[0].y + 1 }];
     deerY = Math.round(H * 0.875);
   } else if (comp === "lake") {
     lake = { cx: mid, cy: H * 0.835, rx: W * 0.44, ry: H * 0.042 };
@@ -291,19 +291,21 @@ export function pixLayout(w: number, h: number, seed: number, style = 2, comp: C
   } else if (comp === "train") {
     trestle = Math.round(H * 0.835);
     houses = [house(W * 0.16, H * 0.95)];
-    fence = [{ x0: Math.round(W * 0.6), x1: Math.round(W * 0.96), y: Math.round(H * 0.93) }];
-    deerY = Math.round(H * 0.875);
+    fence = [{ x0: houses[0].x + 10, x1: houses[0].x + 22, y: houses[0].y }];
+    deerY = Math.round(H * 0.905);
+    deerSpan = [0.36, 0.94]; // clear of the cabin
   } else {
     const hx = W * 0.3,
       hy = H * 0.885;
     houses = [house(mid - hx, hy, -1), house(mid + hx, hy)];
     fence = [
-      { x0: Math.round(mid - W * 0.46), x1: Math.round(mid - W * 0.1), y: Math.round(H * 0.925) },
-      { x0: Math.round(mid + W * 0.1), x1: Math.round(mid + W * 0.46), y: Math.round(H * 0.925) },
+      { x0: houses[0].x - 21, x1: houses[0].x - 10, y: houses[0].y },
+      { x0: houses[1].x + 10, x1: houses[1].x + 21, y: houses[1].y },
     ];
+    deerY = Math.round(H * 0.93);
     bridge = Math.round(H * 0.96);
   }
-  return { W, H, comp, style, range, peaks, ridge, near, edge, valley, river, lake, dock, trestle, trees, houses, fence, bridge, deerY, fish };
+  return { W, H, comp, style, range, peaks, ridge, near, edge, valley, river, lake, dock, trestle, trees, houses, fence, bridge, deerY, deerSpan, fish };
 }
 
 // ---------------------------------------------------------------------------

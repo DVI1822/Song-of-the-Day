@@ -81,10 +81,15 @@ function wob(x: number, y: number, s: number): [number, number] {
 }
 
 class Pen {
+  // a: how strong the ink is; farther layers are drawn fainter, like air
   constructor(
     public g: CanvasRenderingContext2D,
     public I: Inks,
+    public a = 1,
   ) {}
+  get ink() {
+    return css(this.I.inkC, 0.92 * this.a);
+  }
   path(pts: [number, number][], close = false, seed = 0) {
     const g = this.g;
     g.beginPath();
@@ -98,7 +103,7 @@ class Pen {
   stroke(pts: [number, number][], w = 1.4, seed = 0) {
     this.path(pts, false, seed);
     this.g.lineWidth = w;
-    this.g.strokeStyle = this.I.ink;
+    this.g.strokeStyle = this.ink;
     this.g.stroke();
   }
   shape(pts: [number, number][], fill: C | null, w = 1.4, seed = 0) {
@@ -108,7 +113,7 @@ class Pen {
       this.g.fill();
     }
     this.g.lineWidth = w;
-    this.g.strokeStyle = this.I.ink;
+    this.g.strokeStyle = this.ink;
     this.g.stroke();
   }
   fillOnly(pts: [number, number][], fill: C) {
@@ -182,131 +187,141 @@ function cotton(pen: Pen, x: number, base: number, h: number, poplar: boolean) {
 
 // one layout, drawn into the three layers (each a 2D context already moved
 // to where this stretch begins)
-function drawLayout(gs: CanvasRenderingContext2D[], lay: PixLayout, I: Inks, L: Light) {
+// one layout, drawn into the three layers (each a 2D context already moved
+// to where this stretch begins). "ground" is the land itself; "things" are
+// what stands on it, drawn after every stretch's ground so nothing that
+// leans over a join gets painted over by the next stretch.
+function drawLayout(gs: CanvasRenderingContext2D[], lay: PixLayout, I: Inks, L: Light, phase: "ground" | "things") {
   const { W, H } = lay;
   const bottom = H * P;
   const sunSide = L.sun[0] >= 0 ? 1 : -1;
-
-  // ---- far: the range, a few hatch lines on the shaded faces, snow caps
-  {
-    const pen = new Pen(gs[0], I);
-    const top: [number, number][] = [];
-    for (let x = 0; x <= W; x++) top.push([x * P, lay.range[Math.min(W - 1, x)] * P]);
-    pen.fillOnly([[0, bottom], ...top, [W * P, bottom]], I.fill[0]);
-    for (const p of lay.peaks) {
-      // the snow cap: from the summit down to a zigzag hem
-      const cap = H * (0.05 + 0.09 * L.snowline + (I.snowy ? 0.06 : 0)) * (p.half / (W * 0.15));
-      const half = cap / SLOPE;
-      const hem: [number, number][] = [];
-      const n = Math.max(3, Math.round(half / 2.5));
-      for (let i = 0; i <= n * 2; i++) {
-        const x = p.x - half + (i / (n * 2)) * half * 2;
-        hem.push([x * P, (p.top + cap - (i % 2 ? 2.4 : 0) + noise1(x / 3, 41)) * P]);
-      }
-      const capPts: [number, number][] = [[(p.x - half) * P, (p.top + cap) * P], [p.x * P, p.top * P], [(p.x + half) * P, (p.top + cap) * P], ...hem.slice().reverse()];
-      const g = gs[0];
-      g.save();
-      pen.path(top.concat([[W * P, bottom], [0, bottom]]), true);
-      g.clip();
-      pen.fillOnly(capPts, I.snow);
-      pen.stroke(hem, 1.1, p.x);
-      // the spine, and hatching on the shaded face
-      pen.stroke(
-        [
-          [p.x * P, p.top * P],
-          [(p.x - sunSide * cap * 0.25) * P, (p.top + cap * 0.9) * P],
-          [(p.x - sunSide * cap * 0.15) * P, (p.top + cap * 1.4) * P],
-        ],
-        1,
-        p.x + 9,
-      );
-      for (let i = 0; i < 6; i++) {
-        const d = cap * (1.2 + i * 0.35);
-        const x0 = p.x - sunSide * (d / SLOPE) * (0.35 + hash(i + p.x) * 0.4);
-        const y0 = p.top + d;
-        pen.stroke(
-          [
-            [x0 * P, y0 * P],
-            [(x0 + sunSide * 3.5) * P, (y0 + 3.5) * P],
-          ],
-          0.9,
-          i,
-        );
-      }
-      g.restore();
-    }
-    pen.stroke(top, 1.5, 1);
-  }
-
-  // ---- middle: the far forest, a treeline of little points
-  const treeline = (g: CanvasRenderingContext2D, edge: number[], bottomOf: (x: number) => number, fill: C, tip: number, seed: number) => {
-    const pen = new Pen(g, I);
-    const pts: [number, number][] = [];
-    for (let x = 0; x < W; x += 3) {
-      const y = edge[x];
-      pts.push([x * P, y * P]);
-      pts.push([(x + 1.5) * P, (y - tip - hash(x + seed) * tip * 0.8) * P]);
-    }
-    pts.push([W * P, edge[W - 1] * P]);
-    const low: [number, number][] = [];
-    for (let x = W - 1; x >= 0; x -= 4) low.push([x * P, bottomOf(x) * P]);
-    pen.fillOnly([...pts, [W * P, bottomOf(W - 1) * P], ...low, [0, bottomOf(0) * P]], fill);
-    pen.stroke(pts, 1.2, seed);
-    // a few trunks showing under the canopy
-    for (let x = 4; x < W; x += 9) {
-      const y = edge[x] + 2 + hash(x + seed) * 3;
-      pen.stroke(
-        [
-          [x * P, y * P],
-          [x * P, (y + 2) * P],
-        ],
-        0.9,
-      );
-    }
-  };
-  treeline(gs[1], lay.ridge, (x) => lay.near[x] + 14, I.fill[1], 2.2, 3);
-
-  // ---- near: the near forest, the meadow, water, buildings, trees
   const g = gs[2];
   const pen = new Pen(g, I);
-  treeline(g, lay.near, (x) => lay.edge[x] + 2, I.fill[2], 3.4, 8);
-  const edge: [number, number][] = [];
-  for (let x = 0; x <= W; x++) edge.push([x * P, lay.edge[Math.min(W - 1, x)] * P]);
-  pen.fillOnly([...edge, [W * P, bottom], [0, bottom]], I.meadow);
-  pen.stroke(edge, 1.3, 5);
-  // rows across the meadow, closer together far away
-  for (let k = 1; k < 9; k++) {
-    const y = lay.valley + (H - lay.valley) * (k / 9) ** 1.8;
-    for (let x = 2; x < W - 4; x += 10 + Math.floor(hash(k * 13 + x) * 8)) {
-      if (y < lay.edge[x] + 2) continue;
-      const len = 2 + (k / 9) * 5;
-      pen.stroke(
-        [
-          [x * P, y * P],
-          [(x + len) * P, y * P],
-        ],
-        0.8,
-        k + x,
-      );
+  if (phase === "things") return things(pen, lay, I);
+
+  // ---- far: the range. Each column belongs to one peak (the one whose
+  // slope is highest there), and a peak's snow, ridge line and shading stay
+  // inside its own columns, so no line wanders across a neighbour.
+  {
+    const fp = new Pen(gs[0], I, 0.5);
+    const owner: number[] = [];
+    for (let x = 0; x < W; x++) {
+      let best = 0,
+        by = Infinity;
+      lay.peaks.forEach((p, i) => {
+        const y = p.top + Math.abs(x - p.x) * SLOPE;
+        if (y < by) {
+          by = y;
+          best = i;
+        }
+      });
+      owner.push(best);
     }
+    const top: [number, number][] = [[-P, lay.range[0] * P]];
+    for (let x = 0; x < W; x++) top.push([(x + 0.5) * P, lay.range[x] * P]);
+    top.push([W * P + P, lay.range[W - 1] * P]);
+    fp.fillOnly([[-P, bottom], ...top, [W * P + P, bottom]], I.fill[0]);
+    // snow down to one shared altitude (a snowline, not a cap per peak),
+    // ending in a gentle zigzag where it thins out into gullies
+    const minTop = Math.min(...lay.peaks.map((p) => p.top));
+    const line = minTop + H * (0.05 + 0.06 * L.snowline + (I.snowy ? 0.05 : 0));
+    const hem = (x: number) => {
+      const tri = Math.abs((((x / 2.6) % 2) + 2) % 2 - 1);
+      return line - tri * 2.4 + noise1(x / 4, 41) * 1.2;
+    };
+    {
+      let run: number[] = [];
+      const flush = () => {
+        if (run.length > 1) {
+          const upper = run.map((x) => [(x + 0.5) * P, lay.range[x] * P] as [number, number]);
+          const lower = run.map((x) => [(x + 0.5) * P, Math.max(lay.range[x], hem(x)) * P] as [number, number]);
+          fp.fillOnly([...upper, ...lower.slice().reverse()], I.snow);
+          let seg: [number, number][] = [];
+          run.forEach((x, i) => {
+            if (hem(x) > lay.range[x] + 1.2) seg.push(lower[i]);
+            else {
+              if (seg.length > 1) fp.stroke(seg, 1.1, x);
+              seg = [];
+            }
+          });
+          if (seg.length > 1) fp.stroke(seg, 1.1, 2);
+        }
+        run = [];
+      };
+      for (let x = 0; x < W; x++) {
+        if (hem(x) > lay.range[x]) run.push(x);
+        else flush();
+      }
+      flush();
+    }
+    lay.peaks.forEach((p, pi) => {
+      const cap = H * (0.03 + 0.05 * L.snowline + (I.snowy ? 0.04 : 0)) * (p.half / (W * 0.15));
+      // the ridge down from the summit, only if the summit itself shows
+      const sx = Math.round(p.x);
+      if (sx >= 0 && sx < W && owner[sx] === pi && Math.abs(lay.range[sx] - p.top) < 4) {
+        const ex = p.x - sunSide * cap * 0.3;
+        const ey = p.top + cap * 1.1;
+        if (ex >= 0 && ex < W && owner[Math.round(ex)] === pi && ey < lay.ridge[Math.round(ex)] - 4)
+          fp.stroke(
+            [
+              [p.x * P, (p.top + 1) * P],
+              [(p.x - sunSide * cap * 0.12) * P, (p.top + cap * 0.6) * P],
+              [ex * P, ey * P],
+            ],
+            1,
+            pi + 9,
+          );
+      }
+    });
+    fp.stroke(top, 1.4, 1);
   }
-  // grass tufts
-  for (let i = 0; i < 26; i++) {
-    const x = hash(i * 3 + W) * W,
-      y = lay.valley + 4 + hash(i * 7 + 1) * (H - lay.valley - 6);
-    if (y < lay.edge[Math.floor(x)] + 3) continue;
-    const s = 0.6 + ((y - lay.valley) / (H - lay.valley)) * 1.4;
-    pen.stroke(
-      [
-        [(x - s) * P, (y - s) * P],
-        [x * P, y * P],
-        [(x + s) * P, (y - s * 1.2) * P],
-      ],
-      0.8,
-      i,
-    );
+
+  // ---- a treeline: little conifer tips, irregular in spacing and height
+  const treeline = (gg: CanvasRenderingContext2D, edge: number[], bottomOf: (x: number) => number, fill: C, tip: number, seed: number) => {
+    const tp = new Pen(gg, I, gg === gs[1] ? 0.68 : 1);
+    const pts: [number, number][] = [[-P, edge[0] * P]];
+    let x = 0;
+    while (x < W) {
+      const w = 2.2 + hash(x * 3.1 + seed) * 2.2;
+      const xi = Math.min(W - 1, Math.round(x));
+      const xm = Math.min(W - 1, Math.round(x + w / 2));
+      const h = tip * (0.55 + hash(x * 7.7 + seed) * 0.7) * (hash(x + seed * 3) < 0.12 ? 1.5 : 1);
+      pts.push([x * P, edge[xi] * P]);
+      pts.push([(x + w / 2) * P, (edge[xm] - h) * P]);
+      x += w;
+    }
+    pts.push([W * P + P, edge[W - 1] * P]);
+    const low: [number, number][] = [];
+    for (let xx = W - 1; xx >= 0; xx -= 4) low.push([xx * P, bottomOf(xx) * P]);
+    tp.fillOnly([...pts, [W * P + P, bottomOf(W - 1) * P], ...low, [-P, bottomOf(0) * P]], fill);
+    tp.stroke(pts, 1.15, seed);
+  };
+  treeline(gs[1], lay.ridge, (x) => lay.near[x] + 14, I.fill[1], 2.6, 3);
+
+  // ---- near: the near forest, the meadow, water
+  treeline(g, lay.near, (x) => lay.edge[x] + 2, I.fill[2], 3.6, 8);
+  const edge: [number, number][] = [[-P, lay.edge[0] * P]];
+  for (let x = 0; x < W; x++) edge.push([(x + 0.5) * P, lay.edge[x] * P]);
+  edge.push([W * P + P, lay.edge[W - 1] * P]);
+  pen.fillOnly([...edge, [W * P + P, bottom], [-P, bottom]], I.meadow);
+  pen.stroke(edge, 1.3, 5);
+  const wet = (x: number, y: number) => {
+    const r = lay.river[Math.round(y) - lay.valley];
+    if (r && r.hw > 0 && Math.abs(x - r.c) < r.hw + 3) return true;
+    const k = lay.lake;
+    return !!k && ((x - k.cx) / (k.rx + 4)) ** 2 + ((y - k.cy) / (k.ry + 3)) ** 2 < 1;
+  };
+  // a few tufts of grass, bigger as they come closer
+  for (let i = 0; i < 14; i++) {
+    const x = 4 + hash(i * 3 + W) * (W - 8),
+      y = lay.valley + 6 + hash(i * 7 + 1) ** 0.7 * (H - lay.valley - 8);
+    if (y < lay.edge[Math.floor(x)] + 4 || wet(x, y)) continue;
+    const s = 0.5 + ((y - lay.valley) / (H - lay.valley)) * 1.1;
+    pen.stroke([[(x - s * 1.2) * P, (y - s * 1.4) * P], [(x - s * 0.2) * P, y * P]], 0.8, i);
+    pen.stroke([[x * P, (y - s * 2) * P], [x * P, y * P]], 0.8, i + 0.3);
+    pen.stroke([[(x + s * 1.2) * P, (y - s * 1.3) * P], [(x + s * 0.2) * P, y * P]], 0.8, i + 0.6);
   }
-  // the river: two banks and the water between
+  // the river: two banks and the water between, a few ripples
   const rows = lay.river.map((r, i) => ({ ...r, y: lay.valley + i })).filter((r) => r.hw > 0);
   if (rows.length > 2) {
     const left = rows.map((r) => [(r.c - r.hw) * P, r.y * P] as [number, number]);
@@ -314,14 +329,14 @@ function drawLayout(gs: CanvasRenderingContext2D[], lay: PixLayout, I: Inks, L: 
     pen.fillOnly([...left, ...right.slice().reverse()], I.water);
     pen.stroke(left, 1.3, 11);
     pen.stroke(right, 1.3, 12);
-    for (let i = 6; i < rows.length; i += 7) {
+    for (let i = Math.floor(rows.length * 0.45); i < rows.length; i += Math.max(5, Math.floor(rows.length / 5))) {
       const r = rows[i];
-      if (r.hw < 3) continue;
-      const o = (hash(i) - 0.5) * r.hw;
+      if (r.hw < 4) continue;
+      const o = (hash(i) - 0.5) * r.hw * 0.8;
       pen.stroke(
         [
-          [(r.c + o - r.hw * 0.25) * P, r.y * P],
-          [(r.c + o + r.hw * 0.25) * P, r.y * P],
+          [(r.c + o - r.hw * 0.18) * P, r.y * P],
+          [(r.c + o + r.hw * 0.18) * P, r.y * P],
         ],
         0.8,
         i,
@@ -336,21 +351,30 @@ function drawLayout(gs: CanvasRenderingContext2D[], lay: PixLayout, I: Inks, L: 
       pts.push([(cx + Math.cos(a) * rx) * P, (cy + Math.sin(a) * ry) * P]);
     }
     pen.shape(pts, I.snowy ? I.snow : I.water, 1.3, 20);
-    // the far shore's reflection and a few ripples
-    for (let k = 0; k < 5; k++) {
-      const y = cy - ry * 0.55 + k * ry * 0.3;
-      const half = rx * Math.sqrt(Math.max(0, 1 - ((y - cy) / ry) ** 2)) * (0.75 - k * 0.1);
-      for (let x = cx - half; x < cx + half - 3; x += 8 + hash(k + x) * 6)
-        pen.stroke(
-          [
-            [x * P, y * P],
-            [(x + 3 + hash(x) * 3) * P, y * P],
-          ],
-          0.8,
-          k,
-        );
+    // a few ripples
+    for (const [u, v, l] of [
+      [-0.5, -0.2, 6],
+      [-0.15, 0.25, 9],
+      [0.3, -0.35, 5],
+      [0.45, 0.3, 7],
+    ]) {
+      const x = cx + u * rx,
+        y = cy + v * ry;
+      pen.stroke(
+        [
+          [(x - l / 2) * P, y * P],
+          [(x + l / 2) * P, y * P],
+        ],
+        0.8,
+        u,
+      );
     }
   }
+}
+
+// what stands on the land: dock, trestle, fences, houses, bridge, trees
+function things(pen: Pen, lay: PixLayout, I: Inks) {
+  const W = lay.W;
   if (lay.dock) {
     const { x0, x1, y } = lay.dock;
     pen.shape(
@@ -530,6 +554,8 @@ function drawLayout(gs: CanvasRenderingContext2D[], lay: PixLayout, I: Inks, L: 
     }
   }
   for (const t of lay.trees) {
+    // no forest-edge pine standing in front of a cabin
+    if (t.depth >= 0.5 && lay.houses.some((h) => Math.abs(t.x - h.x) < 13 && t.y <= h.y + 1)) continue;
     if (t.kind === "pine") pine(pen, t.x, t.y, t.h, t.h > 25 ? 1.6 : 1.2);
     else cotton(pen, t.x, t.y, t.h, t.kind === "poplar");
   }
@@ -561,10 +587,16 @@ export function paintLinePano(lays: PixLayout[], L: Light, season: Season, style
     g.lineJoin = "round";
     return g;
   });
-  lays.forEach((lay, n) => {
-    for (const g of gs) g.setTransform(scale, 0, 0, scale, n * W * scale, -top * scale);
-    drawLayout(gs, lay, I, L);
-  });
+  for (const phase of ["ground", "things"] as const)
+    lays.forEach((lay, n) => {
+      // things near either end are drawn again one loop over, so a tree
+      // leaning across the wrap shows on both sides of it
+      const shifts = phase === "things" ? [0, -PW, PW] : [0];
+      for (const sh of shifts) {
+        for (const g of gs) g.setTransform(scale, 0, 0, scale, (n * W + sh) * scale, -top * scale);
+        drawLayout(gs, lay, I, L, phase);
+      }
+    });
   return { W: PW, H, top, scale, layers, lays, I };
 }
 
@@ -623,21 +655,36 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
     }
     g.globalAlpha = 1;
   }
-  // deer: a doe and a fawn crossing the meadow, stopping to graze
-  const ph = ((t + 12) % 70) / 70;
+  // deer: a doe and a fawn ambling to one end of their stretch of meadow
+  // and back, stopping to graze on the way
+  const ph = ((t + 12) % 140) / 140;
+  const back = ph >= 0.5;
+  const hp = (ph % 0.5) * 2;
   const keys = [0, 0.25, 0.35, 0.6, 0.72, 1];
   const pos = [0, 0.35, 0.35, 0.7, 0.7, 1];
   let k = 0;
-  while (k < keys.length - 2 && ph > keys[k + 1]) k++;
-  const f = (ph - keys[k]) / (keys[k + 1] - keys[k]);
+  while (k < keys.length - 2 && hp > keys[k + 1]) k++;
+  const f = (hp - keys[k]) / (keys[k + 1] - keys[k]);
   const grazing = pos[k] === pos[k + 1];
-  const along = pos[k] + (pos[k + 1] - pos[k]) * f;
-  const dx0 = -10 + (lay.W + 20) * along;
+  let along = pos[k] + (pos[k + 1] - pos[k]) * f;
+  if (back) along = 1 - along;
+  const [s0, s1] = lay.deerSpan;
+  const dx0 = lay.W * (s0 + (s1 - s0) * along);
+  const dir = back ? -1 : 1;
   const fillC = css(I.meadow);
+  // drawn facing right around (0, 0), flipped when heading left
   const deer = (x: number, y: number, s: number, step: number, up: boolean) => {
     const bw = 6 * s;
+    g.save();
+    g.translate(X(x), y * P);
+    g.scale(dir * P, P);
     g.fillStyle = fillC;
-    // legs, swinging when walking
+    g.lineWidth = 1.15 / P;
+    const seg = (pts: [number, number][]) => {
+      g.beginPath();
+      pts.forEach(([a, b], i) => (i ? g.lineTo(a, b) : g.moveTo(a, b)));
+      g.stroke();
+    };
     const sw = grazing ? 0 : step * 0.8;
     for (const [lx, d] of [
       [0.5, sw],
@@ -645,60 +692,44 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
       [bw - 1.3, -sw],
       [bw - 0.5, sw],
     ] as [number, number][])
-      line(
-        [
-          [x + lx, y + 1],
-          [x + lx + d, y + 1 + 3.4 * s],
-        ],
-        1.1,
-      );
-    // body
+      seg([
+        [lx - bw / 2, 1],
+        [lx - bw / 2 + d, 1 + 3.4 * s],
+      ]);
     g.beginPath();
-    g.ellipse(X(x + bw / 2), (y + 0.6) * P, (bw / 2) * P, 1.4 * s * P, 0, 0, Math.PI * 2);
+    g.ellipse(0, 0.6, bw / 2, 1.4 * s, 0, 0, Math.PI * 2);
     g.fill();
-    g.lineWidth = 1.2;
     g.stroke();
-    // neck and head
+    const hx = bw / 2;
     if (up) {
-      line(
-        [
-          [x + bw - 0.6, y],
-          [x + bw + 0.6, y - 3 * s],
-          [x + bw + 2.2 * s, y - 2.4 * s],
-        ],
-        1.2,
-      );
-      line(
-        [
-          [x + bw + 0.6, y - 3 * s],
-          [x + bw + 0.2, y - 4.4 * s],
-        ],
-        1,
-      );
+      seg([
+        [hx - 0.6, 0],
+        [hx + 0.6, -3 * s],
+        [hx + 2.2 * s, -2.4 * s],
+      ]);
+      seg([
+        [hx + 0.6, -3 * s],
+        [hx + 0.2, -4.4 * s],
+      ]);
     } else
-      line(
-        [
-          [x + bw - 0.6, y],
-          [x + bw + 1.2, y + 2.6 * s],
-        ],
-        1.2,
-      );
-    line(
-      [
-        [x, y],
-        [x - 0.8, y - 0.6],
-      ],
-      1,
-    ); // tail
+      seg([
+        [hx - 0.6, 0],
+        [hx + 1.2, 2.6 * s],
+      ]);
+    seg([
+      [-bw / 2, 0],
+      [-bw / 2 - 0.8, -0.6],
+    ]);
+    g.restore();
   };
   if (I.snowy) {
-    g.globalAlpha = 0.5;
-    for (let px = -10; px < dx0 - 2; px += 3) line([[px, lay.deerY + 4.6], [px + 0.6, lay.deerY + 4.6]], 1);
+    g.globalAlpha = 0.45;
+    for (let px = lay.W * s0; px < lay.W * s1; px += 3) line([[px, lay.deerY + 4.6], [px + 0.6, lay.deerY + 4.6]], 1);
     g.globalAlpha = 1;
   }
   const step = Math.floor(t * 4) % 2 ? 1 : -1;
   deer(dx0, lay.deerY, 1, step, !grazing || Math.sin(t * 0.8) > 0.6);
-  deer(dx0 - 9, lay.deerY + 2, 0.7, -step, !grazing || Math.sin(t * 0.8 + 2) > 0.3);
+  deer(dx0 - dir * 9, lay.deerY + 2, 0.7, -step, !grazing || Math.sin(t * 0.8 + 2) > 0.3);
   // a trout jumping: an arc out of the water and two splashes
   if (lay.fish.length && L.snow < 0.9) {
     const j = Math.floor(t / 6);
