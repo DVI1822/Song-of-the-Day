@@ -3,6 +3,13 @@ import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
 import { livePixels, paintPixels, pixLayout, type PixLayout } from "./pixel";
+
+// ?pix=1|2|3 picks a pixel style while we try them out
+function pixStyle() {
+  if (typeof window === "undefined") return 2;
+  const q = Number(new URLSearchParams(window.location.search).get("pix"));
+  return q >= 1 && q <= 3 ? q : 2;
+}
 import type { V3 } from "./math";
 
 // Where you are, alive behind the Globe (lib/setting.ts picks which).
@@ -829,7 +836,7 @@ export class SettingScene {
         cv.height = Math.round(f.h * this.dpr);
       }
       this.lay = this.kind === "city" ? cityLayout(f.w, f.h, 7) : mountainLayout(f.w, f.h, 11);
-      this.pix = this.kind === "mountain" ? pixLayout(f.w, f.h, 11) : null;
+      this.pix = this.kind === "mountain" ? pixLayout(f.w, f.h, 11, pixStyle()) : null;
       this.key = "";
     }
     // repaint the still layer only when the light has really changed
