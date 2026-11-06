@@ -77,7 +77,7 @@ const LINE = (LINE_PX * 24) / ICON; // in the 24-unit drawing
 // Notes: a speech bubble with a little music note in it. Tapping it lights it
 // up in light green and jingles the note (`ring` restarts that); once you've
 // left a note it stays softly lit.
-const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
+export const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
   <svg
     key={ring}
     aria-hidden
@@ -114,7 +114,7 @@ const NoteIcon = ({ on, ring }: { on?: boolean; ring: number }) => (
 // the real thing: the globe's own Signal core, same rings, colours and spin,
 // with a band of coral running up and down through the rings, and the plus
 // turned to a tick.
-const CoreIcon = ({ on }: { on?: boolean }) => (
+export const CoreIcon = ({ on }: { on?: boolean }) => (
   <span className="relative block" style={{ width: ICON, height: ICON }}>
     {on ? (
       <SignalCore rings={13} moving sweep="255,94,87" className="absolute inset-0 h-full w-full" />
