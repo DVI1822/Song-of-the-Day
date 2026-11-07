@@ -29,6 +29,7 @@ import { settingOverride, type SettingKind } from "@/lib/setting";
 import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
+import { drawInkGlobe, inkMode } from "./ink";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -233,6 +234,7 @@ function newEls() {
     sphere: null as HTMLDivElement | null,
     beam: null as HTMLCanvasElement | null,
     ripples: null as HTMLCanvasElement | null,
+    inkGlobe: null as HTMLCanvasElement | null,
     sigCore: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
@@ -326,6 +328,10 @@ function Globe({
   const R = useRef(newEls());
   // the kind of place you're in, shown behind the globe (setting.ts)
   const setting = useRef({ scene: null as SettingScene | null, kind: null as SettingKind | null, at: "" });
+  // the drawn look (ink.ts) also restyles the buttons and panels (globals.css)
+  useEffect(() => {
+    if (inkMode()) document.documentElement.dataset.ink = "";
+  }, []);
   useEffect(() => {
     const o = settingOverride();
     if (o) setting.current.kind = o === "off" ? null : o;
@@ -1130,7 +1136,17 @@ function Globe({
           className="display text-[26px] leading-[1.1] transition-colors duration-500"
           style={hw ? { color: hw.title, fontFamily: hw.titleFont, textShadow: hw.titleGlow, fontWeight: 400, letterSpacing: "0.02em", fontSize: hw.titleSize } : { color: ink }}
         >
-          {hw ? "TopTrack" : <Wordmark light={inkLight} size={31} />}
+          {hw ? (
+            "TopTrack"
+          ) : (
+            <>
+              <Wordmark light={inkLight} size={31} />
+              {/* the drawn look's hand-lettered name (globals.css, [data-ink]) */}
+              <span className="ink-word" aria-hidden>
+                TopTrack
+              </span>
+            </>
+          )}
         </h1>
         <Clock color={muted} />
         {posted && !launching && <Countdown color={muted} timeZone={me.timezone} />}
@@ -1211,6 +1227,8 @@ function Globe({
         />
         <canvas ref={(el) => void (R.current.beam = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.ripples = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* the drawn look's ink ball (ink.ts) */}
+        <canvas ref={(el) => void (R.current.inkGlobe = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div
           ref={(el) => void (R.current.world = el)}
           className="preserve-3d absolute z-[1] h-0 w-0"
@@ -1316,6 +1334,13 @@ function Globe({
       {welcomeSeen && !help && !tour && !keyOn && <InstallCard />}
       {welcomeSeen && !help && !tour && !keyOn && <NotifyCard api={api} />}
 
+      {/* the drawn look's wobbly ink edge (globals.css, [data-ink]) */}
+      <svg aria-hidden width="0" height="0" className="absolute">
+        <filter id="ink-wobble">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" />
+          <feDisplacementMap in="SourceGraphic" scale="3.2" />
+        </filter>
+      </svg>
       {/* left tabs */}
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
         {(
@@ -1696,6 +1721,7 @@ sim: TileSim,
   const sElv = Math.sin(sun.el),
     cElv = Math.cos(sun.el);
   const roomOp = (1 - reveal) * (1 - lensP) * (1 - dk);
+  let inkShadow: { cx: number; cy: number; w: number; h: number; a: number } | null = null;
   if (r.sunShadow) {
     const cot = Math.min(2.2, cElv / Math.max(0.05, sElv));
     const lx = Math.sin(sun.az),
@@ -1706,6 +1732,7 @@ sim: TileSim,
     const cx = L.cx - lx * len,
       cy = L.cy + 216 * L.s - lz * len * 0.3;
     const a = (0.12 * (1 - day) + (day * 0.72) / (1 + 0.3 * cot)) * (0.35 + 0.65 * direct);
+    inkShadow = { cx, cy, w, h, a };
     const st = r.sunShadow.style;
     st.left = (cx - w / 2).toFixed(1) + "px";
     st.top = (cy - h / 2).toFixed(1) + "px";
@@ -1726,6 +1753,29 @@ sim: TileSim,
     r.sphere.style.opacity = ((1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3)).toFixed(3);
     r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(${glass},${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk + 0.12 * warm * direct).toFixed(3)}) 0%, rgba(${glass},0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
     r.sphere.style.boxShadow = dk > 0 ? `0 0 ${(40 * dk).toFixed(0)}px rgba(180,210,255,${(0.08 * dk).toFixed(3)})` : "";
+  }
+  if (inkMode()) {
+    // the drawn look: an ink ball instead of the glass one
+    const op = (1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3);
+    if (r.sphere) r.sphere.style.opacity = "0";
+    if (r.sunShadow) r.sunShadow.style.opacity = "0";
+    if (r.floor) r.floor.style.opacity = "0";
+    drawInkGlobe(r.inkGlobe, {
+      w: L.w,
+      h: L.h,
+      cx: L.cx,
+      cy: L.cy,
+      R: L.R + 8,
+      Rb,
+      zoom: s.zoom,
+      cam,
+      op,
+      dk,
+      day,
+      sun: Lc,
+      t: s.t,
+      shadow: inkShadow && { ...inkShadow, a: inkShadow.a * roomOp },
+    });
   }
   if (s.sky && r.day && s.sky.bg !== s.skyBg) {
     s.skyBg = s.sky.bg;
@@ -1902,6 +1952,12 @@ const TileLayer = memo(function TileLayer({
         <div
           key={i}
           ref={(el) => void (te.facets[i] = el)}
+          data-facet=""
+          data-wait={wait ? "" : undefined}
+          data-t={row === 0 ? "" : undefined}
+          data-b={row === 2 ? "" : undefined}
+          data-l={col === 0 ? "" : undefined}
+          data-r={col === 2 ? "" : undefined}
           className="backface-hidden absolute box-border overflow-hidden"
           style={{
             left: l0,
