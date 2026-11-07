@@ -40,6 +40,8 @@ export function tempOverride(): number | null {
   return q !== null && q !== "" && Number.isFinite(Number(q)) ? Number(q) : null;
 }
 
+export const LOCATED = "tt-located";
+
 export function useWeather(onPlace: (lat: number, lon: number) => void) {
   const [weather, setWeather] = useState<Weather | null>(null);
   const placed = useRef(onPlace);
@@ -79,6 +81,13 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
         .query({ name: "geolocation" as PermissionName })
         .then((ps) => (ps.state === "granted" ? located() : load()))
         .catch(() => load());
+    // the location card (Locate.tsx) just got the phone's own location
+    const onLocated = (e: Event) => {
+      const d = (e as CustomEvent<{ lat: number; lon: number }>).detail;
+      coords = `?lat=${d.lat.toFixed(2)}&lon=${d.lon.toFixed(2)}`;
+      load();
+    };
+    window.addEventListener(LOCATED, onLocated);
     const t = setInterval(load, REFRESH);
     // coming back to the app (a phone keeps the tab asleep): check again if it's been a while
     const back = () => {
@@ -89,6 +98,7 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
     return () => {
       on = false;
       clearInterval(t);
+      window.removeEventListener(LOCATED, onLocated);
       document.removeEventListener("visibilitychange", back);
     };
   }, []);

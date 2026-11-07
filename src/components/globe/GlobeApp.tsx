@@ -17,6 +17,7 @@ import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
 import { Key, KeyButton } from "./Key";
 import { AppTour, InstallCard } from "./Install";
 import { NotifyCard } from "./Notify";
+import { LocateCard } from "./Locate";
 import { CoreInside } from "./CoreInside";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -1332,6 +1333,7 @@ function Globe({
       {tour && <AppTour onClose={() => setTour(false)} />}
       {keyOn && <Key onClose={() => setKeyOn(false)} />}
       {welcomeSeen && !help && !tour && !keyOn && <InstallCard />}
+      {welcomeSeen && !help && !tour && !keyOn && <LocateCard />}
       {welcomeSeen && !help && !tour && !keyOn && <NotifyCard api={api} />}
 
       {/* the drawn look's wobbly ink edge (globals.css, [data-ink]) */}

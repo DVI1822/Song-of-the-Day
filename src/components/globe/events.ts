@@ -176,7 +176,7 @@ const GROUND: Record<Place, { horizon: number; near: number; road?: number; sea?
   mountain: { horizon: 0.72, near: 0.9 },
   coast: { horizon: 0.745, near: 0.93, sea: [0.76, 0.805], sand: [0.84, 0.95] },
   farm: { horizon: 0.718, near: 0.94, road: 0.886 },
-  city: { horizon: 0.8, near: 0.95 },
+  city: { horizon: 0.745, near: 0.82, road: 0.872 },
 };
 
 // ------------------------------------------------------------ the moments
@@ -1204,6 +1204,98 @@ const DEFS: Def[] = [
         shp(c, [[5, -9], [7, -13], [12, -12], [12, -9], [7, -7]], fur, 1);
         ln(c, [[-7, -8], [-11, -11 + Math.sin(c.t * 20)]], 1.2);
       });
+    },
+  },
+  // -------------------------------------------------------------- the city
+  {
+    name: "cyclist",
+    places: ["city"],
+    when: (c) => dry(c) && !night(c),
+    weight: 3,
+    dur: [9, 12],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 30),
+        y = c.h * GROUND.city.near;
+      const spin = c.t * 9;
+      const shirt: C = ([[255, 94, 87], [120, 200, 120], [90, 160, 230], [255, 220, 90]] as C[])[Math.floor(r.seed * 4)];
+      pen(c, 1.1);
+      facing(c, x, y, r.dir, () => {
+        for (const wx of [-8, 8]) {
+          circ(c, wx, -5, 5, null, 1.1);
+          ln(c, [[wx + Math.cos(spin) * 5, -5 + Math.sin(spin) * 5], [wx - Math.cos(spin) * 5, -5 - Math.sin(spin) * 5]], 0.6);
+        }
+        ln(c, [[-8, -5], [-2, -13], [6, -13], [8, -5]], 1.1);
+        ln(c, [[-2, -13], [0, -5], [6, -13]], 1);
+        ln(c, [[6, -13], [7, -16], [9, -16]], 1);
+        // rider: legs pedalling, body leaning over the bars
+        const k = Math.sin(spin) * 2.5;
+        ln(c, [[-3, -15], [0 + k, -9], [0 + k * 0.6, -5]], 1.4);
+        shp(c, [[-4, -15], [5, -21], [7, -19], [-2, -13]], col(c, shirt), 1);
+        ln(c, [[5, -20], [8, -16]], 1.2);
+        circ(c, 6.5, -24, 2.6, col(c, [236, 196, 160]), 1);
+        shp(c, [[3.5, -25], [6.5, -28], [9.5, -25]], col(c, [70, 80, 100]), 0.9);
+      });
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  {
+    name: "ice-cream-truck",
+    places: ["city"],
+    when: (c) => day(c) && dry(c) && (c.season === "summer" || c.season === "spring"),
+    weight: 2,
+    dur: [14, 18],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 50),
+        y = c.h * GROUND.city.road! + 6 * c.s + Math.sin(c.t * 14) * 0.4 * c.s;
+      pen(c, 1.2);
+      facing(c, x, y, r.dir, () => {
+        shp(c, [[-22, -3], [-22, -24], [10, -24], [10, -14], [20, -12], [22, -8], [22, -3]], col(c, [250, 248, 240]), 1.2);
+        shp(c, [[11, -22], [11, -15], [19, -13.5], [15, -22]], col(c, [200, 230, 250]), 0.9);
+        // pink stripe, serving window, a cone on the roof
+        shp(c, [[-22, -9], [10, -9], [10, -6], [-22, -6]], col(c, [255, 160, 190]), 0.9);
+        shp(c, [[-17, -20], [3, -20], [3, -12], [-17, -12]], col(c, [255, 220, 150]), 0.9);
+        shp(c, [[-9, -24], [-6, -33], [-3, -24]], col(c, [226, 170, 100]), 1);
+        circ(c, -6, -33.5, 3.2, col(c, [255, 160, 190]), 1);
+        const spin = c.t * 12;
+        for (const wx of [-13, 13]) {
+          circ(c, wx, -2, 3.6, c.I.inkC, 0);
+          ln(c, [[wx + Math.cos(spin) * 1.6, -2 + Math.sin(spin) * 1.6], [wx - Math.cos(spin) * 1.6, -2 - Math.sin(spin) * 1.6]], 0.8);
+        }
+      });
+      // its little tune, as notes floating up
+      for (let i = 0; i < 3; i++) {
+        const q = (c.t * 0.6 + i / 3) % 1;
+        c.g.globalAlpha = Math.sin(q * Math.PI) * 0.9;
+        c.g.font = hand(11 * c.s);
+        c.g.fillStyle = css(c.I.inkC);
+        c.g.fillText(i % 2 ? "\u266A" : "\u266B", x + (i - 1) * 9 * c.s - r.dir * 10 * c.s, y - (38 + q * 22) * c.s);
+      }
+      c.g.globalAlpha = 1;
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  {
+    name: "city-bus",
+    places: ["city"],
+    when: () => true,
+    weight: 3,
+    dur: [11, 14],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 60),
+        y = c.h * GROUND.city.road! - 3 * c.s;
+      pen(c, 1.2);
+      facing(c, x, y, r.dir, () => {
+        shp(c, [[-36, -3], [-36, -22], [34, -22], [36, -18], [36, -3]], col(c, [90, 160, 230]), 1.2);
+        shp(c, [[-36, -9], [36, -9], [36, -6], [-36, -6]], col(c, [255, 220, 90]), 0.8);
+        for (let i = 0; i < 6; i++) shp(c, [[-32 + i * 10, -19], [-25 + i * 10, -19], [-25 + i * 10, -12], [-32 + i * 10, -12]], c.I.lit ? c.I.window : col(c, [200, 230, 250]), 0.8);
+        shp(c, [[29, -20], [35, -20], [35, -9], [29, -9]], col(c, [200, 230, 250]), 0.8);
+        const spin = c.t * 10;
+        for (const wx of [-24, 22]) {
+          circ(c, wx, -2, 3.8, c.I.inkC, 0);
+          ln(c, [[wx + Math.cos(spin) * 1.7, -2 + Math.sin(spin) * 1.7], [wx - Math.cos(spin) * 1.7, -2 - Math.sin(spin) * 1.7]], 0.8);
+        }
+      });
+      c.g.strokeStyle = c.I.ink;
     },
   },
 ];

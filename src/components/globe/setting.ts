@@ -831,7 +831,8 @@ export class SettingScene {
   }
 
   set(kind: SettingKind | null) {
-    const k = kind === "city" || kind === "mountain" || kind === "coast" || kind === "country" ? kind : null;
+    // a town gets the countryside round it until it has a scene of its own
+    const k = kind === "town" ? "country" : kind === "city" || kind === "mountain" || kind === "coast" || kind === "country" ? kind : null;
     if (k === this.kind) return;
     this.kind = k;
     this.lay = null;
@@ -926,7 +927,7 @@ export class SettingScene {
 
   // the line-drawn worlds beyond Montana
   private world(): WorldKind | null {
-    return this.kind === "coast" ? "coast" : this.kind === "country" ? "farm" : null;
+    return this.kind === "coast" ? "coast" : this.kind === "country" ? "farm" : this.kind === "city" ? "city" : null;
   }
 
   private aura(g: CanvasRenderingContext2D, f: SettingFrame) {
@@ -964,7 +965,8 @@ export class SettingScene {
     }
     // and every so often, something happens (events.ts)
     const lp = this.lpano;
-    if (lp && this.L && this.kind !== "city") {
+    if (lp && this.L) {
+      if (process.env.NODE_ENV !== "production") Object.assign(window, { __mom: this.moments, __t: this.t });
       this.moments.step({
         g,
         w: f.w,
@@ -972,7 +974,7 @@ export class SettingScene {
         s: Math.max(0.8, Math.min(1.6, f.w / 390)),
         I: lp.I,
         L: this.L,
-        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast"),
+        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast" | "city"),
         season: f.season,
         weather: this.wxKind,
         hour: f.hour,

@@ -29,10 +29,26 @@ export function classify(o: { elevation: number | null; relief: number | null; p
   return "country";
 }
 
-// ?setting=city (or mountain) shows that scene wherever you are, and
-// ?setting=off shows none.
+// The scene someone picked in Settings ("auto" or nothing: from where they
+// are). Kept on the device.
+export const SCENE_KEY = "tt-scene";
+export type ScenePick = "auto" | "city" | "mountain" | "coast" | "country" | "off";
+const PICKS: ScenePick[] = ["auto", "city", "mountain", "coast", "country", "off"];
+export function scenePick(): ScenePick {
+  try {
+    const v = localStorage.getItem(SCENE_KEY) as ScenePick | null;
+    return v && PICKS.includes(v) ? v : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+// ?setting=city (or mountain, coast, country) shows that scene wherever you
+// are, and ?setting=off shows none; otherwise the scene picked in Settings
 export function settingOverride(): SettingKind | "off" | null {
   if (typeof window === "undefined") return null;
   const q = new URLSearchParams(window.location.search).get("setting");
-  return q === "off" || q === "city" || q === "mountain" || q === "coast" || q === "town" || q === "country" ? q : null;
+  if (q === "off" || q === "city" || q === "mountain" || q === "coast" || q === "town" || q === "country") return q;
+  const p = scenePick();
+  return p === "auto" ? null : p;
 }
