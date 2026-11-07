@@ -24,9 +24,12 @@ import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
 import { SignalCore } from "./SignalCore";
 import { HalloweenScene } from "./HalloweenScene";
+import { SettingScene, settingFor } from "./setting";
+import { settingOverride, type SettingKind } from "@/lib/setting";
 import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
+import { drawInkGlobe, inkMode } from "./ink";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -161,6 +164,7 @@ function newMotion(posted: boolean) {
     mt: 0,
     last: 0,
     wxShow: 0,
+    setShow: 0,
     look: { overcast: 0, wet: 0, frost: 0 } as Look,
     cam: { yaw: 0, pitch: 0, roll: 0 } as Camera,
     target: null as null | { yaw: number; pitch: number },
@@ -221,6 +225,8 @@ function newEls() {
     day: null as HTMLDivElement | null,
     sunShadow: null as HTMLDivElement | null,
     wxSky: null as HTMLCanvasElement | null,
+    setStill: null as HTMLCanvasElement | null,
+    setLive: null as HTMLCanvasElement | null,
     wxBack: null as HTMLCanvasElement | null,
     wxFront: null as HTMLCanvasElement | null,
     wxFlash: null as HTMLDivElement | null,
@@ -228,6 +234,7 @@ function newEls() {
     sphere: null as HTMLDivElement | null,
     beam: null as HTMLCanvasElement | null,
     ripples: null as HTMLCanvasElement | null,
+    inkGlobe: null as HTMLCanvasElement | null,
     sigCore: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
@@ -319,9 +326,23 @@ function Globe({
   const sim = useRef(new TileSim());
   const els = useRef(new Map<number, TileEls>());
   const R = useRef(newEls());
+  // the kind of place you're in, shown behind the globe (setting.ts)
+  const setting = useRef({ scene: null as SettingScene | null, kind: null as SettingKind | null, at: "" });
+  // the drawn look (ink.ts) also restyles the buttons and panels (globals.css)
+  useEffect(() => {
+    if (inkMode()) document.documentElement.dataset.ink = "";
+  }, []);
+  useEffect(() => {
+    const o = settingOverride();
+    if (o) setting.current.kind = o === "off" ? null : o;
+  }, []);
   const weather = useWeather((lat, lon) => {
     m.current.geo = { lat, lon };
     m.current.sunAt = 0;
+    const at = `${lat.toFixed(1)},${lon.toFixed(1)}`;
+    if (settingOverride() || setting.current.at === at) return;
+    setting.current.at = at;
+    settingFor(lat, lon).then((k) => void (setting.current.kind = k));
   });
   const wx = useRef({ weather, dark: false, scene: null as Scene | null, failed: false, season: "autumn" as Season, seasonAt: -Infinity });
   useLayoutEffect(() => {
@@ -803,13 +824,46 @@ function Globe({
         if (el.wxFront) el.wxFront.style.opacity = show.toFixed(3);
         s.look = w.scene.look;
       }
+      // the place you're in, behind it all
+      const st = setting.current;
+      if (!st.scene && el.setStill && el.setLive)
+        try {
+          st.scene = new SettingScene(el.setStill, el.setLive);
+        } catch {}
+      if (st.scene) {
+        st.scene.set(s.haunt ? null : st.kind);
+        const { L: Lw } = live.current;
+        const hide = s.lens !== null || s.coreOn || s.featOn;
+        s.setShow += ((hide ? 0 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.setShow) * ease(0.1, dt);
+        const d = clockNow();
+        st.scene.step(dt, w.weather, {
+          show: s.setShow,
+          w: Lw.w,
+          h: Lw.h,
+          cx: Lw.cx,
+          cy: Lw.cy,
+          R: Lw.R,
+          dk: s.dk,
+          day: s.sun.day,
+          warm: s.sky?.warm ?? 0,
+          warmC: s.sky?.warmC ?? [1, 1, 1],
+          el: s.sun.el,
+          az: s.sun.az,
+          season: w.scene ? w.season : (seasonOverride() ?? seasonAt(d, s.geo.lat)),
+          hour: d.getHours() + d.getMinutes() / 60,
+          temp: tempOverride() ?? w.weather?.temp ?? null,
+          yaw: s.yaw,
+        });
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     const w = wx.current;
+    const st = setting.current;
     return () => {
       cancelAnimationFrame(raf);
       w.scene = null;
+      st.scene = null;
     };
   }, []);
 
@@ -1082,7 +1136,17 @@ function Globe({
           className="display text-[26px] leading-[1.1] transition-colors duration-500"
           style={hw ? { color: hw.title, fontFamily: hw.titleFont, textShadow: hw.titleGlow, fontWeight: 400, letterSpacing: "0.02em", fontSize: hw.titleSize } : { color: ink }}
         >
-          {hw ? "TopTrack" : <Wordmark light={inkLight} size={31} />}
+          {hw ? (
+            "TopTrack"
+          ) : (
+            <>
+              <Wordmark light={inkLight} size={31} />
+              {/* the drawn look's hand-lettered name (globals.css, [data-ink]) */}
+              <span className="ink-word" aria-hidden>
+                TopTrack
+              </span>
+            </>
+          )}
         </h1>
         <Clock color={muted} />
         {posted && !launching && <Countdown color={muted} timeZone={me.timezone} />}
@@ -1139,6 +1203,9 @@ function Globe({
         {size && hw && <HalloweenScene name={hw.name} layer="back" w={L.w} h={L.h} cx={L.cx} cy={L.cy} R={L.R} />}
         {/* clouds, then the weather and seasons further away than the globe's middle */}
         <canvas ref={(el) => void (R.current.wxSky = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* where you are: a skyline, a mountain village (setting.ts) */}
+        <canvas ref={(el) => void (R.current.setStill = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <canvas ref={(el) => void (R.current.setLive = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         <div
@@ -1160,6 +1227,8 @@ function Globe({
         />
         <canvas ref={(el) => void (R.current.beam = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.ripples = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* the drawn look's ink ball (ink.ts) */}
+        <canvas ref={(el) => void (R.current.inkGlobe = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div
           ref={(el) => void (R.current.world = el)}
           className="preserve-3d absolute z-[1] h-0 w-0"
@@ -1265,6 +1334,13 @@ function Globe({
       {welcomeSeen && !help && !tour && !keyOn && <InstallCard />}
       {welcomeSeen && !help && !tour && !keyOn && <NotifyCard api={api} />}
 
+      {/* the drawn look's wobbly ink edge (globals.css, [data-ink]) */}
+      <svg aria-hidden width="0" height="0" className="absolute">
+        <filter id="ink-wobble">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" />
+          <feDisplacementMap in="SourceGraphic" scale="3.2" />
+        </filter>
+      </svg>
       {/* left tabs */}
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
         {(
@@ -1676,6 +1752,28 @@ sim: TileSim,
     r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(${glass},${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk + 0.12 * warm * direct).toFixed(3)}) 0%, rgba(${glass},0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
     r.sphere.style.boxShadow = dk > 0 ? `0 0 ${(40 * dk).toFixed(0)}px rgba(180,210,255,${(0.08 * dk).toFixed(3)})` : "";
   }
+  if (inkMode()) {
+    // the drawn look: an ink ball instead of the glass one
+    const op = (1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3);
+    if (r.sphere) r.sphere.style.opacity = "0";
+    if (r.sunShadow) r.sunShadow.style.opacity = "0";
+    if (r.floor) r.floor.style.opacity = "0";
+    drawInkGlobe(r.inkGlobe, {
+      w: L.w,
+      h: L.h,
+      cx: L.cx,
+      cy: L.cy,
+      R: L.R + 8,
+      Rb,
+      zoom: s.zoom,
+      cam,
+      op,
+      dk,
+      day,
+      sun: Lc,
+      t: s.t,
+    });
+  }
   if (s.sky && r.day && s.sky.bg !== s.skyBg) {
     s.skyBg = s.sky.bg;
     r.day.style.background = s.skyBg;
@@ -1851,6 +1949,12 @@ const TileLayer = memo(function TileLayer({
         <div
           key={i}
           ref={(el) => void (te.facets[i] = el)}
+          data-facet=""
+          data-wait={wait ? "" : undefined}
+          data-t={row === 0 ? "" : undefined}
+          data-b={row === 2 ? "" : undefined}
+          data-l={col === 0 ? "" : undefined}
+          data-r={col === 2 ? "" : undefined}
           className="backface-hidden absolute box-border overflow-hidden"
           style={{
             left: l0,
