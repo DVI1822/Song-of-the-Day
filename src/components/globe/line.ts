@@ -51,7 +51,8 @@ export function inksFor(L: Light, season: Season, style: number): Inks {
   const chalk = Math.max(0, Math.min(1, (n - 0.62) / 0.25));
   const inkC = mix([26, 24, 34], [214, 222, 246], chalk * chalk * (3 - 2 * chalk));
   const sky = L.haze;
-  const dim = (c: C) => mix(c, mix(sky, [16, 20, 40], 0.4), n * 0.8);
+  // colours hold through golden hour and only sink once it's getting dark
+  const dim = (c: C) => mix(c, mix(sky, [16, 20, 40], 0.4), Math.pow(n, 1.6) * 0.78);
   let fill: [C, C, C];
   let snow: C, water: C, wall: C, roof: C, tree: C, meadow: C;
   let paint: (c: C, k: number) => C = (c) => mix(sky, c, 0.2);
@@ -677,6 +678,25 @@ export function liveLines(g: CanvasRenderingContext2D, lay: PixLayout, I: Inks, 
     g.stroke();
   };
   const night = I.night > 0.5;
+  // the river running: short glints sliding downstream, toward you
+  if (!I.snowy || L.snow < 0.9) {
+    g.strokeStyle = night ? "rgba(220,235,255,0.35)" : "rgba(255,255,255,0.85)";
+    g.lineWidth = 1;
+    for (let i = 0; i < lay.river.length; i++) {
+      const r = lay.river[i];
+      if (r.hw < 1.2) continue;
+      const ph = (((i - t * 5) % 11) + 11) % 11;
+      if (ph > 1) continue;
+      const y = (lay.valley + i) * P;
+      const off = Math.sin(i * 1.7) * r.hw * 0.45;
+      const len = Math.max(0.6, r.hw * 0.45) * P;
+      g.beginPath();
+      g.moveTo(X(r.c + off) - len / 2, y);
+      g.lineTo(X(r.c + off) + len / 2, y);
+      g.stroke();
+    }
+    g.strokeStyle = I.ink;
+  }
   // smoke: little curls rising and drifting downwind
   const wind = 0.4 + Math.min(1, L.wind / 8);
   for (const hs of lay.houses) {

@@ -3,6 +3,7 @@ import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
 import { drawLinePano, lineOffset, liveLines, paintLinePano, type LinePano } from "./line";
+import { Moments } from "./events";
 import { liveWorld, paintWorldPano, type WorldKind, type WorldPano } from "./world";
 import { PIX, drawPano, livePixels, paintPano, panoOffset, pixLayout, type Comp, type Pano, type PixLayout } from "./pixel";
 
@@ -804,6 +805,8 @@ export class SettingScene {
   private live: CanvasRenderingContext2D;
   private kind: "city" | "mountain" | "coast" | "country" | null = null;
   private wpano: WorldPano | null = null;
+  private moments = new Moments();
+  private wxKind = "clear";
   private lay: CityLayout | MtnLayout | null = null;
   private pix: PixLayout[] | null = null;
   private pano: Pano | null = null;
@@ -845,6 +848,7 @@ export class SettingScene {
 
   step(dt: number, wx: Weather | null, f: SettingFrame) {
     if (!this.kind) return;
+    this.wxKind = wx?.kind ?? "clear";
     this.t += dt;
     const show = f.show < 0.02 ? 0 : f.show;
     if (Math.abs(show - this.lastShow) > 0.005) {
@@ -957,6 +961,23 @@ export class SettingScene {
     } else if (this.pix && this.pano) {
       const off = panoOffset(this.pano, f.yaw ?? 0, f.R, 2);
       this.pix.forEach((lay, i) => livePixels(g, lay, this.L!, this.t + i * 23, i * lay.W - off, this.pano!.W, i === 0));
+    }
+    // and every so often, something happens (events.ts)
+    const lp = this.lpano;
+    if (lp && this.L && this.kind !== "city") {
+      this.moments.step({
+        g,
+        w: f.w,
+        h: f.h,
+        s: Math.max(0.8, Math.min(1.6, f.w / 390)),
+        I: lp.I,
+        L: this.L,
+        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast"),
+        season: f.season,
+        weather: this.wxKind,
+        hour: f.hour,
+        t: this.t,
+      });
     }
   }
 

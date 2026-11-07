@@ -3,8 +3,8 @@
 // ?ink=1 turns it on (and remembers it), ?ink=0 turns it off.
 //
 // What changes: the glass ball becomes an ink circle with a few lines of
-// latitude and longitude turning with it, a couple of shine marks and a
-// hatched shadow on the ground; the songs get an ink outline; the core's
+// latitude and longitude turning with it and a couple of shine marks (no
+// shadow on the ground); the songs get an ink outline; the core's
 // neon rings are drawn in ink with a coral and a green one; and the buttons,
 // tabs and panels become paper with a wobbly ink edge (globals.css, under
 // [data-ink]). The lines "boil" a few times a second, the way hand-drawn
@@ -96,7 +96,6 @@ export type InkGlobeFrame = {
   day: number;
   sun: V3; // toward the sun, camera space
   t: number;
-  shadow: { cx: number; cy: number; w: number; h: number; a: number } | null;
 };
 
 export function drawInkGlobe(cv: HTMLCanvasElement | null, f: InkGlobeFrame) {
@@ -115,32 +114,6 @@ export function drawInkGlobe(cv: HTMLCanvasElement | null, f: InkGlobeFrame) {
   const night = f.dk > 0.6;
   const ink = night ? CHALK : INK;
   const b = boil(f.t);
-
-  // the shadow on the ground: an ellipse of diagonal hatching
-  if (f.shadow && f.shadow.a > 0.02) {
-    const s = f.shadow;
-    g.save();
-    g.beginPath();
-    g.ellipse(s.cx, s.cy, s.w * 0.26, s.h * 0.26, 0, 0, TAU);
-    g.clip();
-    g.strokeStyle = css(ink, Math.min(0.55, 0.25 + s.a));
-    g.lineWidth = 1;
-    for (let x = s.cx - s.w; x < s.cx + s.w; x += 5) {
-      g.beginPath();
-      g.moveTo(x + noise(x, b) * 0.6, s.cy + s.h);
-      g.lineTo(x + s.h * 1.2 + noise(x + 9, b) * 0.6, s.cy - s.h);
-      g.stroke();
-    }
-    g.restore();
-    g.strokeStyle = css(ink, 0.5);
-    g.lineWidth = 1.2;
-    const rim: [number, number][] = [];
-    for (let i = 0; i <= 48; i++) {
-      const a = (i / 48) * TAU;
-      rim.push([s.cx + Math.cos(a) * s.w * 0.26, s.cy + Math.sin(a) * s.h * 0.26]);
-    }
-    wobbly(g, rim, 30 + b, 0.7);
-  }
 
   // lines of latitude and longitude, turning with the songs; the far side
   // faint and broken, seen through the glass

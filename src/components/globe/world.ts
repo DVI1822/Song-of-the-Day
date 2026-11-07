@@ -556,6 +556,29 @@ const coast = {
       g.lineWidth = lw;
       g.stroke();
     };
+    // the sea glinting: little ticks of light that come and go, thicker
+    // where the sun is, drifting slowly with the swell
+    {
+      const hz = h * coast.hz;
+      const glint = I.night > 0.6 ? "rgba(220,235,255,0.5)" : "rgba(255,255,255,0.9)";
+      g.strokeStyle = glint;
+      g.lineWidth = 1;
+      for (let i = 0; i < 36; i++) {
+        const life = (t * 0.35 + hash(i * 3.3)) % 1;
+        if (life > 0.5) continue;
+        const a = Math.sin((life / 0.5) * Math.PI);
+        const x = hash(i * 7.1) * PW + t * 3;
+        const y = hz + 3 + hash(i * 5.7) * (h * 0.055);
+        const len = (2 + 4 * hash(i)) * a;
+        g.globalAlpha = a;
+        g.beginPath();
+        g.moveTo(X(x, 1) - len, y);
+        g.lineTo(X(x, 1) + len, y);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.strokeStyle = ink;
+    }
     // the surf: a line of foam running up the sand and sliding back, in
     // short stretches so it breaks up like real waves
     const night = I.night > 0.5;
@@ -1233,6 +1256,20 @@ const farm = {
         g.stroke();
       }
       g.globalAlpha = 1;
+    }
+    // the pond: rings spreading where a fish rose or a bug landed
+    if (!I.snowy) {
+      for (let i = 0; i < 2; i++) {
+        const life = (t * 0.25 + i * 0.5) % 1;
+        const px = w * 3 + w * (0.6 + 0.12 * hash(Math.floor(t * 0.25 + i * 0.5) * 3 + i)),
+          py = h * 0.836;
+        g.strokeStyle = `rgba(255,255,255,${(0.8 * (1 - life)).toFixed(3)})`;
+        g.lineWidth = 0.9;
+        g.beginPath();
+        g.ellipse(X(px, 2), py, 2 + life * 9, 0.6 + life * 1.8, 0, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.strokeStyle = css(I.inkC, 0.9);
     }
     // cows grazing in the pasture, heads going up and down
     for (let i = 0; i < 3; i++) {

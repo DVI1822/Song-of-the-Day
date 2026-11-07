@@ -1721,7 +1721,6 @@ sim: TileSim,
   const sElv = Math.sin(sun.el),
     cElv = Math.cos(sun.el);
   const roomOp = (1 - reveal) * (1 - lensP) * (1 - dk);
-  let inkShadow: { cx: number; cy: number; w: number; h: number; a: number } | null = null;
   if (r.sunShadow) {
     const cot = Math.min(2.2, cElv / Math.max(0.05, sElv));
     const lx = Math.sin(sun.az),
@@ -1732,7 +1731,6 @@ sim: TileSim,
     const cx = L.cx - lx * len,
       cy = L.cy + 216 * L.s - lz * len * 0.3;
     const a = (0.12 * (1 - day) + (day * 0.72) / (1 + 0.3 * cot)) * (0.35 + 0.65 * direct);
-    inkShadow = { cx, cy, w, h, a };
     const st = r.sunShadow.style;
     st.left = (cx - w / 2).toFixed(1) + "px";
     st.top = (cy - h / 2).toFixed(1) + "px";
@@ -1774,7 +1772,6 @@ sim: TileSim,
       day,
       sun: Lc,
       t: s.t,
-      shadow: inkShadow && { ...inkShadow, a: inkShadow.a * roomOp },
     });
   }
   if (s.sky && r.day && s.sky.bg !== s.skyBg) {
