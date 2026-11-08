@@ -29,7 +29,11 @@ export function locateNow(done?: (ok: boolean) => void) {
   if (!("geolocation" in navigator)) return done?.(false);
   navigator.geolocation.getCurrentPosition(
     (g) => {
-      window.dispatchEvent(new CustomEvent(LOCATED, { detail: { lat: g.coords.latitude, lon: g.coords.longitude } }));
+      window.dispatchEvent(
+        new CustomEvent(LOCATED, {
+          detail: { lat: g.coords.latitude, lon: g.coords.longitude },
+        }),
+      );
       done?.(true);
     },
     () => done?.(false),
@@ -76,7 +80,12 @@ export function LocateCard() {
 
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center px-5">
-      <button type="button" aria-label="Close" onClick={close} className="absolute inset-0 cursor-default bg-[#0D2A3F]/30" />
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={close}
+        className="absolute inset-0 cursor-default bg-[#0D2A3F]/30"
+      />
       <div
         role="dialog"
         aria-label="Show where you are"
@@ -86,8 +95,8 @@ export function LocateCard() {
         <PinIcon />
         <h2 className="display text-[24px] leading-tight">Show where you are</h2>
         <p className="text-[15px] leading-relaxed">
-          Behind your Globe is a drawing of your kind of place: mountains, the coast, farmland or the city, with your real
-          sky and weather. Your location only picks the scene. It&apos;s never shown to anyone.
+          Behind your Globe is a drawing of your kind of place: mountains, the coast, the suburbs, farmland or the city,
+          with your real sky and weather. Your location only picks the scene. It&apos;s never shown to anyone.
         </p>
         <button
           type="button"
@@ -107,7 +116,17 @@ export function LocateCard() {
 
 const PinIcon = () => (
   <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
-    <svg aria-hidden width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden
+      width="26"
+      height="26"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" />
       <circle cx="12" cy="9.5" r="2.5" />
     </svg>

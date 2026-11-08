@@ -10,6 +10,7 @@ const OPTIONS: [ScenePick, string][] = [
   ["auto", "Where I am"],
   ["mountain", "Mountains"],
   ["coast", "Coast"],
+  ["suburb", "Suburbs"],
   ["country", "Farmland"],
   ["city", "City"],
   ["off", "None"],
@@ -36,7 +37,11 @@ export function ScenePicker() {
   const locate = () => {
     setNote("Finding you…");
     locateNow((ok) =>
-      setNote(ok ? "Got it. Your Globe will show where you are." : "Location is off for TopTrack. You can turn it on in your phone's settings."),
+      setNote(
+        ok
+          ? "Got it. Your Globe will show where you are."
+          : "Location is off for TopTrack. You can turn it on in your phone's settings.",
+      ),
     );
   };
   return (
@@ -56,7 +61,11 @@ export function ScenePicker() {
         ))}
       </div>
       {pick === "auto" && (
-        <button type="button" onClick={locate} className="self-start text-sm font-semibold text-accent underline underline-offset-2">
+        <button
+          type="button"
+          onClick={locate}
+          className="self-start text-sm font-semibold text-accent underline underline-offset-2"
+        >
           Use my phone&apos;s location
         </button>
       )}

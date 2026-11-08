@@ -14,10 +14,12 @@ import { Pen, css, inksFor, mix, type Inks, type LinePano } from "./line";
 //          with a scarecrow, a pasture with cows and a pond
 //   city:  downtown across a river, a stone suspension bridge, a park with
 //          a Ferris wheel, a street of houses with a corner diner
+//   suburb: a street of houses with yards, a playground, the elementary
+//          school, a strip mall
 
 type Pt = [number, number];
 
-export type WorldKind = "coast" | "farm" | "city";
+export type WorldKind = "coast" | "farm" | "city" | "suburb";
 
 type Kit = {
   pens: Pen[]; // one per layer: far, middle, near
@@ -115,8 +117,20 @@ const coast = {
     const hz = h * this.hz;
     const sea = I.paint([70, 146, 206], 0.14);
     // the sea, with the horizon and a few rows of little wave marks
-    pens[1].fillOnly([[-8, hz], [PW + 8, hz], [PW + 8, h + 8], [-8, h + 8]], I.snowy ? mix(sea, [230, 236, 246], 0.3) : sea);
-    pens[1].stroke(curve(() => hz, -8, PW + 8, 40), 1.2, 1);
+    pens[1].fillOnly(
+      [
+        [-8, hz],
+        [PW + 8, hz],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      I.snowy ? mix(sea, [230, 236, 246], 0.3) : sea,
+    );
+    pens[1].stroke(
+      curve(() => hz, -8, PW + 8, 40),
+      1.2,
+      1,
+    );
     for (let r = 1; r < 6; r++) {
       const y = hz + (h * 0.07 * (r / 6)) ** 1 * 1;
       const gap = 40 + r * 12;
@@ -240,7 +254,12 @@ const coast = {
         ],
         1.3,
       );
-      pen.shape(rect(lx - tw * 0.8, gy - h * 0.018, tw * 1.6, h * 0.018), I.lit ? I.window : I.paint([200, 220, 236], 0.04), 1.1, 3);
+      pen.shape(
+        rect(lx - tw * 0.8, gy - h * 0.018, tw * 1.6, h * 0.018),
+        I.lit ? I.window : I.paint([200, 220, 236], 0.04),
+        1.1,
+        3,
+      );
       pen.shape(ellipse(lx, gy - h * 0.018, tw * 1.1, h * 0.012, 14, Math.PI, TAU), red, 1.2, 4);
       for (let i = -1; i <= 1; i++)
         pen.stroke(
@@ -393,7 +412,12 @@ const coast = {
         for (let i = 0; i < 4; i++) {
           const a0 = Math.PI + (i * Math.PI) / 4,
             a1 = Math.PI + ((i + 1) * Math.PI) / 4;
-          pen.shape([[cx, cy], ...ellipse(cx, cy, r, r * 0.55, 6, a0, a1)], i % 2 ? I.paint([250, 248, 240], 0.04) : c, 1.1, i + x);
+          pen.shape(
+            [[cx, cy], ...ellipse(cx, cy, r, r * 0.55, 6, a0, a1)],
+            i % 2 ? I.paint([250, 248, 240], 0.04) : c,
+            1.1,
+            i + x,
+          );
         }
       };
       if (!I.snowy) {
@@ -745,7 +769,12 @@ const farm = {
         const mid = 1 - Math.abs(j - (n - 1) / 2) / Math.max(1, n / 2);
         const rr = 2.6 + hash(i * 5 + j) * 1.6 + mid * 1.4;
         const by = this.hills(k, cx) + 1;
-        pens[0].shape(ellipse(cx, by - rr * 0.95, rr * 0.9, rr, 12), winter ? I.paint([150, 150, 160], 0.36) : I.paint([70, 120, 80], 0.36), 1, i + j);
+        pens[0].shape(
+          ellipse(cx, by - rr * 0.95, rr * 0.9, rr, 12),
+          winter ? I.paint([150, 150, 160], 0.36) : I.paint([70, 120, 80], 0.36),
+          1,
+          i + j,
+        );
         cx += rr * (1 + hash(i + j * 13) * 0.5);
       }
     }
@@ -827,8 +856,16 @@ const farm = {
       ],
       road,
     );
-    pens[2].stroke(curve(() => ry, -8, PW + 8, 30), 1.2, 6);
-    pens[2].stroke(curve(() => ry + h * 0.022, -8, PW + 8, 30), 1.2, 7);
+    pens[2].stroke(
+      curve(() => ry, -8, PW + 8, 30),
+      1.2,
+      6,
+    );
+    pens[2].stroke(
+      curve(() => ry + h * 0.022, -8, PW + 8, 30),
+      1.2,
+      7,
+    );
     for (let j = 0; j < 30; j++) {
       const gx = hash(j * 11) * PW,
         gy = ry + 3 + hash(j * 5) * (h * 0.022 - 6);
@@ -956,7 +993,12 @@ const farm = {
         [-0.6, 0.38],
         [0.4, 0.38],
       ])
-        pen.shape(rect(hx + hw * fx, base - hh * fy, 6, 6), I.lit ? I.window : I.paint([150, 190, 220], 0.04), 1, fx + fy);
+        pen.shape(
+          rect(hx + hw * fx, base - hh * fy, 6, 6),
+          I.lit ? I.window : I.paint([150, 190, 220], 0.04),
+          1,
+          fx + fy,
+        );
       pen.stroke(
         [
           [hx - hw - 2, base - hh * 0.5],
@@ -1035,7 +1077,11 @@ const farm = {
       const top = h * 0.81,
         base = h * 0.868;
       const stalk: C =
-        I.snowy || season === "winter" ? I.paint([196, 176, 130], 0.04) : season === "autumn" ? I.paint([214, 184, 100], 0.04) : I.paint([104, 168, 72], 0.04);
+        I.snowy || season === "winter"
+          ? I.paint([196, 176, 130], 0.04)
+          : season === "autumn"
+            ? I.paint([214, 184, 100], 0.04)
+            : I.paint([104, 168, 72], 0.04);
       const tall = I.snowy || season === "winter" ? 0.25 : 1;
       // the field as one mass with a ragged tassel line on top, split for
       // the scarecrow; only the front row is drawn stalk by stalk
@@ -1048,7 +1094,8 @@ const farm = {
           xb = x0 + w * b;
         const ht = 22 * tall;
         const crest: Pt[] = [];
-        for (let x = xa; x <= xb + 0.1; x += 3) crest.push([x, base - ht + (Math.round((x - xa) / 3) % 2 ? 1.6 : -0.6) * tall + (hash(x * 1.7) - 0.5) * 1.6]);
+        for (let x = xa; x <= xb + 0.1; x += 3)
+          crest.push([x, base - ht + (Math.round((x - xa) / 3) % 2 ? 1.6 : -0.6) * tall + (hash(x * 1.7) - 0.5) * 1.6]);
         pen.shape([[xa, base], ...crest, [xb, base]], stalk, 1.1, a);
         // a few rows of leaves hinted inside
         const g = pen.g;
@@ -1062,7 +1109,8 @@ const farm = {
           g.quadraticCurveTo(x + sd * 3, y - 3, x + sd * 5, y + 0.5);
           g.stroke();
         }
-        for (let x = xa + 3; x < xb - 2; x += 9 + hash(x + 1) * 3) g2(pen, x, base + 3, ht * (0.75 + hash(x * 3) * 0.2), leafInk, tall < 1);
+        for (let x = xa + 3; x < xb - 2; x += 9 + hash(x + 1) * 3)
+          g2(pen, x, base + 3, ht * (0.75 + hash(x * 3) * 0.2), leafInk, tall < 1);
       }
       // the scarecrow
       const sx = x0 + w * 0.58,
@@ -1374,7 +1422,18 @@ function g2(pen: Pen, x: number, base: number, h: number, c: C, stubble: boolean
 // ---------------------------------------------------------------------------
 
 // a grid of windows on a building face; some lit after dark
-function windows(pen: Pen, I: Inks, x: number, y: number, bw: number, bh: number, cols: number, rows: number, seed: number, glass: C) {
+function windows(
+  pen: Pen,
+  I: Inks,
+  x: number,
+  y: number,
+  bw: number,
+  bh: number,
+  cols: number,
+  rows: number,
+  seed: number,
+  glass: C,
+) {
   const gx = bw / cols,
     gy = bh / rows;
   const ww = Math.max(2, gx * 0.5),
@@ -1382,7 +1441,12 @@ function windows(pen: Pen, I: Inks, x: number, y: number, bw: number, bh: number
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
       const lit = I.lit && hash(seed * 13.7 + r * 7.1 + c * 3.3) > 0.42;
-      pen.shape(rect(x + gx * c + (gx - ww) / 2, y + gy * r + (gy - wh) / 2, ww, wh), lit ? I.window : glass, 0.7, seed + r + c * 0.1);
+      pen.shape(
+        rect(x + gx * c + (gx - ww) / 2, y + gy * r + (gy - wh) / 2, ww, wh),
+        lit ? I.window : glass,
+        0.7,
+        seed + r + c * 0.1,
+      );
     }
 }
 
@@ -1464,12 +1528,27 @@ const city = {
         if (I.lit)
           for (let r = 0; r < b.bh / 7 - 1; r++)
             for (let c = 0; c < b.bw / 6 - 1; c++)
-              if (hash(b.i * 9 + r * 3 + c) > 0.6) pens[0].fillOnly(rect(x + 3 + c * 6, top + 4 + r * 7, 2, 2.5), I.window);
+              if (hash(b.i * 9 + r * 3 + c) > 0.6)
+                pens[0].fillOnly(rect(x + 3 + c * 6, top + 4 + r * 7, 2, 2.5), I.window);
       }
     // the river, with a few rows of little wave marks
-    const water: C = I.snowy ? mix(I.paint([84, 140, 190], 0.14), [220, 230, 240], 0.25) : I.paint([84, 140, 190], 0.14);
-    pens[1].fillOnly([[-8, hz], [PW + 8, hz], [PW + 8, bank + 2], [-8, bank + 2]], water);
-    pens[1].stroke(curve(() => hz, -8, PW + 8, 40), 1.2, 1);
+    const water: C = I.snowy
+      ? mix(I.paint([84, 140, 190], 0.14), [220, 230, 240], 0.25)
+      : I.paint([84, 140, 190], 0.14);
+    pens[1].fillOnly(
+      [
+        [-8, hz],
+        [PW + 8, hz],
+        [PW + 8, bank + 2],
+        [-8, bank + 2],
+      ],
+      water,
+    );
+    pens[1].stroke(
+      curve(() => hz, -8, PW + 8, 40),
+      1.2,
+      1,
+    );
     for (let r = 1; r < 5; r++) {
       const y = hz + (bank - hz) * (r / 5);
       const gap = 36 + r * 10;
@@ -1488,9 +1567,25 @@ const city = {
     }
     // our side: a paved walk along the water with a railing
     const paving: C = I.snowy ? I.snow : I.paint([222, 212, 192], 0.04);
-    pens[2].fillOnly([[-8, bank], [PW + 8, bank], [PW + 8, h + 8], [-8, h + 8]], paving);
-    pens[2].stroke(curve(() => bank, -8, PW + 8, 30), 1.3, 2);
-    pens[2].stroke(curve(() => bank - 7, -8, PW + 8, 30), 1.1, 3);
+    pens[2].fillOnly(
+      [
+        [-8, bank],
+        [PW + 8, bank],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      paving,
+    );
+    pens[2].stroke(
+      curve(() => bank, -8, PW + 8, 30),
+      1.3,
+      2,
+    );
+    pens[2].stroke(
+      curve(() => bank - 7, -8, PW + 8, 30),
+      1.1,
+      3,
+    );
     for (let x = 0; x < PW; x += 12)
       pens[2].stroke(
         [
@@ -1510,8 +1605,20 @@ const city = {
         x,
       );
     // the street: kerb, asphalt, a dashed middle line, and the far pavement
-    const road: C = I.snowy ? mix(I.paint([120, 124, 136], 0.04), [230, 234, 240], 0.35) : I.paint([120, 124, 136], 0.04);
-    pens[2].shape([[-8, s0], [PW + 8, s0], [PW + 8, s1], [-8, s1]], road, 1.3, 4);
+    const road: C = I.snowy
+      ? mix(I.paint([120, 124, 136], 0.04), [230, 234, 240], 0.35)
+      : I.paint([120, 124, 136], 0.04);
+    pens[2].shape(
+      [
+        [-8, s0],
+        [PW + 8, s0],
+        [PW + 8, s1],
+        [-8, s1],
+      ],
+      road,
+      1.3,
+      4,
+    );
     for (let x = 6; x < PW; x += 26)
       pens[2].stroke(
         [
@@ -1523,7 +1630,15 @@ const city = {
       );
     // the near pavement, then a strip of grass with a hydrant here and there
     const s2 = s1 + h * 0.035;
-    pens[2].fillOnly([[-8, s1], [PW + 8, s1], [PW + 8, s2], [-8, s2]], paving);
+    pens[2].fillOnly(
+      [
+        [-8, s1],
+        [PW + 8, s1],
+        [PW + 8, s2],
+        [-8, s2],
+      ],
+      paving,
+    );
     for (let x = 0; x < PW; x += 30)
       pens[2].stroke(
         [
@@ -1534,7 +1649,17 @@ const city = {
         x,
       );
     const verge: C = I.snowy ? I.snow : I.paint([132, 182, 104], 0.04);
-    pens[2].shape([[-8, s2], [PW + 8, s2], [PW + 8, h + 8], [-8, h + 8]], verge, 1.2, 6);
+    pens[2].shape(
+      [
+        [-8, s2],
+        [PW + 8, s2],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      verge,
+      1.2,
+      6,
+    );
     if (!I.snowy)
       for (let i = 0; i < PW / 14; i++) {
         const x = hash(i * 3.7) * PW,
@@ -2032,13 +2157,58 @@ const city = {
     {
       const tx = (t * 6 + w * 0.3) % PW,
         ty = bank - 9;
-      box([[tx - 12, ty], [tx + 10, ty], [tx + 7, ty + 5], [tx - 10, ty + 5]], 1, css(I.paint([214, 80, 70], 0.1)));
-      box([[tx - 6, ty - 7], [tx + 2, ty - 7], [tx + 2, ty], [tx - 6, ty]], 1, css(I.paint([246, 240, 226], 0.1)));
-      box([[tx - 4, ty - 12], [tx - 1, ty - 12], [tx - 1, ty - 7], [tx - 4, ty - 7]], 1, css(I.paint([60, 60, 70], 0.1)));
+      box(
+        [
+          [tx - 12, ty],
+          [tx + 10, ty],
+          [tx + 7, ty + 5],
+          [tx - 10, ty + 5],
+        ],
+        1,
+        css(I.paint([214, 80, 70], 0.1)),
+      );
+      box(
+        [
+          [tx - 6, ty - 7],
+          [tx + 2, ty - 7],
+          [tx + 2, ty],
+          [tx - 6, ty],
+        ],
+        1,
+        css(I.paint([246, 240, 226], 0.1)),
+      );
+      box(
+        [
+          [tx - 4, ty - 12],
+          [tx - 1, ty - 12],
+          [tx - 1, ty - 7],
+          [tx - 4, ty - 7],
+        ],
+        1,
+        css(I.paint([60, 60, 70], 0.1)),
+      );
       const fx = PW - ((t * 4 + w * 1.7) % PW),
         fy = hz + 7;
-      box([[fx - 16, fy], [fx + 16, fy], [fx + 13, fy + 4], [fx - 13, fy + 4]], 1, css(I.paint([246, 210, 90], 0.2)));
-      box([[fx - 11, fy - 6], [fx + 11, fy - 6], [fx + 11, fy], [fx - 11, fy]], 1, css(I.paint([250, 248, 240], 0.2)));
+      box(
+        [
+          [fx - 16, fy],
+          [fx + 16, fy],
+          [fx + 13, fy + 4],
+          [fx - 13, fy + 4],
+        ],
+        1,
+        css(I.paint([246, 210, 90], 0.2)),
+      );
+      box(
+        [
+          [fx - 11, fy - 6],
+          [fx + 11, fy - 6],
+          [fx + 11, fy],
+          [fx - 11, fy],
+        ],
+        1,
+        css(I.paint([250, 248, 240], 0.2)),
+      );
       for (let i = -2; i <= 2; i++) {
         g.fillStyle = night ? css(I.window) : css(I.paint([150, 190, 220], 0.2));
         g.fillRect(X(fx + i * 4, 1) - 1.2, fy - 4, 2.4, 2.2);
@@ -2056,7 +2226,17 @@ const city = {
         [120, 170, 220],
         [240, 240, 236],
       ];
-      box([[x - 5, y], [x - 4, y - 4], [x + 4, y - 4], [x + 5, y]], 1, css(I.paint(cl[i], 0.12)), 0.9);
+      box(
+        [
+          [x - 5, y],
+          [x - 4, y - 4],
+          [x + 4, y - 4],
+          [x + 5, y],
+        ],
+        1,
+        css(I.paint(cl[i], 0.12)),
+        0.9,
+      );
     }
     // the bridge's string of lights along its cables after dark
     if (I.night > 0.45) {
@@ -2237,7 +2417,858 @@ const city = {
   },
 };
 
-const WORLDS = { coast, farm, city };
+// ---------------------------------------------------------------------------
+// the suburbs
+// ---------------------------------------------------------------------------
+
+// a house: walls, a gable roof, a door, windows, maybe a garage
+function house(
+  pen: Pen,
+  I: Inks,
+  x: number,
+  base: number,
+  bw: number,
+  ht: number,
+  wall: C,
+  roof: C,
+  garage: boolean,
+  seed: number,
+) {
+  const glass: C = I.paint([200, 224, 240], 0.04);
+  pen.shape(rect(x, base - ht, bw, ht), wall, 1.3, seed);
+  pen.shape(
+    [
+      [x - 4, base - ht],
+      [x + bw / 2, base - ht - ht * 0.75],
+      [x + bw + 4, base - ht],
+    ],
+    roof,
+    1.3,
+    seed + 1,
+  );
+  // a round window up in the gable
+  pen.shape(ellipse(x + bw / 2, base - ht - ht * 0.3, 3, 3, 10), I.lit ? I.window : glass, 0.9, seed + 2);
+  const dx = x + bw * 0.42;
+  pen.shape(rect(dx, base - ht * 0.55, bw * 0.14, ht * 0.55), I.paint([120, 90, 70], 0.04), 1.1, seed + 3);
+  pen.shape(ellipse(dx + bw * 0.11, base - ht * 0.28, 0.9, 0.9, 6), I.paint([240, 210, 120], 0.04), 0.6, seed + 4);
+  for (const f of [0.1, 0.66]) {
+    const wx = x + bw * f,
+      wy = base - ht * 0.75;
+    const lit = I.lit && hash(seed * 3 + f) > 0.35;
+    pen.shape(rect(wx, wy, bw * 0.22, ht * 0.38), lit ? I.window : glass, 1, seed + f);
+    pen.stroke(
+      [
+        [wx + bw * 0.11, wy],
+        [wx + bw * 0.11, wy + ht * 0.38],
+      ],
+      0.6,
+      seed + f + 1,
+    );
+    // shutters
+    for (const s of [-3, bw * 0.22])
+      pen.shape(rect(wx + s, wy, 3, ht * 0.38), mix(roof, [255, 255, 255], 0.15), 0.7, seed + s);
+  }
+  if (garage) {
+    const gx = x + bw,
+      gw = bw * 0.5,
+      gh = ht * 0.72;
+    pen.shape(rect(gx, base - gh, gw, gh), wall, 1.3, seed + 6);
+    pen.shape(
+      [
+        [gx, base - gh],
+        [gx + gw / 2, base - gh - gh * 0.4],
+        [gx + gw + 3, base - gh],
+      ],
+      roof,
+      1.2,
+      seed + 7,
+    );
+    pen.shape(
+      rect(gx + gw * 0.12, base - gh * 0.75, gw * 0.76, gh * 0.75),
+      I.paint([236, 236, 230], 0.04),
+      1,
+      seed + 8,
+    );
+    for (let r = 1; r < 4; r++)
+      pen.stroke(
+        [
+          [gx + gw * 0.12, base - gh * 0.75 + (gh * 0.75 * r) / 4],
+          [gx + gw * 0.88, base - gh * 0.75 + (gh * 0.75 * r) / 4],
+        ],
+        0.6,
+        seed + r,
+      );
+  }
+}
+
+const suburb = {
+  hz: 0.735,
+  yard: 0.8, // where the houses stand
+  walk: [0.835, 0.85] as [number, number],
+  street: [0.85, 0.905] as [number, number],
+  ground(k: Kit) {
+    const { pens, I, h, PW, season } = k;
+    const winter = I.snowy;
+    // far: a low line of trees with a water tower and a steeple poking up
+    const tl = (x: number) => h * (this.hz - 0.012 + 0.006 * loopWave(x, PW, 21));
+    const treeline: Pt[] = [];
+    for (let x = -8; x <= PW + 8; x += 5)
+      treeline.push([x, tl(x) - Math.abs(Math.sin(x * 0.09)) * 5 - Math.abs(Math.sin(x * 0.031)) * 4]);
+    const far: C = winter
+      ? I.paint([170, 176, 190], 0.38)
+      : season === "autumn"
+        ? I.paint([196, 150, 96], 0.38)
+        : I.paint([100, 150, 110], 0.38);
+    pens[0].fillOnly([...treeline, [PW + 8, h + 8], [-8, h + 8]], far);
+    pens[0].stroke(treeline, 1.1, 1);
+    // the town water tower
+    {
+      const wx = PW * 0.12,
+        b = tl(wx);
+      for (const d of [-7, 7])
+        pens[0].stroke(
+          [
+            [wx + d, b],
+            [wx + d * 0.6, b - h * 0.05],
+          ],
+          1,
+          d,
+        );
+      pens[0].shape(ellipse(wx, b - h * 0.062, 12, 9, 18), I.paint([170, 200, 220], 0.38), 1.1, 3);
+      pens[0].stroke(
+        [
+          [wx - 4, b - h * 0.075],
+          [wx, b - h * 0.08],
+        ],
+        1.4,
+        4,
+      );
+    }
+    // a church steeple
+    {
+      const sx = PW * 0.58,
+        b = tl(sx);
+      pens[0].shape(rect(sx - 4, b - h * 0.035, 8, h * 0.035), I.paint([240, 236, 226], 0.38), 1, 5);
+      pens[0].shape(
+        [
+          [sx - 5, b - h * 0.035],
+          [sx, b - h * 0.07],
+          [sx + 5, b - h * 0.035],
+        ],
+        I.paint([140, 150, 170], 0.38),
+        1,
+        6,
+      );
+    }
+    // middle: the backyards, rooftops of the next street over, power lines
+    const back: C = winter ? I.snow : I.paint([140, 186, 110], 0.18);
+    pens[1].fillOnly(
+      [
+        [-8, h * this.hz],
+        [PW + 8, h * this.hz],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      back,
+    );
+    pens[1].stroke(
+      curve(() => h * this.hz, -8, PW + 8, 30),
+      1.1,
+      2,
+    );
+    const roofs: C[] = [
+      [150, 110, 100],
+      [110, 120, 140],
+      [170, 140, 110],
+      [120, 100, 110],
+    ];
+    for (let x = 10, i = 0; x < PW - 20; i++) {
+      const rw = 26 + hash(i * 3.3) * 16,
+        rb = h * (this.hz + 0.016);
+      pens[1].shape(
+        [
+          [x, rb],
+          [x + rw * 0.25, rb - 9 - hash(i) * 4],
+          [x + rw * 0.75, rb - 9 - hash(i) * 4],
+          [x + rw, rb],
+        ],
+        winter ? I.snow : I.paint(roofs[i % 4], 0.18),
+        1,
+        i,
+      );
+      x += rw + 10 + hash(i * 7) * 30;
+    }
+    // backyard fences in front of those roofs
+    {
+      const fb = h * (this.hz + 0.02);
+      const wood: C = winter ? I.paint([200, 190, 176], 0.18) : I.paint([190, 160, 120], 0.18);
+      pens[1].fillOnly([[-8, fb - 6], [PW + 8, fb - 6], [PW + 8, fb], [-8, fb]], wood);
+      pens[1].stroke(curve(() => fb - 6, -8, PW + 8, 30), 0.8, 7);
+      pens[1].stroke(curve(() => fb, -8, PW + 8, 30), 0.8, 8);
+      for (let x = 0; x < PW; x += 7)
+        pens[1].stroke(
+          [
+            [x, fb],
+            [x, fb - 6],
+          ],
+          0.5,
+          x,
+        );
+    }
+    for (let x = 0; x < PW; x += 120)
+      pens[1].stroke(
+        [
+          [x, h * (this.hz + 0.03)],
+          [x, h * (this.hz - 0.03)],
+        ],
+        1.1,
+        x,
+      );
+    for (const dy of [0, 4])
+      for (let x = 0; x < PW; x += 120) {
+        const pts: Pt[] = [];
+        for (let i = 0; i <= 10; i++)
+          pts.push([x + i * 12, h * (this.hz - 0.03) + dy + Math.sin((i / 10) * Math.PI) * 6]);
+        pens[1].stroke(pts, 0.6, x + dy);
+      }
+    // near: front lawns, the sidewalk, the street, the lawn on our side
+    const lawn: C = winter
+      ? I.snow
+      : season === "autumn"
+        ? I.paint([150, 176, 100], 0.04)
+        : I.paint([126, 186, 100], 0.04);
+    const yard = h * (this.yard - 0.018);
+    pens[2].fillOnly(
+      [
+        [-8, yard],
+        [PW + 8, yard],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      lawn,
+    );
+    pens[2].stroke(
+      curve(() => yard, -8, PW + 8, 30),
+      1.1,
+      3,
+    );
+    const walk: C = winter ? mix(I.snow, [200, 200, 200], 0.2) : I.paint([214, 210, 200], 0.04);
+    const [w0, w1] = this.walk.map((f) => h * f);
+    pens[2].shape(
+      [
+        [-8, w0],
+        [PW + 8, w0],
+        [PW + 8, w1],
+        [-8, w1],
+      ],
+      walk,
+      1.1,
+      4,
+    );
+    for (let x = 0; x < PW; x += 22)
+      pens[2].stroke(
+        [
+          [x, w0],
+          [x - 2, w1],
+        ],
+        0.6,
+        x,
+      );
+    const [s0, s1] = this.street.map((f) => h * f);
+    const road: C = winter ? mix(I.paint([120, 124, 136], 0.04), [230, 234, 240], 0.3) : I.paint([120, 124, 136], 0.04);
+    pens[2].shape(
+      [
+        [-8, s0],
+        [PW + 8, s0],
+        [PW + 8, s1],
+        [-8, s1],
+      ],
+      road,
+      1.3,
+      5,
+    );
+    for (let x = 6; x < PW; x += 30)
+      pens[2].stroke(
+        [
+          [x, (s0 + s1) / 2],
+          [x + 14, (s0 + s1) / 2],
+        ],
+        1.2,
+        x,
+      );
+    pens[2].shape(
+      [
+        [-8, s1],
+        [PW + 8, s1],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      lawn,
+      1.2,
+      6,
+    );
+    if (!winter)
+      for (let i = 0; i < PW / 12; i++) {
+        const x = hash(i * 3.7) * PW,
+          y = s1 + 8 + hash(i * 5.1) * (h - s1 - 14);
+        pens[2].stroke(
+          [
+            [x - 2, y - 3],
+            [x, y],
+            [x + 2, y - 3],
+          ],
+          0.8,
+          i,
+        );
+      }
+  },
+  scenes: [
+    // a street of houses: picket fence, mailbox, a hoop over the garage
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h, season } = k;
+      const pen = pens[2];
+      const base = h * suburb.yard;
+      const ht = h * 0.042;
+      house(
+        pen,
+        I,
+        x0 + w * 0.04,
+        base,
+        w * 0.24,
+        ht,
+        I.paint([246, 236, 210], 0.04),
+        I.paint([110, 120, 150], 0.04),
+        true,
+        1,
+      );
+      house(
+        pen,
+        I,
+        x0 + w * 0.5,
+        base,
+        w * 0.22,
+        ht * 1.08,
+        I.paint([170, 200, 214], 0.04),
+        I.paint([180, 90, 80], 0.04),
+        false,
+        2,
+      );
+      house(
+        pen,
+        I,
+        x0 + w * 0.76,
+        base,
+        w * 0.2,
+        ht,
+        I.paint([240, 200, 170], 0.04),
+        I.paint([100, 110, 100], 0.04),
+        false,
+        3,
+      );
+      // driveway
+      const wb = h * suburb.walk[0];
+      pen.shape(
+        [
+          [x0 + w * 0.28, base],
+          [x0 + w * 0.4, base],
+          [x0 + w * 0.42, wb],
+          [x0 + w * 0.26, wb],
+        ],
+        I.paint([200, 196, 188], 0.04),
+        1,
+        4,
+      );
+      // the basketball hoop over the garage
+      pen.stroke(
+        [
+          [x0 + w * 0.34, base - ht * 0.72 - h * 0.006],
+          [x0 + w * 0.34, base - ht * 0.72 - h * 0.022],
+        ],
+        1,
+        5,
+      );
+      pen.shape(rect(x0 + w * 0.325, base - ht * 0.72 - h * 0.03, 11, 8), I.paint([250, 250, 246], 0.04), 0.9, 6);
+      pen.stroke(
+        [
+          [x0 + w * 0.33, base - ht * 0.72 - h * 0.021],
+          [x0 + w * 0.335, base - ht * 0.72 - h * 0.015],
+          [x0 + w * 0.345, base - ht * 0.72 - h * 0.015],
+          [x0 + w * 0.35, base - ht * 0.72 - h * 0.021],
+        ],
+        0.8,
+        7,
+      );
+      // a white picket fence in front of the middle house
+      const fy = (base + wb) / 2 + 4;
+      pen.stroke(
+        [
+          [x0 + w * 0.47, fy - 5],
+          [x0 + w * 0.74, fy - 5],
+        ],
+        0.9,
+        8,
+      );
+      for (let x = x0 + w * 0.47; x <= x0 + w * 0.74; x += 5)
+        pen.shape(
+          [
+            [x - 1.4, fy],
+            [x - 1.4, fy - 8],
+            [x, fy - 10],
+            [x + 1.4, fy - 8],
+            [x + 1.4, fy],
+          ],
+          I.paint([250, 250, 246], 0.04),
+          0.6,
+          x,
+        );
+      // mailbox
+      const mx = x0 + w * 0.2;
+      pen.stroke(
+        [
+          [mx, wb - 1],
+          [mx, wb - 11],
+        ],
+        1.1,
+        9,
+      );
+      pen.shape(
+        [
+          [mx - 5, wb - 11],
+          [mx - 5, wb - 16],
+          [mx + 5, wb - 16],
+          [mx + 5, wb - 11],
+        ],
+        I.paint([90, 110, 150], 0.04),
+        1,
+        10,
+      );
+      pen.stroke(
+        [
+          [mx + 5, wb - 16],
+          [mx + 5, wb - 21],
+          [mx + 8, wb - 20],
+        ],
+        1,
+        11,
+      );
+      // shade trees
+      const leaf: C = season === "autumn" ? I.paint([230, 140, 60], 0.04) : I.paint([100, 166, 90], 0.04);
+      leafy(pen, x0 + w * 0.45, base + 4, 40, leaf, season === "winter");
+      leafy(pen, x0 + w * 0.985, base + 2, 34, leaf, season === "winter");
+    },
+    // the playground in the little park at the end of the cul-de-sac
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h, season } = k;
+      const pen = pens[2];
+      const base = h * suburb.yard + 6;
+      // wood chips under the play set
+      pen.shape(ellipse(x0 + w * 0.5, base, w * 0.3, h * 0.012, 28), I.paint([200, 160, 110], 0.04), 1, 1);
+      // the swing frame (the swings move: live)
+      const sx = x0 + w * 0.32,
+        top = base - h * 0.06;
+      for (const d of [-w * 0.09, w * 0.09]) {
+        pen.stroke(
+          [
+            [sx + d - 6, base],
+            [sx + d, top],
+            [sx + d + 6, base],
+          ],
+          1.4,
+          d,
+        );
+      }
+      pen.stroke(
+        [
+          [sx - w * 0.09, top],
+          [sx + w * 0.09, top],
+        ],
+        1.6,
+        2,
+      );
+      // the slide with its ladder and little roof
+      const tx = x0 + w * 0.62,
+        deck = base - h * 0.04;
+      pen.shape(rect(tx, deck, 22, 3), I.paint([200, 150, 100], 0.04), 1, 3);
+      for (const d of [0, 22])
+        pen.stroke(
+          [
+            [tx + d, deck],
+            [tx + d, base],
+          ],
+          1.2,
+          d + 4,
+        );
+      pen.shape(
+        [
+          [tx - 3, deck - 16],
+          [tx + 11, deck - 26],
+          [tx + 25, deck - 16],
+        ],
+        I.paint([226, 96, 86], 0.04),
+        1.1,
+        5,
+      );
+      for (const d of [0, 22])
+        pen.stroke(
+          [
+            [tx + d, deck],
+            [tx + d, deck - 16],
+          ],
+          1,
+          d + 6,
+        );
+      pen.shape(
+        [
+          [tx + 22, deck],
+          [tx + 50, base - 2],
+          [tx + 54, base - 2],
+          [tx + 26, deck + 3],
+        ],
+        I.paint([246, 206, 80], 0.04),
+        1.1,
+        7,
+      );
+      for (let r = 0; r < 4; r++)
+        pen.stroke(
+          [
+            [tx - 8, base - (r + 1) * 6],
+            [tx, base - (r + 1) * 6],
+          ],
+          0.8,
+          r,
+        );
+      pen.stroke(
+        [
+          [tx - 8, base],
+          [tx - 6, deck],
+        ],
+        1,
+        8,
+      );
+      // a big oak and a bench
+      const leaf: C = season === "autumn" ? I.paint([214, 120, 60], 0.04) : I.paint([90, 150, 80], 0.04);
+      leafy(pen, x0 + w * 0.1, base, 54, leaf, season === "winter");
+      leafy(pen, x0 + w * 0.9, base - 2, 40, leaf, season === "winter");
+      const bx = x0 + w * 0.78;
+      pen.shape(rect(bx, base - 7, 18, 3), I.paint([170, 120, 80], 0.04), 1, 9);
+      pen.stroke(
+        [
+          [bx, base - 11],
+          [bx + 18, base - 11],
+        ],
+        1.1,
+        10,
+      );
+    },
+    // the elementary school: brick, a clock, the flag, a soccer goal
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h } = k;
+      const pen = pens[2];
+      const base = h * suburb.yard;
+      const brick: C = I.paint([196, 110, 86], 0.04);
+      const glass: C = I.paint([200, 224, 240], 0.04);
+      const sx = x0 + w * 0.2,
+        sw = w * 0.56,
+        sh = h * 0.05;
+      pen.shape(rect(sx, base - sh, sw, sh), brick, 1.3, 1);
+      pen.shape(rect(sx - 3, base - sh - 3, sw + 6, 4), I.paint([236, 226, 206], 0.04), 1.1, 2);
+      windows(pen, I, sx + 4, base - sh + 5, sw * 0.38, sh * 0.6, 4, 2, 3, glass);
+      windows(pen, I, sx + sw * 0.6, base - sh + 5, sw * 0.38, sh * 0.6, 4, 2, 4, glass);
+      // the entrance with its pediment and clock
+      const ex = sx + sw / 2;
+      pen.shape(rect(ex - 14, base - sh - 10, 28, sh + 10), I.paint([236, 226, 206], 0.04), 1.2, 5);
+      pen.shape(
+        [
+          [ex - 17, base - sh - 10],
+          [ex, base - sh - 22],
+          [ex + 17, base - sh - 10],
+        ],
+        I.paint([236, 226, 206], 0.04),
+        1.2,
+        6,
+      );
+      pen.shape(ellipse(ex, base - sh - 2, 5, 5, 14), I.paint([250, 250, 246], 0.04), 1, 7);
+      pen.stroke(
+        [
+          [ex, base - sh - 5],
+          [ex, base - sh - 2],
+          [ex + 2.5, base - sh - 2],
+        ],
+        0.8,
+        8,
+      );
+      pen.shape(rect(ex - 7, base - 16, 14, 16), I.paint([110, 130, 160], 0.04), 1.1, 9);
+      // the flagpole (the flag waves: live)
+      pen.stroke(
+        [
+          [x0 + w * 0.12, base + 4],
+          [x0 + w * 0.12, base - h * 0.085],
+        ],
+        1.2,
+        10,
+      );
+      pen.shape(ellipse(x0 + w * 0.12, base - h * 0.086, 1.6, 1.6, 8), I.paint([240, 210, 120], 0.04), 0.8, 11);
+      // a soccer goal on the field
+      const gx = x0 + w * 0.84;
+      pen.stroke(
+        [
+          [gx, base + 6],
+          [gx, base - 12],
+          [gx + 26, base - 12],
+          [gx + 26, base + 6],
+        ],
+        1.2,
+        12,
+      );
+      for (let i = 1; i < 6; i++)
+        pen.stroke(
+          [
+            [gx + i * 4.3, base - 12],
+            [gx + i * 4.3 + 3, base + 4],
+          ],
+          0.5,
+          i,
+        );
+    },
+    // the strip mall: a row of shops under one roof, a parking lot, a sign
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h } = k;
+      const pen = pens[2];
+      const base = h * suburb.yard;
+      const sh = h * 0.04;
+      const mx = x0 + w * 0.08,
+        mw = w * 0.74;
+      pen.shape(rect(mx, base - sh, mw, sh), I.paint([236, 226, 206], 0.04), 1.3, 1);
+      pen.shape(rect(mx - 3, base - sh - 7, mw + 6, 7), I.paint([200, 186, 160], 0.04), 1.2, 2);
+      const shops: C[] = [
+        [226, 96, 86],
+        [90, 160, 200],
+        [120, 180, 110],
+        [246, 190, 80],
+      ];
+      const n = 4,
+        sw = mw / n;
+      for (let i = 0; i < n; i++) {
+        const x = mx + sw * i;
+        if (i)
+          pen.stroke(
+            [
+              [x, base - sh],
+              [x, base],
+            ],
+            0.9,
+            i,
+          );
+        pen.shape(
+          rect(x + 4, base - sh + 9, sw - 8, sh - 9),
+          I.lit ? I.window : I.paint([200, 224, 240], 0.04),
+          1,
+          i + 0.2,
+        );
+        // a sign over each shop in its own colour
+        pen.shape(rect(x + 6, base - sh - 5, sw - 12, 4), I.paint(shops[i], 0.04), 0.8, i + 0.4);
+        // a striped awning on two of them
+        if (i % 2 === 0)
+          for (let s = 0; s < 5; s++)
+            pen.shape(
+              [
+                [x + 4 + ((sw - 8) * s) / 5, base - sh + 4],
+                [x + 4 + ((sw - 8) * (s + 1)) / 5, base - sh + 4],
+                [x + 4 + ((sw - 8) * (s + 1)) / 5, base - sh + 8],
+                [x + 4 + ((sw - 8) * s) / 5, base - sh + 8],
+              ],
+              s % 2 ? I.paint([250, 246, 236], 0.04) : I.paint(shops[i], 0.04),
+              0.7,
+              s + i,
+            );
+      }
+      // the parking lot lines in front
+      const wb = h * suburb.walk[0];
+      pen.shape(
+        [
+          [mx - 6, base + 1],
+          [mx + mw + 6, base + 1],
+          [mx + mw + 10, wb - 1],
+          [mx - 10, wb - 1],
+        ],
+        I.paint([150, 154, 164], 0.04),
+        1,
+        9,
+      );
+      for (let x = mx; x < mx + mw; x += 14)
+        pen.stroke(
+          [
+            [x, base + 3],
+            [x - 3, (base + wb) / 2],
+          ],
+          0.9,
+          x,
+        );
+      // the tall sign by the road (its OPEN light flickers on: live)
+      const px = x0 + w * 0.9;
+      pen.stroke(
+        [
+          [px, wb - 1],
+          [px, base - h * 0.06],
+        ],
+        1.4,
+        10,
+      );
+      pen.shape(rect(px - 14, base - h * 0.085, 28, h * 0.026), I.paint([250, 246, 236], 0.04), 1.2, 11);
+      for (let i = 0; i < 3; i++)
+        pen.shape(rect(px - 11 + i * 8, base - h * 0.08, 6, h * 0.015), I.paint(shops[i], 0.04), 0.7, 12 + i);
+    },
+  ],
+  live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, layer: number) => number) {
+    const { I, h, w, PW } = k;
+    const ink = css(I.inkC, 0.9);
+    g.strokeStyle = ink;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    const night = I.night > 0.5;
+    const base = h * suburb.yard;
+    // the swings going back and forth
+    {
+      const sx = w * 1.32,
+        top = base + 6 - h * 0.06;
+      for (const [d, ph] of [
+        [-w * 0.04, 0],
+        [w * 0.04, 1.7],
+      ]) {
+        const a = Math.sin(t * 1.6 + ph) * 0.5;
+        const L = h * 0.045;
+        const px = X(sx + d, 2),
+          sx2 = px + Math.sin(a) * L,
+          sy = top + Math.cos(a) * L;
+        g.lineWidth = 0.8;
+        g.beginPath();
+        g.moveTo(px - 3, top);
+        g.lineTo(sx2 - 3, sy);
+        g.moveTo(px + 3, top);
+        g.lineTo(sx2 + 3, sy);
+        g.stroke();
+        g.fillStyle = css(I.paint([226, 96, 86], 0.04));
+        g.fillRect(sx2 - 4, sy - 1, 8, 2.4);
+        g.lineWidth = 0.9;
+        g.strokeRect(sx2 - 4, sy - 1, 8, 2.4);
+      }
+    }
+    // the school flag waving
+    {
+      const fx = X(w * 2.12, 2),
+        fy = base - h * 0.082;
+      const pts: Pt[] = [];
+      for (let i = 0; i <= 8; i++) pts.push([fx + i * 2.6, fy + Math.sin(t * 5 - i * 0.7) * (i / 8) * 2.2]);
+      const bot = pts.map(([x, y]) => [x, y + 11] as Pt).reverse();
+      g.beginPath();
+      [...pts, ...bot].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.closePath();
+      g.fillStyle = css(I.paint([226, 96, 86], 0.04));
+      g.fill();
+      g.lineWidth = 1;
+      g.stroke();
+      g.fillStyle = css(I.paint([250, 250, 246], 0.04));
+      for (let r = 1; r < 3; r++) {
+        g.beginPath();
+        pts.forEach(([x, y], i) => (i ? g.lineTo(x, y + r * 3.6) : g.moveTo(x, y + r * 3.6)));
+        g.lineWidth = 1.4;
+        g.strokeStyle = css(I.paint([250, 250, 246], 0.04));
+        g.stroke();
+      }
+      g.strokeStyle = ink;
+    }
+    // a sprinkler ticking across the first lawn on summer mornings and evenings
+    if (!night && k.season !== "winter") {
+      const cx = X(w * 0.33, 2),
+        cy = (base + h * suburb.walk[0]) / 2 + 2;
+      const a = Math.PI + 0.3 + ((Math.sin(t * 0.8) + 1) / 2) * (Math.PI - 0.6);
+      g.strokeStyle = "rgba(160,210,255,0.85)";
+      for (let i = 0; i < 6; i++) {
+        const r = 6 + i * 4;
+        g.globalAlpha = 1 - i / 7;
+        g.beginPath();
+        g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.5 - Math.sin((i / 6) * Math.PI) * 5, 0.9, 0, TAU);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      g.strokeStyle = ink;
+    }
+    // OPEN lit at the strip mall after dark, with a flicker
+    if (I.night > 0.3) {
+      const on = Math.sin(t * 7) > -0.8 || Math.sin(t * 0.7) > 0;
+      g.fillStyle = on ? "rgba(255,90,80,0.95)" : "rgba(140,60,60,0.5)";
+      g.font = "700 9px system-ui, sans-serif";
+      g.fillText("OPEN", X(w * 3.13, 2), base - h * 0.012);
+    }
+    // cars and the odd minivan along the street
+    {
+      const [s0, s1] = suburb.street.map((f) => h * f);
+      const lanes = [s0 + (s1 - s0) * 0.42, s1 - 3];
+      const cl: C[] = [
+        [120, 170, 220],
+        [226, 96, 86],
+        [240, 240, 236],
+        [150, 200, 130],
+      ];
+      for (let i = 0; i < 4; i++) {
+        const dir = i % 2 ? -1 : 1;
+        const sp = 18 + hash(i * 3 + 1) * 10;
+        const xx = (((hash(i * 5.7) * PW + t * sp * dir) % PW) + PW) % PW;
+        const y = lanes[i % 2];
+        const L = 26,
+          H = 10;
+        const pts: Pt[] = (
+          [
+            [-L / 2, 0],
+            [-L / 2, -H * 0.85],
+            [L * 0.15, -H],
+            [L * 0.3, -H * 0.55],
+            [L / 2, -H * 0.45],
+            [L / 2, 0],
+          ] as Pt[]
+        ).map(([a, b]) => [X(xx + a * dir, 2), y + b] as Pt);
+        g.beginPath();
+        pts.forEach(([a, b], j) => (j ? g.lineTo(a, b) : g.moveTo(a, b)));
+        g.closePath();
+        g.fillStyle = css(I.paint(cl[i], 0.04));
+        g.fill();
+        g.lineWidth = 1.1;
+        g.stroke();
+        for (const f of [-0.28, 0.28]) {
+          g.fillStyle = css(I.paint([50, 50, 60], 0.04));
+          g.beginPath();
+          g.arc(X(xx + L * f, 2), y, 3, 0, TAU);
+          g.fill();
+          g.stroke();
+        }
+        if (night) {
+          const hx = X(xx + (L / 2) * dir, 2);
+          const gr = g.createLinearGradient(hx, y, hx + dir * 28, y);
+          gr.addColorStop(0, "rgba(255,236,170,0.5)");
+          gr.addColorStop(1, "rgba(255,236,170,0)");
+          g.fillStyle = gr;
+          g.beginPath();
+          g.moveTo(hx, y - 4);
+          g.lineTo(hx + dir * 28, y - 9);
+          g.lineTo(hx + dir * 28, y + 2);
+          g.closePath();
+          g.fill();
+        }
+      }
+    }
+    // fireflies over the lawns on summer nights
+    if (night && k.season === "summer")
+      for (let i = 0; i < 10; i++) {
+        const a = Math.max(0, Math.sin(t * 1.5 + i * 2.1));
+        g.fillStyle = `rgba(230,255,140,${a})`;
+        g.beginPath();
+        g.arc(X(hash(i * 3.1) * PW + Math.sin(t * 0.4 + i) * 8, 2), base - 10 + hash(i * 1.7) * 30, 1.4, 0, TAU);
+        g.fill();
+      }
+  },
+};
+
+const WORLDS = { coast, farm, city, suburb };
 
 // ---------------------------------------------------------------------------
 // painting the loop, and the moving bits
@@ -2245,7 +3276,15 @@ const WORLDS = { coast, farm, city };
 
 export type WorldPano = LinePano & { kit: Kit; kind: WorldKind };
 
-export function paintWorldPano(kind: WorldKind, w: number, h: number, L: Light, season: Season, style: number, dpr: number): WorldPano {
+export function paintWorldPano(
+  kind: WorldKind,
+  w: number,
+  h: number,
+  L: Light,
+  season: Season,
+  style: number,
+  dpr: number,
+): WorldPano {
   const I = inksFor(L, season, style);
   const def = WORLDS[kind];
   const n = def.scenes.length;
@@ -2268,6 +3307,7 @@ export function paintWorldPano(kind: WorldKind, w: number, h: number, L: Light, 
   const kit: Kit = { pens, I, L, w, h, PW, season };
   if (kind === "coast") coast.ground(kit);
   else if (kind === "city") city.ground(kit);
+  else if (kind === "suburb") suburb.ground(kit);
   else farm.draw(kit);
   def.scenes.forEach((scene, i) => scene(kit, i * w));
   return { W: PW, H: h, top, scale, layers, lays: [], I, kit, kind };
