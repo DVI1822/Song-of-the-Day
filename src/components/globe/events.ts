@@ -11,7 +11,7 @@ import type { Inks } from "./line";
 import type { C, Light } from "./setting";
 import type { Season } from "./scene";
 
-export type Place = "mountain" | "coast" | "farm" | "city" | "suburb";
+export type Place = "mountain" | "coast" | "farm" | "city" | "suburb" | "desert";
 export type Ctx = {
   g: CanvasRenderingContext2D;
   w: number;
@@ -195,6 +195,7 @@ const GROUND: Record<
   farm: { horizon: 0.718, near: 0.94, road: 0.886 },
   city: { horizon: 0.745, near: 0.82, road: 0.872 },
   suburb: { horizon: 0.735, near: 0.842, road: 0.882 },
+  desert: { horizon: 0.73, near: 0.835, road: 0.885 },
 };
 
 // ------------------------------------------------------------ the moments
@@ -405,7 +406,7 @@ const DEFS: Def[] = [
   },
   {
     name: "hawk",
-    places: ["mountain", "farm"],
+    places: ["mountain", "farm", "desert"],
     when: (c) => day(c),
     weight: 2,
     dur: [20, 30],
@@ -2598,6 +2599,178 @@ const DEFS: Def[] = [
           );
         }
       });
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  // ------------------------------------------------------------ the desert
+  {
+    name: "roadrunner",
+    places: ["desert"],
+    when: (c) => !night(c),
+    weight: 3,
+    dur: [4, 6],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 30),
+        y = c.h * GROUND.desert.near;
+      const run = Math.sin(c.t * 30);
+      pen(c, 1);
+      // a little dust behind it
+      for (let i = 0; i < 4; i++) {
+        c.g.fillStyle = `rgba(220,200,160,${0.4 - i * 0.09})`;
+        c.g.beginPath();
+        c.g.arc(x - r.dir * (12 + i * 6) * c.s, y - 2 * c.s, (2 + i) * c.s, 0, TAU);
+        c.g.fill();
+      }
+      facing(c, x, y, r.dir, () => {
+        ln(
+          c,
+          [
+            [-2, -7],
+            [-4 + run * 3, 0],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [1, -7],
+            [3 - run * 3, 0],
+          ],
+          1,
+        );
+        shp(
+          c,
+          [
+            [-14, -14],
+            [-4, -8],
+            [6, -9],
+            [9, -13],
+            [4, -14],
+            [-4, -12],
+          ],
+          col(c, [150, 130, 110]),
+          1,
+        );
+        shp(
+          c,
+          [
+            [5, -13],
+            [9, -18],
+            [13, -17],
+            [12, -14],
+          ],
+          col(c, [150, 130, 110]),
+          1,
+        );
+        ln(
+          c,
+          [
+            [12, -16],
+            [18, -15.5],
+          ],
+          1.1,
+        );
+        ln(
+          c,
+          [
+            [8, -18],
+            [6, -22],
+            [9, -19],
+          ],
+          0.9,
+        );
+        circ(c, 10.5, -16.2, 0.8, c.I.inkC, 0);
+      });
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  {
+    name: "coyote",
+    places: ["desert"],
+    when: (c) => night(c),
+    weight: 2,
+    dur: [12, 16],
+    draw(c, p, r) {
+      // trots in, stops on a rise, howls, trots off
+      const stop = p > 0.35 && p < 0.7;
+      const q = p < 0.35 ? p / 0.35 / 2 : p > 0.7 ? 0.5 + (p - 0.7) / 0.3 / 2 : 0.5;
+      const x = across(c, q, r.dir, 30),
+        y = c.h * GROUND.desert.near - 6 * c.s;
+      const step = stop ? 0 : Math.sin(c.t * 12);
+      pen(c, 1);
+      const fur = col(c, [176, 150, 120]);
+      facing(c, x, y, r.dir, () => {
+        for (const [lx, ph] of [
+          [-9, 0],
+          [-6, 1],
+          [6, 1],
+          [9, 0],
+        ] as [number, number][])
+          ln(
+            c,
+            [
+              [lx, -8],
+              [lx + (ph ? step : -step) * 2, 0],
+            ],
+            1.1,
+          );
+        shp(
+          c,
+          [
+            [-12, -12],
+            [8, -13],
+            [10, -8],
+            [-10, -7],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [-12, -11],
+            [-18, -8],
+            [-20, -5],
+          ],
+          2,
+        );
+        const up = stop ? -6 : 0;
+        shp(
+          c,
+          [
+            [7, -12],
+            [11, -18 + up],
+            [14, -17 + up],
+            [18, -15 + up * 1.3],
+            [12, -11],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [11, -18 + up],
+            [11, -22 + up],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [13, -17.5 + up],
+            [14, -21.5 + up],
+          ],
+          1,
+        );
+      });
+      if (stop) {
+        c.g.globalAlpha = Math.sin(((p - 0.35) / 0.35) * Math.PI);
+        c.g.font = hand(12 * c.s);
+        c.g.fillStyle = css(c.I.inkC);
+        c.g.fillText("awoo", x + r.dir * 14 * c.s, y - 30 * c.s);
+        c.g.globalAlpha = 1;
+      }
       c.g.strokeStyle = c.I.ink;
     },
   },

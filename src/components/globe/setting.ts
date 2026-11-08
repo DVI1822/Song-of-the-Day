@@ -943,7 +943,7 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
 export class SettingScene {
   private still: CanvasRenderingContext2D;
   private live: CanvasRenderingContext2D;
-  private kind: "city" | "mountain" | "coast" | "suburb" | "country" | null = null;
+  private kind: "city" | "mountain" | "coast" | "suburb" | "desert" | "country" | null = null;
   private wpano: WorldPano | null = null;
   private moments = new Moments();
   private wxKind = "clear";
@@ -975,7 +975,12 @@ export class SettingScene {
     const k =
       kind === "town"
         ? "suburb"
-        : kind === "city" || kind === "mountain" || kind === "coast" || kind === "suburb" || kind === "country"
+        : kind === "city" ||
+            kind === "mountain" ||
+            kind === "coast" ||
+            kind === "suburb" ||
+            kind === "desert" ||
+            kind === "country"
           ? kind
           : null;
     if (k === this.kind) return;
@@ -1075,15 +1080,10 @@ export class SettingScene {
 
   // the line-drawn worlds beyond Montana
   private world(): WorldKind | null {
-    return this.kind === "coast"
-      ? "coast"
-      : this.kind === "country"
-        ? "farm"
-        : this.kind === "city"
-          ? "city"
-          : this.kind === "suburb"
-            ? "suburb"
-            : null;
+    if (this.kind === "country") return "farm";
+    if (this.kind === "coast" || this.kind === "city" || this.kind === "suburb" || this.kind === "desert")
+      return this.kind;
+    return null;
   }
 
   private aura(g: CanvasRenderingContext2D, f: SettingFrame) {
@@ -1140,7 +1140,7 @@ export class SettingScene {
         s: Math.max(0.8, Math.min(1.6, f.w / 390)),
         I: lp.I,
         L: this.L,
-        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast" | "city" | "suburb"),
+        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast" | "city" | "suburb" | "desert"),
         season: f.season,
         weather: this.wxKind,
         hour: f.hour,
