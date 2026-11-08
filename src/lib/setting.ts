@@ -6,11 +6,11 @@
 // high and how steep the land around you is. City, mountains, coast and
 // countryside have a scene so far; towns keep the plain sky.
 
-export type SettingKind = "city" | "mountain" | "coast" | "town" | "suburb" | "desert" | "country";
+export type SettingKind = "city" | "mountain" | "coast" | "town" | "suburb" | "desert" | "woods" | "country";
 export type SettingReply = { kind?: SettingKind; place?: string };
 
 // The ones with a scene to show.
-export const SCENES: SettingKind[] = ["city", "mountain", "coast", "suburb", "desert", "country"];
+export const SCENES: SettingKind[] = ["city", "mountain", "coast", "suburb", "desert", "woods", "country"];
 
 // elevation in metres at the middle, and the gap between the highest and
 // lowest of the points around it (about 15 km out); population of the place
@@ -41,8 +41,8 @@ export function classify(o: {
 // The scene someone picked in Settings ("auto" or nothing: from where they
 // are). Kept on the device.
 export const SCENE_KEY = "tt-scene";
-export type ScenePick = "auto" | "city" | "mountain" | "coast" | "suburb" | "desert" | "country" | "off";
-const PICKS: ScenePick[] = ["auto", "city", "mountain", "coast", "suburb", "desert", "country", "off"];
+export type ScenePick = "auto" | "city" | "mountain" | "coast" | "suburb" | "desert" | "woods" | "country" | "off";
+const PICKS: ScenePick[] = ["auto", "city", "mountain", "coast", "suburb", "desert", "woods", "country", "off"];
 export function scenePick(): ScenePick {
   try {
     const v = localStorage.getItem(SCENE_KEY) as ScenePick | null;
@@ -65,6 +65,7 @@ export function settingOverride(): SettingKind | "off" | null {
     q === "town" ||
     q === "suburb" ||
     q === "desert" ||
+    q === "woods" ||
     q === "country"
   )
     return q;

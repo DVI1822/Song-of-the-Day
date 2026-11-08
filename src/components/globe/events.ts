@@ -11,7 +11,7 @@ import type { Inks } from "./line";
 import type { C, Light } from "./setting";
 import type { Season } from "./scene";
 
-export type Place = "mountain" | "coast" | "farm" | "city" | "suburb" | "desert";
+export type Place = "mountain" | "coast" | "farm" | "city" | "suburb" | "desert" | "woods";
 export type Ctx = {
   g: CanvasRenderingContext2D;
   w: number;
@@ -196,6 +196,7 @@ const GROUND: Record<
   city: { horizon: 0.745, near: 0.82, road: 0.872 },
   suburb: { horizon: 0.735, near: 0.842, road: 0.882 },
   desert: { horizon: 0.73, near: 0.835, road: 0.885 },
+  woods: { horizon: 0.725, near: 0.86 },
 };
 
 // ------------------------------------------------------------ the moments
@@ -909,13 +910,13 @@ const DEFS: Def[] = [
   // -------------------------------------------------------------- the mountains
   {
     name: "bear",
-    places: ["mountain"],
+    places: ["mountain", "woods"],
     when: (c) => !night(c) && c.season !== "winter",
     weight: 2,
     dur: [26, 34],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 30),
-        y = c.h * GROUND.mountain.near;
+        y = c.h * GROUND[c.place].near;
       const st = Math.sin(c.t * 4);
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
@@ -986,13 +987,13 @@ const DEFS: Def[] = [
   },
   {
     name: "moose",
-    places: ["mountain"],
+    places: ["mountain", "woods"],
     when: (c) => !night(c),
     weight: 1.5,
     dur: [30, 38],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 30),
-        y = c.h * (GROUND.mountain.near - 0.012);
+        y = c.h * (GROUND[c.place].near - 0.012);
       const st = Math.sin(c.t * 3);
       pen(c, 1.1);
       facing(c, x, y, r.dir, () => {
@@ -1161,13 +1162,13 @@ const DEFS: Def[] = [
   },
   {
     name: "hiker",
-    places: ["mountain"],
+    places: ["mountain", "woods"],
     when: (c) => day(c) && !snowy(c),
     weight: 2,
     dur: [28, 36],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 30),
-        y = c.h * GROUND.mountain.near;
+        y = c.h * GROUND[c.place].near;
       const st = Math.sin(c.t * 5);
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
@@ -1265,7 +1266,7 @@ const DEFS: Def[] = [
   },
   {
     name: "fox",
-    places: ["mountain", "farm"],
+    places: ["mountain", "farm", "woods"],
     when: (c) => !day(c) || hashDay(c) > 0.4,
     weight: 1.8,
     dur: [10, 14],
@@ -1342,7 +1343,7 @@ const DEFS: Def[] = [
   },
   {
     name: "rabbit",
-    places: ["mountain", "farm"],
+    places: ["mountain", "farm", "woods"],
     when: (c) => !night(c),
     weight: 2,
     dur: [8, 12],
@@ -1363,7 +1364,7 @@ const DEFS: Def[] = [
   },
   {
     name: "eagle",
-    places: ["mountain", "coast"],
+    places: ["mountain", "coast", "woods"],
     when: (c) => day(c),
     weight: 1.2,
     dur: [9, 12],

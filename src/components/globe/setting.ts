@@ -943,7 +943,7 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
 export class SettingScene {
   private still: CanvasRenderingContext2D;
   private live: CanvasRenderingContext2D;
-  private kind: "city" | "mountain" | "coast" | "suburb" | "desert" | "country" | null = null;
+  private kind: "city" | "mountain" | "coast" | "suburb" | "desert" | "woods" | "country" | null = null;
   private wpano: WorldPano | null = null;
   private moments = new Moments();
   private wxKind = "clear";
@@ -980,6 +980,7 @@ export class SettingScene {
             kind === "coast" ||
             kind === "suburb" ||
             kind === "desert" ||
+            kind === "woods" ||
             kind === "country"
           ? kind
           : null;
@@ -1081,7 +1082,13 @@ export class SettingScene {
   // the line-drawn worlds beyond Montana
   private world(): WorldKind | null {
     if (this.kind === "country") return "farm";
-    if (this.kind === "coast" || this.kind === "city" || this.kind === "suburb" || this.kind === "desert")
+    if (
+      this.kind === "coast" ||
+      this.kind === "city" ||
+      this.kind === "suburb" ||
+      this.kind === "desert" ||
+      this.kind === "woods"
+    )
       return this.kind;
     return null;
   }
@@ -1140,7 +1147,10 @@ export class SettingScene {
         s: Math.max(0.8, Math.min(1.6, f.w / 390)),
         I: lp.I,
         L: this.L,
-        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast" | "city" | "suburb" | "desert"),
+        place:
+          this.kind === "country"
+            ? "farm"
+            : (this.kind as "mountain" | "coast" | "city" | "suburb" | "desert" | "woods"),
         season: f.season,
         weather: this.wxKind,
         hour: f.hour,

@@ -18,10 +18,12 @@ import { Pen, css, inksFor, mix, type Inks, type LinePano } from "./line";
 //          school, a strip mall
 //   desert: saguaros before a stone arch, an adobe town with a mission, a
 //          roadside motel, a trailer camp with a fire
+//   woods:  a dock with a canoe on a lake, a log cabin, deep pines, an
+//          island
 
 type Pt = [number, number];
 
-export type WorldKind = "coast" | "farm" | "city" | "suburb" | "desert";
+export type WorldKind = "coast" | "farm" | "city" | "suburb" | "desert" | "woods";
 
 type Kit = {
   pens: Pen[]; // one per layer: far, middle, near
@@ -3902,7 +3904,572 @@ const desert = {
   },
 };
 
-const WORLDS = { coast, farm, city, suburb, desert };
+// ---------------------------------------------------------------------------
+// the woods and lakes
+// ---------------------------------------------------------------------------
+
+// a fir: a trunk and three tiers of jagged boughs
+function fir(pen: Pen, I: Inks, x: number, base: number, ht: number, seed: number, far = 0.04) {
+  const dark: C = I.snowy ? I.paint([90, 120, 110], far) : I.paint([60, 120, 90], far);
+  pen.stroke(
+    [
+      [x, base],
+      [x, base - ht * 0.2],
+    ],
+    1.1,
+    seed,
+  );
+  for (let i = 0; i < 3; i++) {
+    const tb = base - ht * (0.15 + i * 0.25),
+      tt = tb - ht * 0.42,
+      tw = ht * (0.3 - i * 0.07);
+    const pts: Pt[] = [
+      [x - tw, tb],
+      [x - tw * 0.55, tb - ht * 0.06],
+      [x - tw * 0.7, tb - ht * 0.03],
+      [x, tt],
+      [x + tw * 0.7, tb - ht * 0.03],
+      [x + tw * 0.55, tb - ht * 0.06],
+      [x + tw, tb],
+    ];
+    pen.shape(pts, dark, 1.1, seed + i);
+    if (I.snowy)
+      pen.fillOnly(
+        [
+          [x - tw * 0.3, tt + ht * 0.12],
+          [x, tt],
+          [x + tw * 0.3, tt + ht * 0.12],
+        ],
+        I.snow,
+      );
+  }
+}
+
+const woods = {
+  hz: 0.725, // the far shore
+  lake: 0.795, // our shore
+  ground(k: Kit) {
+    const { pens, I, h, PW, season } = k;
+    const winter = I.snowy;
+    // far: forested hills, a row of fir tips along the top, a fire tower
+    const hill = (x: number) => h * (this.hz - 0.03 + 0.016 * loopWave(x, PW, 31));
+    const sky: Pt[] = [];
+    for (let x = -8; x <= PW + 8; x += 4) sky.push([x, hill(x) - (x % 8 < 4 ? 5 : 0)]);
+    const forest: C = winter
+      ? I.paint([150, 160, 170], 0.38)
+      : season === "autumn"
+        ? I.paint([170, 120, 80], 0.38)
+        : I.paint([70, 120, 96], 0.38);
+    pens[0].fillOnly([...sky, [PW + 8, h + 8], [-8, h + 8]], forest);
+    pens[0].stroke(sky, 1, 1);
+    {
+      const tx = PW * 0.66,
+        b = hill(tx);
+      for (const d of [-5, 5])
+        pens[0].stroke(
+          [
+            [tx + d, b],
+            [tx + d * 0.5, b - h * 0.04],
+          ],
+          0.9,
+          d,
+        );
+      pens[0].stroke(
+        [
+          [tx - 4, b - h * 0.013],
+          [tx + 4, b - h * 0.027],
+        ],
+        0.6,
+        2,
+      );
+      pens[0].shape(
+        rect(tx - 5, b - h * 0.05, 10, h * 0.01),
+        I.lit ? I.window : I.paint([200, 170, 130], 0.38),
+        0.9,
+        3,
+      );
+      pens[0].shape(
+        [
+          [tx - 7, b - h * 0.05],
+          [tx, b - h * 0.058],
+          [tx + 7, b - h * 0.05],
+        ],
+        I.paint([150, 80, 70], 0.38),
+        0.9,
+        4,
+      );
+    }
+    // middle: the far shore's trees, then the lake
+    const shore = h * this.hz;
+    pens[1].fillOnly(
+      [
+        [-8, shore - 2],
+        [PW + 8, shore - 2],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      forest,
+    );
+    for (let x = 4, i = 0; x < PW; i++) {
+      fir(pens[1], I, x, shore + 1, 14 + hash(i * 1.9) * 10, i, 0.2);
+      x += 7 + hash(i * 3.1) * 9;
+    }
+    const water: C = winter
+      ? mix(I.paint([110, 160, 196], 0.14), [226, 234, 244], 0.55)
+      : I.paint([90, 150, 196], 0.14);
+    pens[1].fillOnly(
+      [
+        [-8, shore],
+        [PW + 8, shore],
+        [PW + 8, h + 8],
+        [-8, h + 8],
+      ],
+      water,
+    );
+    pens[1].stroke(
+      curve(() => shore, -8, PW + 8, 30),
+      1.1,
+      5,
+    );
+    // the far trees reflected, faintly
+    if (!winter)
+      for (let x = 6, i = 0; x < PW; i++) {
+        const r = 8 + hash(i * 1.9) * 6;
+        pens[1].fillOnly(
+          [
+            [x - r * 0.25, shore + 1],
+            [x, shore + r],
+            [x + r * 0.25, shore + 1],
+          ],
+          mix(water, forest, 0.35),
+        );
+        x += 9 + hash(i * 3.1) * 11;
+      }
+    for (let r = 1; r < 5; r++) {
+      const y = shore + (h * this.lake - shore) * (r / 5);
+      for (let x = hash(r) * 50; x < PW - 10; x += 40 + hash(x + r) * 40)
+        pens[1].stroke(
+          [
+            [x, y],
+            [x + 3 + r, y - 0.6],
+            [x + 6 + r * 2, y],
+          ],
+          0.7,
+          x,
+        );
+    }
+    // near: our shore, mossy ground and pine needles, a dirt path
+    const moss: C = winter
+      ? I.snow
+      : season === "autumn"
+        ? I.paint([150, 150, 90], 0.04)
+        : I.paint([110, 160, 96], 0.04);
+    const ns = (x: number) => h * (this.lake + 0.004 * loopWave(x, PW, 41));
+    const edge = curve(ns, -8, PW + 8, 8);
+    pens[2].fillOnly([...edge, [PW + 8, h + 8], [-8, h + 8]], moss);
+    pens[2].stroke(edge, 1.3, 6);
+    for (let i = 0; i < PW / 40; i++) {
+      const x = hash(i * 7.3) * PW;
+      pens[2].shape(
+        ellipse(x, ns(x) + 2, 5 + hash(i) * 4, 2.6, 10, Math.PI, TAU),
+        I.paint([150, 150, 150], 0.04),
+        0.9,
+        i,
+      );
+    }
+    const p0 = h * 0.87,
+      p1 = h * 0.895;
+    pens[2].shape(
+      [
+        ...curve((x) => p0 + 2 * loopWave(x, PW, 43), -8, PW + 8, 10),
+        ...curve((x) => p1 + 2 * loopWave(x, PW, 43), -8, PW + 8, 10).reverse(),
+      ],
+      winter ? mix(I.snow, [200, 190, 180], 0.3) : I.paint([190, 160, 120], 0.04),
+      1,
+      7,
+    );
+    if (!winter)
+      for (let i = 0; i < PW / 10; i++) {
+        const x = hash(i * 3.7) * PW,
+          y = h * 0.82 + hash(i * 5.1) * h * 0.17;
+        if (y > p0 - 3 && y < p1 + 3) continue;
+        pens[2].stroke(
+          [
+            [x - 2, y - 3],
+            [x, y],
+            [x + 2, y - 3],
+          ],
+          0.7,
+          i,
+        );
+      }
+  },
+  scenes: [
+    // a dock out into the lake, a canoe tied up, two chairs at the end
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h } = k;
+      const pen = pens[2];
+      const wood: C = I.paint([176, 130, 90], 0.04);
+      const dy = h * woods.lake - 12;
+      const dx0 = x0 + w * 0.3,
+        dx1 = x0 + w * 0.78;
+      for (let x = dx0 + 6; x < dx1; x += 18)
+        pen.stroke(
+          [
+            [x, dy],
+            [x, dy + 12],
+          ],
+          1.4,
+          x,
+        );
+      pen.shape(rect(dx0, dy - 4, dx1 - dx0, 4), wood, 1.3, 1);
+      for (let x = dx0 + 9; x < dx1; x += 9)
+        pen.stroke(
+          [
+            [x, dy - 4],
+            [x, dy],
+          ],
+          0.5,
+          x + 1,
+        );
+      // Adirondack chairs
+      for (const cx of [dx1 - 26, dx1 - 12]) {
+        const red: C = cx > dx1 - 20 ? I.paint([226, 96, 86], 0.04) : I.paint([246, 206, 80], 0.04);
+        pen.shape(
+          [
+            [cx - 4, dy - 4],
+            [cx - 6, dy - 16],
+            [cx - 2, dy - 17],
+            [cx, dy - 9],
+            [cx + 5, dy - 9],
+            [cx + 5, dy - 4],
+          ],
+          red,
+          1,
+          cx,
+        );
+      }
+      // birches on our shore
+      for (const [f, ht] of [
+        [0.12, 0.07],
+        [0.2, 0.055],
+      ] as [number, number][]) {
+        const bx = x0 + w * f,
+          by = h * 0.86;
+        pen.shape(rect(bx - 2, by - h * ht, 4, h * ht), I.paint([244, 242, 236], 0.04), 1, f);
+        for (let i = 1; i < 6; i++)
+          pen.stroke(
+            [
+              [bx - 2, by - h * ht * (i / 6)],
+              [bx, by - h * ht * (i / 6) + 1],
+            ],
+            1,
+            f + i,
+          );
+        pen.shape(
+          ellipse(bx, by - h * ht, 12, 10, 16),
+          k.season === "autumn" ? I.paint([246, 200, 80], 0.04) : I.paint([140, 190, 100], 0.04),
+          1.1,
+          f + 9,
+        );
+      }
+      fir(pen, I, x0 + w * 0.92, h * 0.88, h * 0.1, 41);
+    },
+    // a log cabin with a stone chimney, a porch and a woodpile
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h } = k;
+      const pen = pens[2];
+      const base = h * 0.865;
+      const cx = x0 + w * 0.32,
+        cw = w * 0.36,
+        ch = h * 0.045;
+      const log: C = I.paint([166, 112, 74], 0.04);
+      pen.shape(rect(cx, base - ch, cw, ch), log, 1.3, 1);
+      for (let i = 1; i < 6; i++)
+        pen.stroke(
+          [
+            [cx - 2, base - (ch * i) / 6],
+            [cx + cw + 2, base - (ch * i) / 6],
+          ],
+          0.7,
+          i,
+        );
+      pen.shape(
+        [
+          [cx - 8, base - ch],
+          [cx + cw * 0.5, base - ch - h * 0.032],
+          [cx + cw + 8, base - ch],
+        ],
+        I.paint([96, 110, 100], 0.04),
+        1.3,
+        7,
+      );
+      // stone chimney (smoke: live)
+      const chx = cx + cw * 0.8;
+      pen.shape(rect(chx - 5, base - ch - h * 0.034, 10, h * 0.03), I.paint([170, 166, 160], 0.04), 1.1, 8);
+      for (let i = 0; i < 4; i++)
+        pen.stroke(
+          [
+            [chx - 5, base - ch - h * 0.03 + i * 5],
+            [chx + 5, base - ch - h * 0.03 + i * 5],
+          ],
+          0.5,
+          i + 8,
+        );
+      // door, windows, porch
+      pen.shape(rect(cx + cw * 0.44, base - ch * 0.7, cw * 0.12, ch * 0.7), I.paint([110, 70, 50], 0.04), 1.1, 9);
+      for (const f of [0.14, 0.7]) {
+        pen.shape(
+          rect(cx + cw * f, base - ch * 0.72, cw * 0.15, ch * 0.4),
+          I.lit ? I.window : I.paint([200, 224, 240], 0.04),
+          1,
+          f,
+        );
+        pen.stroke(
+          [
+            [cx + cw * (f + 0.075), base - ch * 0.72],
+            [cx + cw * (f + 0.075), base - ch * 0.32],
+          ],
+          0.6,
+          f + 1,
+        );
+      }
+      pen.shape(rect(cx - 6, base - 2, cw + 12, 4), I.paint([150, 100, 70], 0.04), 1.1, 10);
+      // the woodpile and a stump with an axe
+      const wx = x0 + w * 0.76;
+      for (let r = 0; r < 3; r++)
+        for (let i = 0; i < 4 - r; i++)
+          pen.shape(
+            ellipse(wx + i * 7 + r * 3.5, base - 3 - r * 6, 3.5, 3, 10),
+            I.paint([200, 160, 110], 0.04),
+            0.8,
+            r * 4 + i,
+          );
+      const sx = x0 + w * 0.15;
+      pen.shape(rect(sx - 6, base - 8, 12, 8), I.paint([166, 112, 74], 0.04), 1, 30);
+      pen.shape(ellipse(sx, base - 8, 6, 2, 10), I.paint([220, 190, 140], 0.04), 0.8, 31);
+      pen.stroke(
+        [
+          [sx + 1, base - 9],
+          [sx + 8, base - 20],
+        ],
+        1.3,
+        32,
+      );
+      pen.shape(
+        [
+          [sx - 1, base - 12],
+          [sx + 3, base - 11],
+          [sx + 1, base - 7],
+        ],
+        I.paint([180, 186, 196], 0.04),
+        0.8,
+        33,
+      );
+      fir(pen, I, x0 + w * 0.05, base + 6, h * 0.11, 51);
+      fir(pen, I, x0 + w * 0.95, base + 8, h * 0.09, 52);
+    },
+    // deep in the pines: tall firs close up, a trail sign, mushrooms
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h } = k;
+      const pen = pens[2];
+      for (const [f, ht, b] of [
+        [0.08, 0.15, 0.9],
+        [0.25, 0.12, 0.88],
+        [0.42, 0.17, 0.92],
+        [0.66, 0.13, 0.88],
+        [0.85, 0.16, 0.91],
+      ] as [number, number, number][])
+        fir(pen, I, x0 + w * f, h * b, h * ht, f * 100);
+      // the trail sign
+      const sx = x0 + w * 0.55,
+        sb = h * 0.866;
+      pen.stroke(
+        [
+          [sx, sb],
+          [sx, sb - 26],
+        ],
+        1.4,
+        1,
+      );
+      pen.shape(
+        [
+          [sx - 16, sb - 26],
+          [sx + 12, sb - 26],
+          [sx + 18, sb - 22],
+          [sx + 12, sb - 18],
+          [sx - 16, sb - 18],
+        ],
+        I.paint([140, 100, 70], 0.04),
+        1.1,
+        2,
+      );
+      pen.stroke(
+        [
+          [sx - 12, sb - 22],
+          [sx + 8, sb - 22],
+        ],
+        0.6,
+        3,
+      );
+      // red-capped mushrooms
+      if (k.season !== "winter")
+        for (const [dx, s] of [
+          [0.32, 1],
+          [0.34, 0.7],
+          [0.76, 0.9],
+        ] as [number, number][]) {
+          const mx = x0 + w * dx,
+            my = h * 0.93;
+          pen.shape(rect(mx - 1.2 * s, my - 5 * s, 2.4 * s, 5 * s), I.paint([246, 240, 226], 0.04), 0.7, dx);
+          pen.shape(
+            ellipse(mx, my - 5 * s, 4.5 * s, 3.5 * s, 10, Math.PI, TAU),
+            I.paint([214, 70, 60], 0.04),
+            0.8,
+            dx + 1,
+          );
+        }
+    },
+    // an island of pines out on the lake, a bit of beach with a fire ring
+    (k: Kit, x0: number) => {
+      const { pens, I, w, h } = k;
+      const ix = x0 + w * 0.55,
+        iy = h * (woods.hz + 0.03);
+      pens[1].shape(ellipse(ix, iy, w * 0.14, h * 0.008, 20, Math.PI, TAU), I.paint([120, 150, 100], 0.14), 1, 1);
+      for (const [d, ht] of [
+        [-0.08, 18],
+        [-0.03, 26],
+        [0.02, 22],
+        [0.07, 16],
+      ] as [number, number][])
+        fir(pens[1], I, ix + w * d, iy - 1, ht, d * 100 + 5, 0.14);
+      // our little beach
+      const pen = pens[2];
+      const bx = x0 + w * 0.2;
+      pen.shape(ellipse(bx, h * 0.84, w * 0.1, h * 0.012, 20), I.snowy ? I.snow : I.paint([230, 210, 170], 0.04), 1, 2);
+      for (const d of [-1, 1])
+        pen.shape(rect(bx + d * w * 0.065 - 7, h * 0.838, 14, 4), I.paint([166, 112, 74], 0.04), 0.9, d);
+      for (let i = 0; i < 7; i++)
+        pen.shape(ellipse(bx - 9 + i * 3, h * 0.845 + (i % 2), 2.2, 1.6, 8), I.paint([150, 140, 130], 0.04), 0.7, i);
+      fir(pen, I, x0 + w * 0.88, h * 0.89, h * 0.12, 61);
+    },
+  ],
+  live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, layer: number) => number) {
+    const { I, h, w, PW } = k;
+    const ink = css(I.inkC, 0.9);
+    g.strokeStyle = ink;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    const night = I.night > 0.5;
+    const shore = h * woods.hz,
+      lake = h * woods.lake;
+    if (I.snowy) return;
+    // the lake glinting
+    g.strokeStyle = night ? "rgba(220,235,255,0.5)" : "rgba(255,255,255,0.9)";
+    g.lineWidth = 1;
+    for (let i = 0; i < 24; i++) {
+      const life = (t * 0.3 + hash(i * 3.3)) % 1;
+      if (life > 0.5) continue;
+      const a = Math.sin((life / 0.5) * Math.PI);
+      const x = hash(i * 7.1) * PW + t * 1.5;
+      const y = shore + 4 + hash(i * 5.7) * (lake - shore - 8);
+      g.globalAlpha = a;
+      g.beginPath();
+      g.moveTo(X(x, 1) - 3 * a, y);
+      g.lineTo(X(x, 1) + 3 * a, y);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.strokeStyle = ink;
+    // the canoe tied at the dock, bobbing
+    {
+      const cx = X(w * 0.55, 2),
+        cy = lake - 5 + Math.sin(t * 1.4) * 1;
+      g.fillStyle = css(I.paint([226, 96, 86], 0.04));
+      g.beginPath();
+      g.moveTo(cx - 20, cy - 3);
+      g.quadraticCurveTo(cx, cy + 6, cx + 20, cy - 3);
+      g.quadraticCurveTo(cx, cy, cx - 20, cy - 3);
+      g.fill();
+      g.lineWidth = 1.1;
+      g.stroke();
+    }
+    // a little fishing boat drifting, someone casting now and then
+    {
+      const x = (t * 2 + w * 2.3) % PW;
+      const bx = X(x, 1),
+        by = shore + (lake - shore) * 0.55 + Math.sin(t * 1.2) * 0.8;
+      g.fillStyle = css(I.paint([150, 180, 200], 0.14));
+      g.beginPath();
+      g.moveTo(bx - 10, by);
+      g.lineTo(bx + 10, by);
+      g.lineTo(bx + 7, by + 4);
+      g.lineTo(bx - 7, by + 4);
+      g.closePath();
+      g.fill();
+      g.lineWidth = 1;
+      g.stroke();
+      g.beginPath();
+      g.moveTo(bx, by);
+      g.lineTo(bx, by - 7);
+      g.stroke();
+      g.beginPath();
+      g.arc(bx, by - 9, 2, 0, TAU);
+      g.stroke();
+      const cast = (t * 0.25) % 1;
+      const tipX = bx + 4 + Math.cos(-0.9 + cast * 0.6) * 14,
+        tipY = by - 7 + Math.sin(-0.9 + cast * 0.6) * 14;
+      g.lineWidth = 0.7;
+      g.beginPath();
+      g.moveTo(bx + 1, by - 6);
+      g.lineTo(tipX, tipY);
+      g.quadraticCurveTo(tipX + 10, tipY + 4, tipX + 14, by + 1);
+      g.stroke();
+    }
+    // a loon bobbing, diving every so often
+    {
+      const cyc = (t * 0.1) % 1;
+      if (cyc < 0.8) {
+        const lx = X(w * 3.2 + cyc * 40, 1),
+          ly = shore + (lake - shore) * 0.35 + Math.sin(t * 1.3) * 0.6;
+        g.fillStyle = css(I.paint([40, 44, 52], 0.14));
+        g.beginPath();
+        g.ellipse(lx, ly, 6, 2.4, 0, Math.PI, TAU);
+        g.fill();
+        g.stroke();
+        g.beginPath();
+        g.arc(lx + 5, ly - 4, 1.8, 0, TAU);
+        g.fill();
+        g.stroke();
+      }
+    }
+    // smoke from the cabin chimney
+    {
+      const cx = w * 1.32 + w * 0.36 * 0.8;
+      const top = h * 0.865 - h * 0.045 - h * 0.034;
+      for (let i = 0; i < 5; i++) {
+        const q = (t * 0.25 + i / 5) % 1;
+        g.globalAlpha = 0.6 * (1 - q);
+        g.beginPath();
+        g.arc(X(cx + q * 18 * (k.L.wind > 3 ? 2 : 1), 2), top - q * 34, 2 + q * 5, 0, TAU);
+        g.lineWidth = 0.9;
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+    // fireflies along the shore on summer nights
+    if (night && k.season === "summer")
+      for (let i = 0; i < 12; i++) {
+        const a = Math.max(0, Math.sin(t * 1.4 + i * 2.3));
+        g.fillStyle = `rgba(230,255,140,${a})`;
+        g.beginPath();
+        g.arc(X(hash(i * 3.1) * PW + Math.sin(t * 0.4 + i) * 8, 2), lake + 8 + hash(i * 1.7) * 40, 1.4, 0, TAU);
+        g.fill();
+      }
+  },
+};
+
+const WORLDS = { coast, farm, city, suburb, desert, woods };
 
 // ---------------------------------------------------------------------------
 // painting the loop, and the moving bits
@@ -3943,6 +4510,7 @@ export function paintWorldPano(
   else if (kind === "city") city.ground(kit);
   else if (kind === "suburb") suburb.ground(kit);
   else if (kind === "desert") desert.ground(kit);
+  else if (kind === "woods") woods.ground(kit);
   else farm.draw(kit);
   def.scenes.forEach((scene, i) => scene(kit, i * w));
   return { W: PW, H: h, top, scale, layers, lays: [], I, kit, kind };

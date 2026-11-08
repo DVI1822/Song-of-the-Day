@@ -12,6 +12,7 @@ const OPTIONS: [ScenePick, string][] = [
   ["coast", "Coast"],
   ["suburb", "Suburbs"],
   ["desert", "Desert"],
+  ["woods", "Woods & lakes"],
   ["country", "Farmland"],
   ["city", "City"],
   ["off", "None"],
