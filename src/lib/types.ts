@@ -30,10 +30,12 @@ export type Post = {
 // Someone you follow, plus today's song if they've posted one. followed_back_at
 // is when they added you back, if they did after you added them; follows_me is
 // whether they have you on their globe too (only then can you chat); hidden means
-// you've hidden their songs from your globe.
+// you've hidden their songs from your globe; streak is how many days in a row
+// they've posted, counting today (missing until the streaks migration is run).
 export type Friend = Profile & { post: Post | null; followed_at: string; followed_back_at: string | null;
   follows_me: boolean;
   hidden: boolean;
+  streak?: number;
 };
 
 // Someone who added you that you haven't added back.

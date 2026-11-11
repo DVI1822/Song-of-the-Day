@@ -996,7 +996,12 @@ function Globe({
         if (!n) return;
         const byUser = new Map(n.posts.map((p) => [p.user_id, p]));
         setFriends((list) =>
-          list.map((f) => ({ ...f, post: byUser.get(f.id) ?? f.post, followed_back_at: n.backAt[f.id] ?? f.followed_back_at, follows_me: f.follows_me || Boolean(n.backAt[f.id]) })),
+          list.map((f) => {
+            const post = byUser.get(f.id) ?? f.post;
+            // a first song today adds today to their streak
+            const streak = f.streak !== undefined && post && !f.post ? f.streak + 1 : f.streak;
+            return { ...f, post, streak, followed_back_at: n.backAt[f.id] ?? f.followed_back_at, follows_me: f.follows_me || Boolean(n.backAt[f.id]) };
+          }),
         );
         setAddedMe(n.addedMe);
         setActivity(n.activity);

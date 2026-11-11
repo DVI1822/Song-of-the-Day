@@ -119,7 +119,7 @@ const FRIENDS: Friend[] = NAMES.map((name, i) => ({
   follows_me: i % 3 !== 2,
   hidden: false,
   post: rnd(i, 12) < 0.28 ? null : song(i + 1, `u${i + 1}`, TODAY, 1 + rnd(i, 1) * 10),
-}));
+})).map((f, i) => ({ ...f, streak: Math.floor(rnd(i, 13) * 30) + (f.post ? 1 : 0) }));
 const MY_SONGS = history("u0", 0, 40);
 
 // Feels and notes on friends' songs: a few made up per song, plus whatever
