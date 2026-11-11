@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SCENE_KEY, scenePick, type ScenePick } from "@/lib/setting";
 import { glass } from "./ui";
 
-// The backdrop dial on the right-hand side, under the chat tab: a wheel whose
+// The backdrop dial low on the right-hand side, level with the Core tab: a wheel whose
 // middle sits just off the screen's edge, so only the scene you're on peeks
 // out and the others wait round the rim, out of sight. Spin it (or tap for the next one)
 // to change what's drawn behind the Globe. Kept on this device, the same
@@ -289,7 +289,7 @@ export function SceneWheel({
             cx={CX}
             cy={CY}
             r={RO - 1}
-            fill={dark ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.32)"}
+            fill={dark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.18)"}
             stroke="rgba(13,42,63,0.18)"
             strokeWidth="1"
           />
@@ -322,7 +322,7 @@ export function SceneWheel({
                   y1={+(CY + Math.sin(a) * r1).toFixed(2)}
                   x2={+(CX + Math.cos(a) * r2).toFixed(2)}
                   y2={+(CY + Math.sin(a) * r2).toFixed(2)}
-                  stroke="rgba(13,42,63,0.35)"
+                  stroke={dark ? "rgba(236,240,248,0.3)" : "rgba(13,42,63,0.25)"}
                   strokeWidth={i % 4 === 0 ? 1.4 : 0.8}
                   strokeLinecap="round"
                 />
@@ -348,7 +348,10 @@ export function SceneWheel({
                 left: x - 20,
                 opacity: Math.round(Math.max(0, 1 - Math.max(0, off - 8) / 22) * 100) / 100,
                 top: y - 20,
-                ...glass(dark),
+                // see-through, so it sits quietly at the edge
+                background: dark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.38)",
+                border: `1.5px solid ${dark ? "rgba(236,240,248,0.45)" : "rgba(29,36,51,0.35)"}`,
+                color: dark ? "rgba(236,240,248,0.75)" : "rgba(13,42,63,0.7)",
                 transition: dragging
                   ? "none"
                   : "left 420ms cubic-bezier(.2,1.4,.4,1), top 420ms cubic-bezier(.2,1.4,.4,1), opacity 300ms",
