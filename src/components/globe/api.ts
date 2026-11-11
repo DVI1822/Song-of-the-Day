@@ -19,18 +19,9 @@ import {
   previewSong,
   reportUser,
   searchPeople,
-  spotifyNext,
-  spotifyNow,
-  spotifyPause,
-  spotifyPlay,
-  spotifyPlayAll,
-  spotifyResume,
   type ContactMatch,
   type NewPost,
   type ReportReason,
-  type SpotifyNow,
-  type Here,
-  type SpotifyPlay,
 } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
@@ -67,17 +58,6 @@ export type GlobeApi = {
   news?(): Promise<News | null>;
   // a few facts about the song you posted, from Wikipedia
   facts?(postId: string): Promise<SongFacts | null>;
-  // Spotify Connect, for people who linked Spotify. The demo has none.
-  spotify?: SpotifyConnect;
-};
-
-export type SpotifyConnect = {
-  play(uri: string, positionMs?: number): Promise<SpotifyPlay>;
-  playAll(uris: string[]): Promise<SpotifyPlay>;
-  next(): Promise<void>;
-  pause(): Promise<void>;
-  resume(): Promise<SpotifyPlay>;
-  now(): Promise<SpotifyNow>;
 };
 
 // The globe chat and messages to one person. These go straight to the
@@ -185,14 +165,6 @@ export const serverApi: GlobeApi = {
   async savePush(sub) {
     await createClient().rpc("save_push", { sub_endpoint: sub.endpoint, sub_p256dh: sub.p256dh, sub_auth: sub.auth });
   },
-  spotify: {
-    play: (uri, at) => spotifyPlay(uri, at, deviceHere()),
-    playAll: (uris) => spotifyPlayAll(uris, deviceHere()),
-    next: spotifyNext,
-    pause: spotifyPause,
-    resume: () => spotifyResume(deviceHere()),
-    now: spotifyNow,
-  },
   // Your picture lives in its own folder beside your one-day photos, so the
   // daily sweep (data.ts) leaves it be; the one before it is removed.
   async setAvatar(userId, photo) {
@@ -235,12 +207,4 @@ export async function shrinkPhoto(file: File): Promise<Blob> {
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.85));
-}
-
-// Which kind of device this is, so a song plays on its own Spotify app.
-function deviceHere(): Here {
-  const ua = navigator.userAgent;
-  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) || (/Android/.test(ua) && !/Mobile/.test(ua)))
-    return "tablet";
-  return /iPhone|iPod|Android|Mobile/.test(ua) ? "phone" : "computer";
 }

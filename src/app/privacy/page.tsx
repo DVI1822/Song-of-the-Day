@@ -26,17 +26,10 @@ export default function PrivacyPage() {
         <li>Reports you send about a song or a person, which only the site&apos;s team can read.</li>
       </ul>
 
-      <h2>Spotify</h2>
+      <h2>Music</h2>
       <p>
-        If you choose to connect Spotify, we ask Spotify for permission to see what&apos;s playing and to start, pause and
-        change songs on your Spotify app. That lets the play button play whole songs. We store the key Spotify gives
-        us for this and your Spotify display name. We don&apos;t read your playlists, library or listening history, and we
-        don&apos;t keep any Spotify content.
-      </p>
-      <p>
-        You can disconnect at any time in <strong>Settings → Disconnect Spotify</strong>, which deletes that key from
-        our records straight away. You can also remove the app&apos;s access from your Spotify account at{" "}
-        <a href="https://www.spotify.com/account/apps/">spotify.com/account/apps</a>.
+        Songs play as 30-second samples, and whole songs open in your own music app. TopTrack doesn&apos;t connect to your
+        Spotify or any other music account, and doesn&apos;t read your playlists, library or listening history.
       </p>
 
       <h2>Weather</h2>
@@ -56,7 +49,7 @@ export default function PrivacyPage() {
       <h2>Deleting your data</h2>
       <p>
         You can delete a post on the day you share it. To delete your whole account and everything in it (songs,
-        photos, follows, blocks and your Spotify link), go to <strong>Settings → Delete my account</strong>. It&apos;s
+        photos, follows and blocks), go to <strong>Settings → Delete my account</strong>. It&apos;s
         erased right away and can&apos;t be undone.
       </p>
     </LegalPage>

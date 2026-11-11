@@ -5,9 +5,8 @@ import type { Post } from "@/lib/types";
 import { usePreview } from "./Preview";
 import { Cover, glass } from "./ui";
 
-// Shuffle all: every song on the Globe, in a random order. Anyone who linked
-// Spotify hears them whole on their Spotify app, the list handed to Spotify
-// in one go; everyone else hears the 30-second previews back to back.
+// Shuffle all: every song on the Globe, in a random order, as 30-second
+// samples back to back.
 // Whatever's playing (a shuffle or one song) lives in PreviewProvider, in the
 // root layout, so it keeps going on every page: the Globe shows it in this
 // bar, everywhere else in the mini player.

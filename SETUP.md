@@ -170,29 +170,16 @@ Spotify keeps new apps in development mode: only people on that User
 Management list can sign in, up to 5 of them. Anyone else uses the email link.
 Their Spotify email still needs to be on the invite list in Supabase.
 
-## Part 4c: Whole songs with Spotify (optional)
+## Part 4c: Songs play as samples
 
-People who connect Spotify (in their Settings, or the "connect Spotify" link
-under a song) can press play and hear the whole song on their own Spotify app:
-phone, computer or speaker. It needs Spotify Premium. Everyone else keeps the
-preview.
-
-1. In Supabase's **SQL Editor**, run
-   `supabase/migrations/20261024000000_spotify_links.sql`.
-2. In your Spotify app at <https://developer.spotify.com/dashboard> (the same
-   one as Part 4b, or a new one with **Web API** ticked), open **Settings →
-   Edit** and add these Redirect URIs, then **Save**:
-   - `https://song-of-the-day-liart.vercel.app/spotify/callback`
-   - `https://song-of-the-day-git-claude-project-threa-3edd57-song-of-the-day.vercel.app/spotify/callback`
-     (the preview link, for trying changes before they go live)
-3. Copy the app's **Client ID** (not the secret; this doesn't need it).
-4. In Vercel, open the project's **Settings → Environment Variables**, add
-   `SPOTIFY_CLIENT_ID` with that value for all environments, and save. Then
-   open **Deployments**, and on the newest one click **⋯ → Redeploy** so it
-   picks up the new value.
-5. In the Spotify app's **User Management**, add yourself and each friend
-   (name plus their Spotify account's email). In development mode Spotify
-   lets up to 5 people connect.
+Every song plays as a 30-second sample, and **Open in Spotify** (or Apple
+Music, YouTube Music, or any other app) opens the whole song in the
+listener's own app. TopTrack doesn't stream whole songs, which keeps it a
+"Non-Streaming" app under Spotify's rules, so it can make money later and
+nobody needs to connect Spotify. If you used to have whole songs on, run
+`supabase/migrations/20261109000000_drop_spotify_links.sql` once in the
+Supabase SQL Editor to delete the saved Spotify keys. `SPOTIFY_CLIENT_ID` in
+Vercel isn't used any more and can be removed.
 
 ## Part 4d: Facts about your song (optional)
 
