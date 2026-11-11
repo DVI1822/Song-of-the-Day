@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatDay, formatTime, todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, MayKnow, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
@@ -15,9 +15,11 @@ const Kicker = ({ children }: { children: React.ReactNode }) => (
 );
 
 // ---------------------------------------------------------------------------
-// My friends: everyone on your globe, by name. Beside each one, their song
-// today (tap to fly to it, or an empty ring if they haven't posted) and their
-// core. Anything new since you last looked gets a dot. Above, likes and notes
+// My friends: everyone on your globe, whoever posted most recently on top,
+// then the people who haven't posted yet, by name. When a new song comes in,
+// its poster rises to the top and everyone else slides down. Beside each
+// one, their streak, their song today (tap to fly to it, or an empty ring if
+// they haven't posted) and their core. Anything new since you last looked gets a dot. Above, likes and notes
 // on your song; below, whose songs you've hidden.
 // ---------------------------------------------------------------------------
 
@@ -43,7 +45,10 @@ export function FriendsPanel({
   const isNew = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenBefore;
   const byName = (a: { f: Friend }, b: { f: Friend }) => a.f.display_name.localeCompare(b.f.display_name);
   const all = friends.map((f, k) => ({ f, k }));
-  const shown = all.filter((x) => !x.f.hidden).sort(byName);
+  const byLatest = (a: { f: Friend }, b: { f: Friend }) =>
+    a.f.post && b.f.post ? b.f.post.created_at.localeCompare(a.f.post.created_at) : a.f.post ? -1 : b.f.post ? 1 : byName(a, b);
+  const shown = all.filter((x) => !x.f.hidden).sort(byLatest);
+  const rows = useSlide(shown.map((x) => x.f.id).join(" "));
   const hidden = all.filter((x) => x.f.hidden).sort(byName);
   const posted = shown.filter((x) => x.f.post).length;
   const mine = activity.length > 0 && <OnYourSong activity={activity} isNew={isNew} onMine={onMine} />;
@@ -69,12 +74,13 @@ export function FriendsPanel({
         const p = f.post;
         const back = isNew(f.followed_back_at);
         return (
-          <div key={f.id} className="flex h-[54px] items-center gap-1 pl-2">
+          <div key={f.id} ref={rows(f.id)} data-motion className="relative flex h-[54px] items-center gap-1 pl-2">
             <PersonButton p={f} onCore={onCore}>
               <Avatar p={f} />
               <div className="flex min-w-0 flex-1 flex-col gap-px">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold">{f.display_name}</span>
+                  {Boolean(f.streak) && <Streak days={f.streak!} />}
                   {(back || isNew(p?.created_at)) && <NewDot />}
                 </div>
                 <div className="truncate text-[11px] text-muted">
@@ -110,6 +116,68 @@ export function FriendsPanel({
       })}
       {hidden.length > 0 && <Hidden people={hidden.map((x) => x.f)} onShow={onShow} onCore={onCore} />}
     </div>
+  );
+}
+
+// Slides rows to their new places when the order changes: whoever just posted
+// rises to the top (over the others) and everyone above them slides down one.
+// Keeps moving with Reduce Motion on, like the song's buttons (data-motion).
+function useSlide(order: string) {
+  const els = useRef(new Map<string, HTMLElement>());
+  const tops = useRef(new Map<string, number>());
+  const refs = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  useLayoutEffect(() => {
+    const before = tops.current;
+    const after = new Map<string, number>();
+    for (const [id, el] of els.current) after.set(id, el.offsetTop);
+    tops.current = after;
+    if (!before.size) return; // first open: no slide
+    for (const [id, el] of els.current) {
+      const from = before.get(id);
+      const to = after.get(id)!;
+      if (from === undefined || from === to) continue;
+      const rising = from > to;
+      el.style.zIndex = rising ? "2" : "";
+      el.animate(
+        rising
+          ? [
+              { transform: `translateY(${from - to}px)`, offset: 0 },
+              { transform: `translateY(${(from - to) * 0.35}px) scale(1.03)`, offset: 0.55 },
+              { transform: "translateY(0) scale(1)", offset: 1 },
+            ]
+          : [{ transform: `translateY(${from - to}px)` }, { transform: "translateY(0)" }],
+        { duration: rising ? 720 : 560, delay: rising ? 0 : 60, easing: "cubic-bezier(.2,.8,.2,1)" },
+      ).onfinish = () => (el.style.zIndex = "");
+    }
+  }, [order]);
+  return (id: string) => {
+    let ref = refs.current.get(id);
+    if (!ref) {
+      ref = (el) => (el ? els.current.set(id, el) : els.current.delete(id));
+      refs.current.set(id, ref);
+    }
+    return ref;
+  };
+}
+
+// Days in a row someone has posted, counting today.
+function Streak({ days }: { days: number }) {
+  return (
+    <span
+      title={`${days}-day streak`}
+      aria-label={`${days}-day streak`}
+      className="flex flex-none items-center gap-0.5 text-[11px] font-semibold tabular-nums text-accent"
+    >
+      <svg width="10" height="12" viewBox="0 0 10 12" fill="none" aria-hidden>
+        <path
+          d="M5 11.2c2.2 0 3.8-1.5 3.8-3.6 0-2.4-2-3.6-2.4-6.1C5 2.6 4.4 4 4.6 5.3 3.8 4.9 3.4 4.1 3.3 3.3 1.9 4.5 1.2 6 1.2 7.6c0 2.1 1.6 3.6 3.8 3.6Z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {days}
+    </span>
   );
 }
 

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCore, getNews, getReactions, getSaved, getSession, type News } from "@/lib/data";
+import { getCore, getNews, getReactions, getSaved, getSession, streaksFor, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
 import type { Core, Friend, MayKnow, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
@@ -301,11 +301,12 @@ export async function follow(profileId: string): Promise<{ friend?: Friend; erro
   if (!userId) redirect("/login");
   const { error } = await supabase.from("follows").insert({ following_id: profileId });
   if (error && error.code !== "23505") return { error: error.message };
-  const [{ data: profile }, { data: post }, { data: hidden }, { data: back }] = await Promise.all([
+  const [{ data: profile }, { data: post }, { data: hidden }, { data: back }, streaks] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", profileId).single<Profile>(),
     supabase.from("today_posts").select("*").eq("user_id", profileId).maybeSingle<Post>(),
     supabase.from("hidden_songs").select("hidden_id").eq("hidden_id", profileId).maybeSingle(),
     supabase.from("follows").select("follower_id").eq("follower_id", profileId).eq("following_id", userId).maybeSingle(),
+    streaksFor(supabase, [profileId]),
   ]);
   if (!profile) return { error: "Couldn't find that person." };
   revalidatePath("/", "layout");
@@ -317,6 +318,7 @@ export async function follow(profileId: string): Promise<{ friend?: Friend; erro
       followed_back_at: null,
       follows_me: Boolean(back),
       hidden: Boolean(hidden),
+      streak: streaks ? (streaks.get(profileId) ?? 0) : undefined,
     },
   };
 }

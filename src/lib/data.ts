@@ -92,6 +92,15 @@ const backAt = (addedAt: Map<string, string>, id: string, followedAt: string) =>
   return at && Date.parse(at) > Date.parse(followedAt) ? at : null;
 };
 
+// Days in a row each of these people has posted, still alive today. Empty
+// null (no streaks shown) if the streaks migration hasn't been run yet.
+export async function streaksFor(supabase: Supabase, ids: string[]): Promise<Map<string, number> | null> {
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase.rpc("streaks", { ids });
+  if (error || !data) return null;
+  return new Map((data as { who: string; days: number }[]).map((r) => [r.who, r.days]));
+}
+
 export async function getGlobe(profile: Profile) {
   const supabase = await createClient();
   const [{ data: follows }, { data: mySongs }, { data: redo }, { data: hidden }] = await Promise.all([
@@ -114,9 +123,10 @@ export async function getGlobe(profile: Profile) {
     .map((f) => ({ followed_at: f.created_at as string, profile: f.profile as unknown as Profile }))
     .filter((f) => f.profile);
   const ids = people.map((p) => p.profile.id);
-  const [{ data: posts }, { addedMe, addedAt }] = await Promise.all([
+  const [{ data: posts }, { addedMe, addedAt }, streaks] = await Promise.all([
     ids.length ? supabase.from("today_posts").select("*").in("user_id", ids) : Promise.resolve({ data: [] as Post[] }),
     addedYou(supabase, profile.id, new Set(ids)),
+    streaksFor(supabase, ids),
   ]);
   const byUser = new Map((posts as Post[]).map((p) => [p.user_id, p]));
   const hiddenIds = new Set((hidden ?? []).map((h) => h.hidden_id as string));
@@ -128,6 +138,7 @@ export async function getGlobe(profile: Profile) {
     follows_me: addedAt.has(p.id),
     hidden: hiddenIds.has(p.id),
     post: byUser.get(p.id) ?? null,
+    streak: streaks ? (streaks.get(p.id) ?? 0) : undefined,
   }));
   const songs = (mySongs ?? []) as Post[];
   const today = todayIn(profile.timezone);
