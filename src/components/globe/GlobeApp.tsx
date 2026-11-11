@@ -339,7 +339,11 @@ function Globe({
     const at = `${lat.toFixed(1)},${lon.toFixed(1)}`;
     if (settingOverride() || setting.current.at === at) return;
     setting.current.at = at;
-    settingFor(lat, lon).then((k) => void (setting.current.kind = k));
+    // only the newest place counts: an older, slower lookup (the network's
+    // guess) mustn't land on top of the phone's own location
+    settingFor(lat, lon).then((k) => {
+      if (setting.current.at === at) setting.current.kind = k;
+    });
   });
   const wx = useRef({ weather, dark: false, scene: null as Scene | null, failed: false, season: "autumn" as Season, seasonAt: -Infinity });
   useLayoutEffect(() => {

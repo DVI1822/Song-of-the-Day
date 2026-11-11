@@ -24,11 +24,31 @@ function markAsked() {
   } catch {}
 }
 
+// The last place the phone itself said you were, kept on this device. A
+// home-screen app on iPhone forgets that location was allowed and reports
+// "ask again" every launch, and the Settings page has no Globe to hear the
+// news, so without this the network's guess (often a far-off city) wins.
+export const HERE_KEY = "tt-here";
+export function rememberHere(lat: number, lon: number) {
+  try {
+    localStorage.setItem(HERE_KEY, JSON.stringify({ lat: +lat.toFixed(2), lon: +lon.toFixed(2), t: Date.now() }));
+  } catch {}
+}
+export function rememberedHere(): { lat: number; lon: number } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(HERE_KEY) ?? "null") as { lat?: unknown; lon?: unknown } | null;
+    return v && typeof v.lat === "number" && typeof v.lon === "number" ? { lat: v.lat, lon: v.lon } : null;
+  } catch {
+    return null;
+  }
+}
+
 // share the phone's location with the sky and the scene
 export function locateNow(done?: (ok: boolean) => void) {
   if (!("geolocation" in navigator)) return done?.(false);
   navigator.geolocation.getCurrentPosition(
     (g) => {
+      rememberHere(g.coords.latitude, g.coords.longitude);
       window.dispatchEvent(
         new CustomEvent(LOCATED, {
           detail: { lat: g.coords.latitude, lon: g.coords.longitude },
