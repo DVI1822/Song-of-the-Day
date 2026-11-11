@@ -22,6 +22,11 @@ import { CELLS, TEX, atlas } from "./textures";
 // petals, seeds) swirl past it, and heavier ones (leaves) hit it, lie flat
 // against it, ride the spin for a moment and slide off. A snowflake that
 // lands on it melts away in a few seconds, and a raindrop runs down it.
+//
+// In the drawn look (ink.ts) it all matches the scenery: flat cartoon clouds
+// with an inked edge, inked rain dashes and snowflakes, flat inked leaves
+// and petals, fog in flat bands, a yellow bolt with an ink edge, and no
+// painted flowers under the globe (the scenery shows the season itself).
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
@@ -147,6 +152,8 @@ in float vShade;
 in float vSeed;
 uniform sampler2D atlas;
 uniform float time;
+uniform float ink;
+uniform vec3 inkC;
 out vec4 o;
 ${NOISE}
 float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 3; i++){ s += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.875; }
@@ -160,18 +167,30 @@ void main(){
   } else if (vKind == 1) {
     float r2 = dot(vUV, vUV);
     a = exp(-r2 * 3.2) * clamp(1.0 - r2, 0.0, 1.0);
-  } else if (vKind == 2) {
+  } else if (vKind == 2 || vKind == 5) {
     float c = vTex;
     vec2 cell = vec2(mod(c, ${CELLS}.0), floor(c / ${CELLS}.0));
     vec2 l = clamp(vUV * 0.5 + 0.5, 0.01, 0.99);
     vec2 uv = vec2((cell.x + l.x) / ${CELLS}.0, 1.0 - (cell.y + 1.0 - l.y) / ${CELLS}.0);
     vec4 t = texture(atlas, uv);
-    o = vec4(t.rgb * vShade * vCol.rgb, t.a) * vCol.a;
+    // drawn things keep their flat colours, barely shaded
+    float sh = (vKind == 5 || ink > 0.5) ? mix(1.0, vShade, 0.35) : vShade;
+    o = vec4(t.rgb * sh * vCol.rgb, t.a) * vCol.a;
     return;
   } else {
     float r = length(vUV);
     float n = fbm(vUV * 1.7 + vec2(vSeed * 31.0 + time * 0.018, vSeed * 17.0 - time * 0.012));
     a = (1.0 - smoothstep(0.25, 1.0, r)) * smoothstep(0.32, 0.78, n);
+    if (ink > 0.5) {
+      // fog in the drawn look: a flat band with an inked edge
+      float e = (a - 0.4) / max(fwidth(a), 1e-4);
+      if (e < 0.0) discard;
+      float ed = 1.0 - smoothstep(1.2, 2.2, e);
+      vec3 c = mix(vCol.rgb, inkC, ed * 0.7);
+      float aa = vCol.a * 1.15 * clamp(e, 0.0, 1.0);
+      o = vec4(c * aa, aa);
+      return;
+    }
   }
   a *= vCol.a;
   o = vec4(vCol.rgb * a, a);
@@ -192,6 +211,8 @@ uniform vec3 litC;
 uniform vec3 shadeC;
 uniform float alpha;
 uniform vec3 flash;
+uniform float ink;
+uniform vec3 inkC;
 out vec4 o;
 ${NOISE}
 float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ s += a * vnoise(p); p = mat2(1.6, 1.2, -1.2, 1.6) * p + 7.3; a *= 0.5; } return s; }
@@ -213,7 +234,21 @@ void main(){
   float thick = smoothstep(lo, lo + 0.5, d);
   vec3 col = mix(litC, shadeC, clamp(thick * 0.55 + (1.0 - lit) * 0.5, 0.0, 1.0));
   vec2 fd = (uv - flash.xy) * vec2(asp, 1.0);
-  col += flash.z * exp(-dot(fd, fd) * 5.0) * vec3(0.85, 0.9, 1.0) * (0.35 + thick);
+  vec3 fl = flash.z * exp(-dot(fd, fd) * 5.0) * vec3(0.85, 0.9, 1.0);
+  if (ink > 0.5) {
+    // the drawn look: flat cartoon clouds, a shadow tone on the far side, an
+    // inked edge a couple of pixels wide whatever the size
+    float thr = lo + 0.08 + (1.0 - mix(mix(0.25, 0.85, cover), 1.0, smoothstep(0.05, 0.8, uv.y))) * 0.22;
+    float e = (d - thr) / max(fwidth(d), 1e-5);
+    if (e < 0.0) { o = vec4(0.0); return; }
+    vec3 c = (lit < 0.42 || d > thr + mix(0.32, 0.12, cover)) ? shadeC : litC;
+    c += fl * 0.6;
+    c = mix(c, inkC, 1.0 - smoothstep(1.4, 2.2, e));
+    float a2 = clamp(e, 0.0, 1.0) * min(1.0, alpha * 1.08);
+    o = vec4(c * a2, a2);
+    return;
+  }
+  col += fl * (0.35 + thick);
   float a = dens * alpha;
   o = vec4(col * a, a);
 }`;
@@ -260,10 +295,14 @@ class Particles {
   data = new Float32Array(MAX * F);
   n = 0;
 
-  constructor(private cv: HTMLCanvasElement) {
+  inkC: V3 = [0.11, 0.14, 0.2];
+  constructor(
+    private cv: HTMLCanvasElement,
+    private ink = false,
+  ) {
     const gl = (this.gl = context(cv));
     this.prog = compile(gl, PART_VS, PART_FS);
-    for (const k of ["res", "ctr", "zoom", "sunL", "day", "direct", "atlas", "time"]) this.u[k] = gl.getUniformLocation(this.prog, k);
+    for (const k of ["res", "ctr", "zoom", "sunL", "day", "direct", "atlas", "time", "ink", "inkC"]) this.u[k] = gl.getUniformLocation(this.prog, k);
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
     const quad = gl.createBuffer();
@@ -288,7 +327,7 @@ class Particles {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas());
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas(this.ink));
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -334,6 +373,8 @@ class Particles {
     gl.uniform1f(this.u.direct, direct);
     gl.uniform1f(this.u.time, t);
     gl.uniform1i(this.u.atlas, 0);
+    gl.uniform1f(this.u.ink, this.ink ? 1 : 0);
+    gl.uniform3f(this.u.inkC, ...this.inkC);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.bindVertexArray(this.vao);
@@ -350,10 +391,13 @@ class Sky {
   private vao: WebGLVertexArrayObject;
   private u: Record<string, WebGLUniformLocation | null> = {};
 
-  constructor(private cv: HTMLCanvasElement) {
+  constructor(
+    private cv: HTMLCanvasElement,
+    private ink = false,
+  ) {
     const gl = (this.gl = context(cv));
     this.prog = compile(gl, SKY_VS, SKY_FS);
-    for (const k of ["res", "time", "cover", "off", "sunDir", "litC", "shadeC", "alpha", "flash"]) this.u[k] = gl.getUniformLocation(this.prog, k);
+    for (const k of ["res", "time", "cover", "off", "sunDir", "litC", "shadeC", "alpha", "flash", "ink", "inkC"]) this.u[k] = gl.getUniformLocation(this.prog, k);
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
     const b = gl.createBuffer();
@@ -364,9 +408,10 @@ class Sky {
     gl.bindVertexArray(null);
   }
 
-  draw(w: number, h: number, t: number, c: { cover: number; off: [number, number]; sun: [number, number]; lit: V3; shade: V3; alpha: number; flash: V3 }) {
+  draw(w: number, h: number, t: number, c: { cover: number; off: [number, number]; sun: [number, number]; lit: V3; shade: V3; alpha: number; flash: V3; ink: V3 }) {
     const gl = this.gl;
-    const [W, H] = fit(this.cv, w, h, 0.4);
+    // the drawn edge needs a sharper canvas than soft clouds do
+    const [W, H] = fit(this.cv, w, h, this.ink ? 0.75 : 0.4);
     gl.viewport(0, 0, W, H);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -381,6 +426,8 @@ class Sky {
     gl.uniform3f(this.u.shadeC, ...c.shade);
     gl.uniform1f(this.u.alpha, c.alpha);
     gl.uniform3f(this.u.flash, ...c.flash);
+    gl.uniform1f(this.u.ink, this.ink ? 1 : 0);
+    gl.uniform3f(this.u.inkC, ...c.ink);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
@@ -507,10 +554,11 @@ export class Scene {
     frontCv: HTMLCanvasElement,
     private flashEl: HTMLElement | null,
     private fast: boolean,
+    private ink = false,
   ) {
-    this.sky = new Sky(skyCv);
-    this.back = new Particles(backCv);
-    this.front = new Particles(frontCv);
+    this.sky = new Sky(skyCv, ink);
+    this.back = new Particles(backCv, ink);
+    this.front = new Particles(frontCv, ink);
     this.calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0.35 : 1;
     this.nextGust = fast ? 2 : rand(8, 30);
   }
@@ -556,6 +604,9 @@ export class Scene {
 
     // ------------------------------------------------------------- the clouds
     const dk = f.dk;
+    // ink: dark by day, a pale chalk line after dark so it still shows
+    const inkC = tint(dk, [0.11, 0.14, 0.2], [0.62, 0.67, 0.78]);
+    this.back.inkC = this.front.inkC = inkC;
     const cover = kind === "clear" ? 0 : kind === "partly" ? Math.max(0.35, wx!.cloud * 0.8) : storm ? 1 : kind === "cloudy" ? 0.9 : 0.85;
     const goal = storm
       ? { lit: tint(dk, [0.5, 0.53, 0.58], [0.16, 0.18, 0.23]), shade: tint(dk, [0.26, 0.29, 0.34], [0.05, 0.06, 0.09]), alpha: 0.95 }
@@ -592,6 +643,7 @@ export class Scene {
       shade: c.shade,
       alpha: c.alpha,
       flash: flashAt,
+      ink: inkC,
     });
 
     const back = this.back,
@@ -621,7 +673,8 @@ export class Scene {
     // ---------------------------------------------------------------- mist
     const morning = f.hour >= 5 && f.hour < 10.5;
     const cold = temp !== null ? temp < 9 : f.season === "autumn" || f.season === "winter";
-    const mistKey = kind === "fog" ? "fog" : morning && cold ? "low" : wet ? "haze" : "";
+    // the drawn look keeps only real fog: soft morning mist and rain haze read as smudges there
+    const mistKey = kind === "fog" ? "fog" : this.ink ? "" : morning && cold ? "low" : wet ? "haze" : "";
     if (mistKey !== this.mistKey) {
       this.mistKey = mistKey;
       for (const m of this.mists) m.age = Math.min(m.age, -1); // the old ones fade out
@@ -657,12 +710,13 @@ export class Scene {
     }
 
     // ------------------------------------------------------------- the ground
-    const groundKey = f.season;
+    const groundKey = this.ink ? "none" : f.season;
     if (groundKey !== this.groundKey) {
       this.groundKey = groundKey;
       for (const g of this.ground) g.age = Math.min(g.age, -1);
-      const plan: [number, number][] =
-        f.season === "spring"
+      const plan: [number, number][] = this.ink
+        ? []
+        : f.season === "spring"
           ? [[TEX.sprout, 6], [TEX.daisy, 4], [TEX.crocus, 4]]
           : f.season === "summer"
             ? [[TEX.daisy, 4]]
@@ -697,9 +751,10 @@ export class Scene {
     while (this.drops.length < wantDrops) this.drops.push(this.dropSpot(kind, halfW, topY, true, R));
     if (this.drops.length > wantDrops) this.drops.length = Math.max(wantDrops, this.drops.length - Math.ceil(dt * 400));
     // by day rain shows as faint grey against the bright sky, by night it catches the light
-    const rc = tint(dk, storm ? [0.84, 0.87, 0.92] : [0.42, 0.48, 0.55], [0.78, 0.84, 0.95]);
-    const ra = (storm ? 0.3 : drizzle ? 0.2 : 0.26) * (storm || dk > 0.5 ? 1 : 1.25) * show;
-    const rw = storm ? 1.05 : drizzle ? 0.65 : 0.85;
+    // in the drawn look: bolder blue-ink dashes
+    const rc = this.ink ? tint(dk, [0.16, 0.24, 0.42], [0.74, 0.8, 0.94]) : tint(dk, storm ? [0.84, 0.87, 0.92] : [0.42, 0.48, 0.55], [0.78, 0.84, 0.95]);
+    const ra = (this.ink ? (drizzle ? 0.6 : 0.8) : (storm ? 0.3 : drizzle ? 0.2 : 0.26) * (storm || dk > 0.5 ? 1 : 1.25)) * show;
+    const rw = (storm ? 1.05 : drizzle ? 0.65 : 0.85) * (this.ink ? 2.3 : 1);
     for (const d of this.drops) {
       const py = d.y;
       d.y += d.vy * dt;
@@ -785,6 +840,13 @@ export class Scene {
       const r = s.r * (1 + near * 1.2);
       const behind = s.z < 0 && s.x * s.x + s.y * s.y < R2 ? 0.45 : 1;
       const a = ((0.8 * depth(s.z) * behind) / (1 + near * 1.4)) * show;
+      if (this.ink) {
+        // an inked snowflake, turning slowly as it falls
+        const sp = this.t * 0.6 + s.ph * 5;
+        const rr = r * 3.4;
+        to(s.z).push([s.x, s.y, s.z], [Math.cos(sp) * rr, Math.sin(sp) * rr, 0], [-Math.sin(sp) * rr, Math.cos(sp) * rr, 0], 1, 1, 1, Math.min(1, a * 1.15), 5, TEX.flake, 0, 0);
+        continue;
+      }
       // a faint grey edge, so flakes still show against a bright sky
       if (dk < 0.5) to(s.z).push([s.x, s.y, s.z], [r * 1.5, r * 1.5, 0], [0, 0, 0], 0.4, 0.45, 0.52, a * 0.5 * (1 - dk * 2), 1, 0, 0, 0);
       to(s.z).push([s.x, s.y, s.z], [r, r, 0], [0, 0, 0], sc[0], sc[1], sc[2], a, 1, 0, 0, 0);
@@ -803,6 +865,11 @@ export class Scene {
       const fade = clamp01(st.age / 0.3) * clamp01((st.life - st.age) / 2);
       // seen through the glass on the far side, only faintly
       const a = 0.85 * fade * (q[2] < 0 ? 0.3 : 1) * show;
+      if (this.ink) {
+        const rr = st.r * 3;
+        to(q[2]).push(q, [rr, 0, 0], [0, rr, 0], 1, 1, 1, a, 5, TEX.flake, 0, 0);
+        continue;
+      }
       if (dk < 0.5) to(q[2]).push(q, [st.r * 1.4, st.r * 1.4, 0], [0, 0, 0], 0.5, 0.55, 0.62, a * 0.35 * (1 - dk * 2), 1, 0, 0, 0);
       to(q[2]).push(q, [st.r, st.r, 0], [0, 0, 0], sc[0], sc[1], sc[2], a, 1, 0, 0, 0);
     }
@@ -1016,6 +1083,12 @@ export class Scene {
           p1 = this.bolt[i];
         const mid: V3 = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2];
         const u: V3 = [(p1[0] - p0[0]) / 2, (p1[1] - p0[1]) / 2, 0];
+        if (this.ink) {
+          // a cartoon bolt: yellow with an ink edge
+          back.push(mid, u, [0, 0, 0], inkC[0], inkC[1], inkC[2], a, 4, 0, 6.5, 0);
+          back.push(mid, u, [0, 0, 0], 1, 0.86, 0.32, a, 4, 0, 3, 0);
+          continue;
+        }
         back.push(mid, u, [0, 0, 0], 0.7, 0.78, 1, 0.16 * a, 4, 0, 9, 0);
         back.push(mid, u, [0, 0, 0], 0.97, 0.98, 1, a, 4, 0, 1.3, 0);
       }
@@ -1045,7 +1118,7 @@ export class Scene {
       y: topY(z) - (scatter ? rand(-1.8, 0.1) * Math.abs(topY(z)) : rand(0, 150)),
       vy,
       // motion blur: how far it falls while the eye takes it in
-      len: vy * (kind === "drizzle" ? 0.014 : 0.02),
+      len: vy * (kind === "drizzle" ? 0.014 : 0.02) * (this.ink ? 0.7 : 1),
     };
   }
 

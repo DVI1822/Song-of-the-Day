@@ -18,6 +18,7 @@ import { Key, KeyButton } from "./Key";
 import { AppTour, InstallCard } from "./Install";
 import { NotifyCard } from "./Notify";
 import { LocateCard } from "./Locate";
+import { SceneWheel, SCENE_EVENT } from "./SceneWheel";
 import { CoreInside } from "./CoreInside";
 import { CoreView } from "./CoreView";
 import { Feature } from "./Feature";
@@ -324,22 +325,36 @@ function Globe({
   const els = useRef(new Map<number, TileEls>());
   const R = useRef(newEls());
   // the kind of place you're in, shown behind the globe (setting.ts)
-  const setting = useRef({ scene: null as SettingScene | null, kind: null as SettingKind | null, at: "" });
+  // auto: what the lookup says for where you are, kept for when the wheel goes back to "Where I am"
+  const setting = useRef({ scene: null as SettingScene | null, kind: null as SettingKind | null, auto: null as SettingKind | null, at: "" });
   // the drawn look (ink.ts) also restyles the buttons and panels (globals.css)
   useEffect(() => {
     if (inkMode()) document.documentElement.dataset.ink = "";
   }, []);
   useEffect(() => {
-    const o = settingOverride();
-    if (o) setting.current.kind = o === "off" ? null : o;
+    const apply = () => {
+      const o = settingOverride();
+      setting.current.kind = o ? (o === "off" ? null : o) : setting.current.auto;
+    };
+    apply();
+    // the backdrop wheel (SceneWheel.tsx) turned
+    window.addEventListener(SCENE_EVENT, apply);
+    return () => window.removeEventListener(SCENE_EVENT, apply);
   }, []);
   const weather = useWeather((lat, lon) => {
     m.current.geo = { lat, lon };
     m.current.sunAt = 0;
     const at = `${lat.toFixed(1)},${lon.toFixed(1)}`;
-    if (settingOverride() || setting.current.at === at) return;
+    if (setting.current.at === at) return;
     setting.current.at = at;
-    settingFor(lat, lon).then((k) => void (setting.current.kind = k));
+    // only the newest place counts: an older, slower lookup (the network's
+    // guess) mustn't land on top of the phone's own location. Looked up even
+    // when a backdrop is picked, ready for a turn back to "Where I am".
+    settingFor(lat, lon).then((k) => {
+      if (setting.current.at !== at) return;
+      setting.current.auto = k;
+      if (!settingOverride()) setting.current.kind = k;
+    });
   });
   const wx = useRef({ weather, dark: false, scene: null as Scene | null, failed: false, season: "autumn" as Season, seasonAt: -Infinity });
   useLayoutEffect(() => {
@@ -791,7 +806,7 @@ function Globe({
         el = R.current;
       if (!w.scene && !w.failed && el.wxSky && el.wxBack && el.wxFront)
         try {
-          w.scene = new Scene(el.wxSky, el.wxBack, el.wxFront, el.wxFlash, weatherOverride() !== null || seasonOverride() !== null);
+          w.scene = new Scene(el.wxSky, el.wxBack, el.wxFront, el.wxFlash, weatherOverride() !== null || seasonOverride() !== null, inkMode());
         } catch {
           w.failed = true; // no WebGL here: the globe just goes without
         }
@@ -1320,6 +1335,9 @@ function Globe({
         className="absolute z-[6]"
         style={{ left: L.cx - L.R * 0.8 - 20, top: L.cy + L.R * 0.8 - 20 }}
       />
+
+      {/* the backdrop: a dial low on the right-hand side, level with the Core tab opposite, spun to pick the scene behind the Globe */}
+      <SceneWheel dark={darkOn} top={Math.min(tabTop + 424, L.h - 120) - 77} wheelRef={(el) => void (R.current.chrome[8] = el)} />
 
       {/* what this is, any time */}
       <HelpButton dark={darkOn} onClick={() => setHelp(true)} buttonRef={(el) => void (R.current.chrome[5] = el)} />

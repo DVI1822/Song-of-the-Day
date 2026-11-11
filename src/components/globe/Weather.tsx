@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PRESETS, type Weather, type WeatherKind, type WeatherReply } from "@/lib/weather";
 import type { Season } from "./scene";
 import { weatherSky } from "./sky";
+import { rememberHere, rememberedHere } from "./Locate";
 
 // The real weather where you are, laid over the day and night skies. This
 // file finds it and greys the sky behind the Globe; the clouds, rain, snow,
@@ -65,11 +66,15 @@ export function useWeather(onPlace: (lat: number, lon: number) => void) {
         })
         .catch(() => {});
     };
-    // The device's own location if it's already been allowed; otherwise the
-    // server goes by the network, with no prompt.
+    // The device's own location if it's already been allowed; failing that,
+    // the last place it said you were (Locate.tsx); only then does the server
+    // go by the network. Never a prompt from here.
+    const here = rememberedHere();
+    if (here) coords = `?lat=${here.lat.toFixed(2)}&lon=${here.lon.toFixed(2)}`;
     const located = () =>
       navigator.geolocation.getCurrentPosition(
         (g) => {
+          rememberHere(g.coords.latitude, g.coords.longitude);
           coords = `?lat=${g.coords.latitude.toFixed(2)}&lon=${g.coords.longitude.toFixed(2)}`;
           load();
         },
