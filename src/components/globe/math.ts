@@ -179,6 +179,18 @@ export class TileSim {
     }
   }
 
+  // Picked up and set down somewhere else (a new song about to land where you
+  // can see it). It keeps drifting at its own pace, in a new direction.
+  moveTo(k: number, p: V3) {
+    this.pos(k);
+    const o = this.bodies.get(k)!;
+    o.p = [p[0], p[1], p[2]];
+    norm(o.p);
+    const F = frame(o.p),
+      a = Math.random() * TWO_PI;
+    o.v = [0, 1, 2].map((i) => (F.e[i] * Math.cos(a) + F.d[i] * Math.sin(a)) * o.sp) as V3;
+  }
+
   // Tapped: it dips into the water, then bobs back up.
   dip(k: number) {
     this.float(k).hv -= 150;
