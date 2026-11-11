@@ -6,7 +6,10 @@ import { glass } from "./ui";
 
 // The backdrop dial low on the right-hand side, level with the Core tab: a wheel whose
 // middle sits just off the screen's edge, so only the scene you're on peeks
-// out and the others wait round the rim, out of sight. Spin it (or tap for the next one)
+// out and the others wait round the rim, out of sight. At rest it tucks
+// further in, just a sliver at the edge; a touch pulls it out (a tap only
+// pulls it out, a spin pulls it out and turns it), and a moment after you
+// let go it slides back in. Spin it (or tap for the next one)
 // to change what's drawn behind the Globe. Kept on this device, the same
 // choice as the picker in Settings.
 
@@ -20,6 +23,8 @@ const H = 2 * Math.ceil(Math.sqrt(RO * RO - OFF * OFF)) + 4;
 const CX = W + OFF,
   CY = H / 2;
 const STEP = 40; // degrees between emblems
+const TUCK = 30; // how far it slides in at rest
+const REST = 1200; // ms after the last touch before it tucks away
 const HOME = 180; // where the shown emblem sits: straight in from the edge
 
 const ink = {
@@ -164,10 +169,21 @@ export function SceneWheel({
   const [turn, setTurn] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [label, setLabel] = useState<string | null>(null);
+  const [out, setOut] = useState(false);
+  const tuckT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pullOut = () => {
+    if (tuckT.current) clearTimeout(tuckT.current);
+    setOut(true);
+  };
+  const tuckSoon = () => {
+    if (tuckT.current) clearTimeout(tuckT.current);
+    tuckT.current = setTimeout(() => setOut(false), REST);
+  };
   const box = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{
     a0: number;
     t0: number;
+    wasIn: boolean;
     moved: number;
     last: number;
   } | null>(null);
@@ -196,10 +212,10 @@ export function SceneWheel({
     }
   };
 
-  // angle of a point round the wheel's middle, in degrees
+  // angle of a point round the wheel's middle (where it sits pulled out), in degrees
   const angle = (x: number, y: number) => {
-    const r = box.current!.getBoundingClientRect();
-    return (Math.atan2(y - (r.top + CY), x - (r.left + CX)) * 180) / Math.PI;
+    const p = (box.current!.offsetParent ?? document.body).getBoundingClientRect();
+    return (Math.atan2(y - (p.top + top + CY), x - (p.right - W + CX)) * 180) / Math.PI;
   };
 
   return (
@@ -210,7 +226,7 @@ export function SceneWheel({
         className="pointer-events-none absolute z-[6] -translate-y-1/2 whitespace-nowrap rounded-full px-2.5 py-[3px] text-[11px] font-semibold transition-opacity duration-300"
         style={{
           ...glass(dark),
-          right: W + 6,
+          right: W + 6 - (out ? 0 : TUCK),
           top: top + CY,
           opacity: label ? 1 : 0,
         }}
@@ -228,12 +244,15 @@ export function SceneWheel({
           width: W,
           height: H,
           touchAction: "none",
+          transform: `translateX(${out ? 0 : TUCK}px)`,
+          transition: "transform 380ms cubic-bezier(.3,1.3,.5,1)",
           clipPath: `circle(${RO}px at ${CX}px ${CY}px)`,
         }}
         onPointerDown={(e) => {
           // only the rim near the shown emblem catches a touch
           const a = angle(e.clientX, e.clientY);
-          drag.current = { a0: a, t0: turn, moved: 0, last: a };
+          drag.current = { a0: a, t0: turn, wasIn: !out, moved: 0, last: a };
+          pullOut();
           (e.target as Element).setPointerCapture?.(e.pointerId);
           setDragging(true);
         }}
@@ -253,20 +272,29 @@ export function SceneWheel({
           drag.current = null;
           setDragging(false);
           if (!d) return;
-          // a tap: on to the next one
-          if (d.moved < 4) settle(d.t0 - STEP);
-          else settle(turn);
+          tuckSoon();
+          // a tap: out it comes, or on to the next one if it's already out
+          if (d.moved < 4) {
+            if (!d.wasIn) settle(d.t0 - STEP);
+          } else settle(turn);
         }}
         onPointerCancel={() => {
           drag.current = null;
           setDragging(false);
+          tuckSoon();
           settle(turn, false);
         }}
-        onWheel={(e) => settle(turn + (e.deltaY > 0 ? -STEP : STEP))}
+        onWheel={(e) => {
+          pullOut();
+          tuckSoon();
+          settle(turn + (e.deltaY > 0 ? -STEP : STEP));
+        }}
         role="button"
         tabIndex={0}
         aria-label={`Backdrop: ${SCENES[slotOf(turn)].name}. Tap or spin to change it`}
         onKeyDown={(e) => {
+          pullOut();
+          tuckSoon();
           if (
             e.key === "Enter" ||
             e.key === " " ||
