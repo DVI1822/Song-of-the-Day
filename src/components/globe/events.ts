@@ -11,7 +11,7 @@ import type { Inks } from "./line";
 import type { C, Light } from "./setting";
 import type { Season } from "./scene";
 
-export type Place = "mountain" | "coast" | "farm" | "city";
+export type Place = "mountain" | "coast" | "farm" | "city" | "suburb" | "desert" | "woods";
 export type Ctx = {
   g: CanvasRenderingContext2D;
   w: number;
@@ -25,7 +25,14 @@ export type Ctx = {
   hour: number;
   t: number;
 };
-type Run = { def: Def; t0: number; dur: number; seed: number; dir: 1 | -1; y: number };
+type Run = {
+  def: Def;
+  t0: number;
+  dur: number;
+  seed: number;
+  dir: 1 | -1;
+  y: number;
+};
 type Def = {
   name: string;
   places?: Place[];
@@ -159,7 +166,8 @@ function ell(c: Ctx, x: number, y: number, rx: number, ry: number, fill: C | nul
 }
 
 // where things cross the screen: from just off one side to just off the other
-const across = (c: Ctx, p: number, dir: number, pad = 60) => (dir > 0 ? -pad + p * (c.w + 2 * pad) : c.w + pad - p * (c.w + 2 * pad));
+const across = (c: Ctx, p: number, dir: number, pad = 60) =>
+  dir > 0 ? -pad + p * (c.w + 2 * pad) : c.w + pad - p * (c.w + 2 * pad);
 
 // ------------------------------------------------------------ the conditions
 const day = (c: Ctx) => c.L.night < 0.35;
@@ -172,15 +180,38 @@ const snowy = (c: Ctx) => c.I.snowy;
 const warmSeason = (c: Ctx) => c.season === "spring" || c.season === "summer";
 
 // the ground lines in each place, as fractions of the screen's height
-const GROUND: Record<Place, { horizon: number; near: number; road?: number; sea?: [number, number]; sand?: [number, number] }> = {
+const GROUND: Record<
+  Place,
+  {
+    horizon: number;
+    near: number;
+    road?: number;
+    sea?: [number, number];
+    sand?: [number, number];
+  }
+> = {
   mountain: { horizon: 0.72, near: 0.9 },
   coast: { horizon: 0.745, near: 0.93, sea: [0.76, 0.805], sand: [0.84, 0.95] },
   farm: { horizon: 0.718, near: 0.94, road: 0.886 },
-  city: { horizon: 0.8, near: 0.95 },
+  city: { horizon: 0.745, near: 0.82, road: 0.872 },
+  suburb: { horizon: 0.735, near: 0.842, road: 0.882 },
+  desert: { horizon: 0.73, near: 0.835, road: 0.885 },
+  woods: { horizon: 0.725, near: 0.86 },
 };
 
 // ------------------------------------------------------------ the moments
-const BANNERS = ["play it loud", "song of the day", "♪ ♪ ♪", "hi mom", "turn it up", "TopTrack", "on repeat", "what's yours today?", "dance break", "track 1, side A"];
+const BANNERS = [
+  "play it loud",
+  "song of the day",
+  "♪ ♪ ♪",
+  "hi mom",
+  "turn it up",
+  "TopTrack",
+  "on repeat",
+  "what's yours today?",
+  "dance break",
+  "track 1, side A",
+];
 
 const DEFS: Def[] = [
   // -------------------------------------------------------------- the sky
@@ -193,9 +224,18 @@ const DEFS: Def[] = [
       const x = across(c, p, r.dir, 40),
         y = c.h * (0.12 + 0.08 * r.y) + Math.sin(c.t * 0.5 + r.seed) * 6 * c.s;
       const stripes: C[][] = [
-        [[255, 94, 87], [255, 236, 200]],
-        [[90, 160, 230], [255, 220, 90]],
-        [[120, 200, 120], [255, 253, 246]],
+        [
+          [255, 94, 87],
+          [255, 236, 200],
+        ],
+        [
+          [90, 160, 230],
+          [255, 220, 90],
+        ],
+        [
+          [120, 200, 120],
+          [255, 253, 246],
+        ],
       ];
       const [a, b] = stripes[Math.floor(r.seed * 3) % 3];
       facing(c, x, y, 1, () => {
@@ -218,9 +258,33 @@ const DEFS: Def[] = [
         }
         ell(c, 0, -2, 14, 15, null, 1.3);
         // ropes and basket, the burner glowing now and then
-        ln(c, [[-6, 11], [-3.5, 19]], 0.8);
-        ln(c, [[6, 11], [3.5, 19]], 0.8);
-        shp(c, [[-4, 19], [4, 19], [3.4, 24], [-3.4, 24]], col(c, [170, 120, 70]), 1);
+        ln(
+          c,
+          [
+            [-6, 11],
+            [-3.5, 19],
+          ],
+          0.8,
+        );
+        ln(
+          c,
+          [
+            [6, 11],
+            [3.5, 19],
+          ],
+          0.8,
+        );
+        shp(
+          c,
+          [
+            [-4, 19],
+            [4, 19],
+            [3.4, 24],
+            [-3.4, 24],
+          ],
+          col(c, [170, 120, 70]),
+          1,
+        );
         if (Math.sin(c.t * 1.7 + r.seed * 9) > 0.7) {
           c.g.fillStyle = "rgba(255,170,60,0.9)";
           c.g.beginPath();
@@ -244,22 +308,69 @@ const DEFS: Def[] = [
       pen(c, 1.2);
       // the plane
       facing(c, x, y, d, () => {
-        shp(c, [[-10, 0], [8, -1.5], [11, 0], [8, 1.8], [-10, 1.5]], col(c, [255, 253, 246]), 1.1);
-        shp(c, [[-1, 0], [3, -6], [5, -6], [3, 0]], col(c, [255, 94, 87]), 1);
-        shp(c, [[-10, 0], [-12, -4], [-9, -4], [-7, 0]], col(c, [255, 94, 87]), 1);
+        shp(
+          c,
+          [
+            [-10, 0],
+            [8, -1.5],
+            [11, 0],
+            [8, 1.8],
+            [-10, 1.5],
+          ],
+          col(c, [255, 253, 246]),
+          1.1,
+        );
+        shp(
+          c,
+          [
+            [-1, 0],
+            [3, -6],
+            [5, -6],
+            [3, 0],
+          ],
+          col(c, [255, 94, 87]),
+          1,
+        );
+        shp(
+          c,
+          [
+            [-10, 0],
+            [-12, -4],
+            [-9, -4],
+            [-7, 0],
+          ],
+          col(c, [255, 94, 87]),
+          1,
+        );
         const prop = Math.sin(c.t * 40) * 3;
-        ln(c, [[11.5, -prop], [11.5, prop]], 1);
+        ln(
+          c,
+          [
+            [11.5, -prop],
+            [11.5, prop],
+          ],
+          1,
+        );
       });
       // the rope and the banner, rippling
       const bx = x - d * 22 * c.s;
-      line(c, [[x - d * 10 * c.s, y], [bx, y]], 0.8);
+      line(
+        c,
+        [
+          [x - d * 10 * c.s, y],
+          [bx, y],
+        ],
+        0.8,
+      );
       c.g.font = hand(12 * c.s);
       const tw = c.g.measureText(msg).width + 14 * c.s;
       const bh = 13 * c.s;
       const x0 = d > 0 ? bx - tw : bx;
       const pts: [number, number][] = [];
-      for (let i = 0; i <= 12; i++) pts.push([x0 + (tw * i) / 12, y - bh / 2 + Math.sin(c.t * 5 + i * 0.7) * 1.4 * c.s]);
-      for (let i = 12; i >= 0; i--) pts.push([x0 + (tw * i) / 12, y + bh / 2 + Math.sin(c.t * 5 + i * 0.7) * 1.4 * c.s]);
+      for (let i = 0; i <= 12; i++)
+        pts.push([x0 + (tw * i) / 12, y - bh / 2 + Math.sin(c.t * 5 + i * 0.7) * 1.4 * c.s]);
+      for (let i = 12; i >= 0; i--)
+        pts.push([x0 + (tw * i) / 12, y + bh / 2 + Math.sin(c.t * 5 + i * 0.7) * 1.4 * c.s]);
       shape(c, pts, col(c, [255, 250, 232]), 1);
       c.g.fillStyle = c.I.ink;
       c.g.textAlign = "center";
@@ -282,13 +393,21 @@ const DEFS: Def[] = [
         const bx = x - r.dir * Math.abs(k) * 11 * c.s,
           by = y + k * 7 * c.s;
         const f = Math.sin(c.t * 5 + i * 0.9) * 3 * c.s;
-        line(c, [[bx - 5 * c.s, by - f], [bx, by], [bx + 5 * c.s, by - f]], 1.2);
+        line(
+          c,
+          [
+            [bx - 5 * c.s, by - f],
+            [bx, by],
+            [bx + 5 * c.s, by - f],
+          ],
+          1.2,
+        );
       }
     },
   },
   {
     name: "hawk",
-    places: ["mountain", "farm"],
+    places: ["mountain", "farm", "desert"],
     when: (c) => day(c),
     weight: 2,
     dur: [20, 30],
@@ -300,7 +419,17 @@ const DEFS: Def[] = [
         y = cy + Math.sin(a) * 9 * c.s;
       pen(c, 1.3, fade(p));
       const tilt = Math.sin(a) * 2 * c.s;
-      line(c, [[x - 9 * c.s, y - 2 * c.s + tilt], [x - 3 * c.s, y - 1 * c.s], [x, y], [x + 3 * c.s, y - 1 * c.s], [x + 9 * c.s, y - 2 * c.s - tilt]], 1.4);
+      line(
+        c,
+        [
+          [x - 9 * c.s, y - 2 * c.s + tilt],
+          [x - 3 * c.s, y - 1 * c.s],
+          [x, y],
+          [x + 3 * c.s, y - 1 * c.s],
+          [x + 9 * c.s, y - 2 * c.s - tilt],
+        ],
+        1.4,
+      );
     },
   },
   {
@@ -315,12 +444,47 @@ const DEFS: Def[] = [
       facing(c, x, y, r.dir, () => {
         ell(c, 2, 0, 7, 4.5, col(c, [255, 94, 87]), 1.1);
         ell(c, 4.5, -1, 2.5, 2, col(c, [190, 225, 245]), 0.9);
-        ln(c, [[-4, 0], [-16, -1]], 1.3);
-        ln(c, [[-16, -4], [-16, 2]], 1);
-        ln(c, [[-2, 5], [7, 5]], 1);
+        ln(
+          c,
+          [
+            [-4, 0],
+            [-16, -1],
+          ],
+          1.3,
+        );
+        ln(
+          c,
+          [
+            [-16, -4],
+            [-16, 2],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [-2, 5],
+            [7, 5],
+          ],
+          1,
+        );
         const b = Math.cos(c.t * 30) * 13;
-        ln(c, [[2 - b, -6], [2 + b, -6]], 1.1);
-        ln(c, [[2, -4.5], [2, -6]], 1);
+        ln(
+          c,
+          [
+            [2 - b, -6],
+            [2 + b, -6],
+          ],
+          1.1,
+        );
+        ln(
+          c,
+          [
+            [2, -4.5],
+            [2, -6],
+          ],
+          1,
+        );
       });
     },
   },
@@ -335,8 +499,29 @@ const DEFS: Def[] = [
       pen(c, 1.3, fade(p, 0.05));
       facing(c, x, y, r.dir, () => {
         ell(c, 0, 0, 26, 9, col(c, [235, 238, 244]), 1.3);
-        shp(c, [[-22, -3], [-31, -9], [-29, 0], [-31, 8], [-22, 3]], col(c, [255, 94, 87]), 1.1);
-        shp(c, [[-5, 8], [7, 8], [6, 12], [-4, 12]], col(c, [70, 82, 104]), 1);
+        shp(
+          c,
+          [
+            [-22, -3],
+            [-31, -9],
+            [-29, 0],
+            [-31, 8],
+            [-22, 3],
+          ],
+          col(c, [255, 94, 87]),
+          1.1,
+        );
+        shp(
+          c,
+          [
+            [-5, 8],
+            [7, 8],
+            [6, 12],
+            [-4, 12],
+          ],
+          col(c, [70, 82, 104]),
+          1,
+        );
         c.g.font = hand(9);
         c.g.fillStyle = c.I.ink;
         c.g.textAlign = "center";
@@ -363,8 +548,25 @@ const DEFS: Def[] = [
       c.g.translate(x, y);
       c.g.rotate(-ang * r.dir);
       c.g.scale(r.dir * c.s, c.s);
-      shp(c, [[7, 0], [-6, -4], [-3, 0], [-6, 3.5]], [255, 255, 255], 1);
-      ln(c, [[7, 0], [-3, 0]], 0.8);
+      shp(
+        c,
+        [
+          [7, 0],
+          [-6, -4],
+          [-3, 0],
+          [-6, 3.5],
+        ],
+        [255, 255, 255],
+        1,
+      );
+      ln(
+        c,
+        [
+          [7, 0],
+          [-3, 0],
+        ],
+        0.8,
+      );
       c.g.restore();
     },
   },
@@ -380,7 +582,10 @@ const DEFS: Def[] = [
         S = 22 * c.s;
       const heart = (u: number): [number, number] => {
         const a = u * TAU;
-        return [cx + (S * 16 * Math.pow(Math.sin(a), 3)) / 16, cy - (S * (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a))) / 16];
+        return [
+          cx + (S * 16 * Math.pow(Math.sin(a), 3)) / 16,
+          cy - (S * (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a))) / 16,
+        ];
       };
       const drawn = clamp01(p / 0.55);
       const gone = clamp01((p - 0.55) / 0.45);
@@ -439,7 +644,8 @@ const DEFS: Def[] = [
   },
   {
     name: "rainbow",
-    when: (c) => day(c) && (c.weather === "partly" || c.weather === "drizzle" || c.weather === "cloudy" || hashDay(c) > 0.8),
+    when: (c) =>
+      day(c) && (c.weather === "partly" || c.weather === "drizzle" || c.weather === "cloudy" || hashDay(c) > 0.8),
     weight: 1.5,
     dur: [25, 35],
     draw(c, p) {
@@ -447,7 +653,14 @@ const DEFS: Def[] = [
       const cx = c.w * 0.5,
         cy = c.h * GROUND[c.place].horizon,
         R = c.w * 0.62;
-      const bands: C[] = [[255, 94, 87], [255, 170, 60], [255, 226, 90], [120, 200, 120], [90, 160, 230], [150, 120, 220]];
+      const bands: C[] = [
+        [255, 94, 87],
+        [255, 170, 60],
+        [255, 226, 90],
+        [120, 200, 120],
+        [90, 160, 230],
+        [150, 120, 220],
+      ];
       c.g.lineWidth = 4 * c.s;
       bands.forEach((b, i) => {
         c.g.strokeStyle = css(b, a);
@@ -459,7 +672,7 @@ const DEFS: Def[] = [
   },
   {
     name: "bats",
-    when: (c) => dusk(c) && (c.season !== "winter"),
+    when: (c) => dusk(c) && c.season !== "winter",
     weight: 2,
     dur: [10, 14],
     draw(c, p, r) {
@@ -604,7 +817,11 @@ const DEFS: Def[] = [
       for (let k = 0; k < 3; k++) {
         const top = c.h * (0.13 + k * 0.03);
         const colr = k === 1 ? "190,140,255" : "130,255,180";
-        const yAt = (x: number) => top + (Math.sin(x / (60 * c.s) + c.t * 0.3 + k * 2) * 0.5 + Math.sin(x / (23 * c.s) - c.t * 0.5 + k) * 0.3) * 14 * c.s;
+        const yAt = (x: number) =>
+          top +
+          (Math.sin(x / (60 * c.s) + c.t * 0.3 + k * 2) * 0.5 + Math.sin(x / (23 * c.s) - c.t * 0.5 + k) * 0.3) *
+            14 *
+            c.s;
         c.g.lineWidth = 1.1 * c.s;
         for (let x = -2; x < c.w + 4; x += 4 * c.s) {
           const y = yAt(x);
@@ -638,7 +855,14 @@ const DEFS: Def[] = [
         if (q < 0 || q > 1) continue;
         const x = c.w * (0.15 + 0.7 * hash(r.seed * 10 + k)),
           y = c.h * (0.08 + 0.12 * hash(r.seed * 20 + k));
-        const colr: C = ([[255, 94, 87], [255, 220, 90], [120, 220, 255], [170, 255, 140]] as C[])[k % 4];
+        const colr: C = (
+          [
+            [255, 94, 87],
+            [255, 220, 90],
+            [120, 220, 255],
+            [170, 255, 140],
+          ] as C[]
+        )[k % 4];
         if (q < 0.3) {
           const gy = c.h * GROUND[c.place].horizon;
           c.g.fillStyle = "rgba(255,240,200,0.9)";
@@ -686,48 +910,170 @@ const DEFS: Def[] = [
   // -------------------------------------------------------------- the mountains
   {
     name: "bear",
-    places: ["mountain"],
+    places: ["mountain", "woods"],
     when: (c) => !night(c) && c.season !== "winter",
     weight: 2,
     dur: [26, 34],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 30),
-        y = c.h * GROUND.mountain.near;
+        y = c.h * GROUND[c.place].near;
       const st = Math.sin(c.t * 4);
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
         const fur = col(c, [110, 74, 50]);
-        ln(c, [[-8, -6], [-9 + st * 2, 0]], 2.4);
-        ln(c, [[6, -6], [7 - st * 2, 0]], 2.4);
-        shp(c, [[-12, -8], [-10, -16], [-2, -18], [6, -16], [10, -12], [12, -8], [8, -5], [-10, -5]], fur, 1.2);
-        shp(c, [[9, -13], [16, -14], [19, -11], [16, -9], [10, -9]], fur, 1.1);
+        ln(
+          c,
+          [
+            [-8, -6],
+            [-9 + st * 2, 0],
+          ],
+          2.4,
+        );
+        ln(
+          c,
+          [
+            [6, -6],
+            [7 - st * 2, 0],
+          ],
+          2.4,
+        );
+        shp(
+          c,
+          [
+            [-12, -8],
+            [-10, -16],
+            [-2, -18],
+            [6, -16],
+            [10, -12],
+            [12, -8],
+            [8, -5],
+            [-10, -5],
+          ],
+          fur,
+          1.2,
+        );
+        shp(
+          c,
+          [
+            [9, -13],
+            [16, -14],
+            [19, -11],
+            [16, -9],
+            [10, -9],
+          ],
+          fur,
+          1.1,
+        );
         circ(c, 11, -15, 1.5, fur, 1);
         circ(c, 18.5, -11.3, 0.8, c.I.inkC, 0);
-        ln(c, [[-6, -6], [-6 - st * 2, 0]], 2.4);
-        ln(c, [[4, -6], [4 + st * 2, 0]], 2.4);
+        ln(
+          c,
+          [
+            [-6, -6],
+            [-6 - st * 2, 0],
+          ],
+          2.4,
+        );
+        ln(
+          c,
+          [
+            [4, -6],
+            [4 + st * 2, 0],
+          ],
+          2.4,
+        );
       });
     },
   },
   {
     name: "moose",
-    places: ["mountain"],
+    places: ["mountain", "woods"],
     when: (c) => !night(c),
     weight: 1.5,
     dur: [30, 38],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 30),
-        y = c.h * (GROUND.mountain.near - 0.012);
+        y = c.h * (GROUND[c.place].near - 0.012);
       const st = Math.sin(c.t * 3);
       pen(c, 1.1);
       facing(c, x, y, r.dir, () => {
         const fur = col(c, [90, 64, 46]);
-        for (const [lx, ph] of [[-9, 1], [-6, -1], [6, -1], [9, 1]] as [number, number][]) ln(c, [[lx, -12], [lx + st * 2 * ph, 0]], 1.4);
-        shp(c, [[-12, -12], [-11, -21], [2, -23], [10, -21], [12, -13], [-10, -11]], fur, 1.1);
-        shp(c, [[10, -20], [15, -23], [21, -18], [19, -15], [13, -16]], fur, 1);
-        ln(c, [[14, -15], [14, -11]], 1.1);
+        for (const [lx, ph] of [
+          [-9, 1],
+          [-6, -1],
+          [6, -1],
+          [9, 1],
+        ] as [number, number][])
+          ln(
+            c,
+            [
+              [lx, -12],
+              [lx + st * 2 * ph, 0],
+            ],
+            1.4,
+          );
+        shp(
+          c,
+          [
+            [-12, -12],
+            [-11, -21],
+            [2, -23],
+            [10, -21],
+            [12, -13],
+            [-10, -11],
+          ],
+          fur,
+          1.1,
+        );
+        shp(
+          c,
+          [
+            [10, -20],
+            [15, -23],
+            [21, -18],
+            [19, -15],
+            [13, -16],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [14, -15],
+            [14, -11],
+          ],
+          1.1,
+        );
         const antler = col(c, [214, 190, 150]);
-        shp(c, [[13, -23], [7, -26], [5, -31], [8, -29], [9, -32], [11, -28], [14, -25]], antler, 0.9);
-        shp(c, [[16, -23], [20, -27], [21, -32], [22, -28], [25, -30], [23, -25], [18, -22]], antler, 0.9);
+        shp(
+          c,
+          [
+            [13, -23],
+            [7, -26],
+            [5, -31],
+            [8, -29],
+            [9, -32],
+            [11, -28],
+            [14, -25],
+          ],
+          antler,
+          0.9,
+        );
+        shp(
+          c,
+          [
+            [16, -23],
+            [20, -27],
+            [21, -32],
+            [22, -28],
+            [25, -30],
+            [23, -25],
+            [18, -22],
+          ],
+          antler,
+          0.9,
+        );
       });
     },
   },
@@ -746,56 +1092,181 @@ const DEFS: Def[] = [
       for (let i = 1; i < 8; i++) {
         const q = p - i * 0.012;
         if (q < 0) break;
-        circle(c, across(c, q, r.dir, 20), c.h * (0.86 + q * 0.08) + Math.sin(q * TAU * 3) * 3 * c.s + 3 * c.s, (1 + i * 0.5) * c.s, [255, 255, 255], 0);
+        circle(
+          c,
+          across(c, q, r.dir, 20),
+          c.h * (0.86 + q * 0.08) + Math.sin(q * TAU * 3) * 3 * c.s + 3 * c.s,
+          (1 + i * 0.5) * c.s,
+          [255, 255, 255],
+          0,
+        );
       }
       c.g.save();
       c.g.translate(x, y);
       c.g.rotate(carve * r.dir);
       c.g.scale(r.dir * c.s, c.s);
-      ln(c, [[-8, 2], [8, 2]], 1.4);
-      shp(c, [[-2, -10], [2, -10], [3, -3], [-3, -3]], col(c, [255, 94, 87]), 1);
-      ln(c, [[-2, -3], [-3, 2]], 1.4);
-      ln(c, [[2, -3], [3, 2]], 1.4);
+      ln(
+        c,
+        [
+          [-8, 2],
+          [8, 2],
+        ],
+        1.4,
+      );
+      shp(
+        c,
+        [
+          [-2, -10],
+          [2, -10],
+          [3, -3],
+          [-3, -3],
+        ],
+        col(c, [255, 94, 87]),
+        1,
+      );
+      ln(
+        c,
+        [
+          [-2, -3],
+          [-3, 2],
+        ],
+        1.4,
+      );
+      ln(
+        c,
+        [
+          [2, -3],
+          [3, 2],
+        ],
+        1.4,
+      );
       circ(c, 0, -13, 2.5, col(c, [90, 160, 230]), 1);
-      ln(c, [[-2, -8], [-7, -2]], 1);
-      ln(c, [[2, -8], [6, -1]], 1);
+      ln(
+        c,
+        [
+          [-2, -8],
+          [-7, -2],
+        ],
+        1,
+      );
+      ln(
+        c,
+        [
+          [2, -8],
+          [6, -1],
+        ],
+        1,
+      );
       c.g.restore();
     },
   },
   {
     name: "hiker",
-    places: ["mountain"],
+    places: ["mountain", "woods"],
     when: (c) => day(c) && !snowy(c),
     weight: 2,
     dur: [28, 36],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 30),
-        y = c.h * GROUND.mountain.near;
+        y = c.h * GROUND[c.place].near;
       const st = Math.sin(c.t * 5);
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
-        ln(c, [[0, -9], [-st * 3, 0]], 1.4);
-        ln(c, [[0, -9], [st * 3, 0]], 1.4);
-        shp(c, [[-2.5, -17], [2.5, -17], [2, -9], [-2, -9]], col(c, [90, 160, 230]), 1);
-        shp(c, [[-6.5, -17], [-2.5, -17], [-2.5, -10], [-6, -10]], col(c, [255, 160, 60]), 1);
+        ln(
+          c,
+          [
+            [0, -9],
+            [-st * 3, 0],
+          ],
+          1.4,
+        );
+        ln(
+          c,
+          [
+            [0, -9],
+            [st * 3, 0],
+          ],
+          1.4,
+        );
+        shp(
+          c,
+          [
+            [-2.5, -17],
+            [2.5, -17],
+            [2, -9],
+            [-2, -9],
+          ],
+          col(c, [90, 160, 230]),
+          1,
+        );
+        shp(
+          c,
+          [
+            [-6.5, -17],
+            [-2.5, -17],
+            [-2.5, -10],
+            [-6, -10],
+          ],
+          col(c, [255, 160, 60]),
+          1,
+        );
         circ(c, 0.5, -20, 2.6, col(c, [240, 200, 170]), 1);
-        ln(c, [[2, -15], [6, -8], [7, 0]], 1);
+        ln(
+          c,
+          [
+            [2, -15],
+            [6, -8],
+            [7, 0],
+          ],
+          1,
+        );
       });
       // and a dog running rings round them
       const dx = x + (Math.sin(c.t * 1.6) * 16 + 14 * r.dir) * c.s;
       const bounce = Math.abs(Math.sin(c.t * 9)) * 2;
       facing(c, dx, y - bounce * c.s, Math.cos(c.t * 1.6) * r.dir > 0 ? 1 : -1, () => {
-        shp(c, [[-5, -6], [4, -6], [5, -3], [-5, -3]], col(c, [230, 190, 120]), 1);
+        shp(
+          c,
+          [
+            [-5, -6],
+            [4, -6],
+            [5, -3],
+            [-5, -3],
+          ],
+          col(c, [230, 190, 120]),
+          1,
+        );
         circ(c, 6, -7, 2.2, col(c, [230, 190, 120]), 1);
-        ln(c, [[-4, -3], [-5, 0]], 1);
-        ln(c, [[3, -3], [4, 0]], 1);
-        ln(c, [[-5, -5], [-8, -8 + Math.sin(c.t * 20) * 1.5]], 1);
+        ln(
+          c,
+          [
+            [-4, -3],
+            [-5, 0],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [3, -3],
+            [4, 0],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [-5, -5],
+            [-8, -8 + Math.sin(c.t * 20) * 1.5],
+          ],
+          1,
+        );
       });
     },
   },
   {
     name: "fox",
-    places: ["mountain", "farm"],
+    places: ["mountain", "farm", "woods"],
     when: (c) => !day(c) || hashDay(c) > 0.4,
     weight: 1.8,
     dur: [10, 14],
@@ -806,19 +1277,73 @@ const DEFS: Def[] = [
       pen(c, 1.1);
       facing(c, x, y, r.dir, () => {
         const fur = col(c, [232, 120, 50]);
-        ln(c, [[-5, -5], [-5 + st * 2.5, 0]], 1.2);
-        ln(c, [[4, -5], [4 - st * 2.5, 0]], 1.2);
-        shp(c, [[-7, -9], [5, -9], [7, -6], [-7, -5]], fur, 1);
-        shp(c, [[-7, -8], [-15, -10], [-18, -6], [-12, -5]], fur, 1);
-        ln(c, [[-17, -8], [-18, -6]], 1.6);
-        shp(c, [[5, -9], [6, -13], [8, -11], [10, -12], [10, -9], [13, -7], [7, -6]], fur, 1);
+        ln(
+          c,
+          [
+            [-5, -5],
+            [-5 + st * 2.5, 0],
+          ],
+          1.2,
+        );
+        ln(
+          c,
+          [
+            [4, -5],
+            [4 - st * 2.5, 0],
+          ],
+          1.2,
+        );
+        shp(
+          c,
+          [
+            [-7, -9],
+            [5, -9],
+            [7, -6],
+            [-7, -5],
+          ],
+          fur,
+          1,
+        );
+        shp(
+          c,
+          [
+            [-7, -8],
+            [-15, -10],
+            [-18, -6],
+            [-12, -5],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [-17, -8],
+            [-18, -6],
+          ],
+          1.6,
+        );
+        shp(
+          c,
+          [
+            [5, -9],
+            [6, -13],
+            [8, -11],
+            [10, -12],
+            [10, -9],
+            [13, -7],
+            [7, -6],
+          ],
+          fur,
+          1,
+        );
         if (night(c)) circ(c, 9.5, -9, 0.8, [255, 240, 150], 0);
       });
     },
   },
   {
     name: "rabbit",
-    places: ["mountain", "farm"],
+    places: ["mountain", "farm", "woods"],
     when: (c) => !night(c),
     weight: 2,
     dur: [8, 12],
@@ -828,7 +1353,7 @@ const DEFS: Def[] = [
         y = c.h * (GROUND[c.place].near + 0.005) - hop * 7 * c.s;
       pen(c, 1);
       facing(c, x, y, r.dir, () => {
-        const fur = snowy(c) ? [255, 255, 255] as C : col(c, [180, 160, 140]);
+        const fur = snowy(c) ? ([255, 255, 255] as C) : col(c, [180, 160, 140]);
         ell(c, 0, -4, 5, 3.6, fur, 1);
         circ(c, 4.5, -7, 2.4, fur, 1);
         ell(c, 4, -11.5, 0.9, 3, fur, 0.9, -0.2);
@@ -839,7 +1364,7 @@ const DEFS: Def[] = [
   },
   {
     name: "eagle",
-    places: ["mountain", "coast"],
+    places: ["mountain", "coast", "woods"],
     when: (c) => day(c),
     weight: 1.2,
     dur: [9, 12],
@@ -850,9 +1375,31 @@ const DEFS: Def[] = [
       const f = Math.sin(c.t * 3) * 2;
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-14, -2 - f], [-4, -1], [0, 0], [4, -1], [14, -2 - f], [4, 1], [-4, 1]], col(c, [92, 64, 44]), 1);
+        shp(
+          c,
+          [
+            [-14, -2 - f],
+            [-4, -1],
+            [0, 0],
+            [4, -1],
+            [14, -2 - f],
+            [4, 1],
+            [-4, 1],
+          ],
+          col(c, [92, 64, 44]),
+          1,
+        );
         circ(c, 3, -0.5, 1.8, [255, 255, 255], 0.9);
-        shp(c, [[-3, 0], [-8, 2], [-3, 2]], [255, 255, 255], 0.9);
+        shp(
+          c,
+          [
+            [-3, 0],
+            [-8, 2],
+            [-3, 2],
+          ],
+          [255, 255, 255],
+          0.9,
+        );
       });
     },
   },
@@ -873,23 +1420,71 @@ const DEFS: Def[] = [
       if (p < 0.35) {
         const q = p / 0.35;
         c.g.strokeStyle = `rgba(255,255,255,${0.9 * (1 - q)})`;
-        for (let i = -2; i <= 2; i++) line(c, [[x, y], [x + i * 4 * c.s * q, y - (14 + 4 * (2 - Math.abs(i))) * c.s * ease(Math.min(1, q * 2))]], 1.4);
+        for (let i = -2; i <= 2; i++)
+          line(
+            c,
+            [
+              [x, y],
+              [x + i * 4 * c.s * q, y - (14 + 4 * (2 - Math.abs(i))) * c.s * ease(Math.min(1, q * 2))],
+            ],
+            1.4,
+          );
         pen(c, 1.2);
-        shape(c, [[x - 12 * c.s, y + 1], [x - 4 * c.s, y - 3 * c.s], [x + 6 * c.s, y - 2 * c.s], [x + 10 * c.s, y + 1]], col(c, [70, 92, 120]), 1.1);
+        shape(
+          c,
+          [
+            [x - 12 * c.s, y + 1],
+            [x - 4 * c.s, y - 3 * c.s],
+            [x + 6 * c.s, y - 2 * c.s],
+            [x + 10 * c.s, y + 1],
+          ],
+          col(c, [70, 92, 120]),
+          1.1,
+        );
       } else if (p < 0.65) {
         const q = (p - 0.35) / 0.3;
         const bx = x + r.dir * q * 14 * c.s;
         const hh = Math.sin(q * Math.PI) * 5 * c.s;
-        shape(c, [[bx - 14 * c.s, y + 1], [bx - 4 * c.s, y - hh], [bx + 8 * c.s, y - hh * 0.6], [bx + 12 * c.s, y + 1]], col(c, [70, 92, 120]), 1.1);
+        shape(
+          c,
+          [
+            [bx - 14 * c.s, y + 1],
+            [bx - 4 * c.s, y - hh],
+            [bx + 8 * c.s, y - hh * 0.6],
+            [bx + 12 * c.s, y + 1],
+          ],
+          col(c, [70, 92, 120]),
+          1.1,
+        );
       } else {
         const q = (p - 0.65) / 0.35;
         const tx = x + r.dir * 18 * c.s;
         const rise = Math.sin(Math.min(1, q * 1.2) * Math.PI) * 14 * c.s;
         if (rise > 0.5) {
-          shape(c, [[tx - 2 * c.s, y + 1], [tx - 1.5 * c.s, y - rise + 4 * c.s], [tx - 9 * c.s, y - rise], [tx, y - rise + 2.5 * c.s], [tx + 9 * c.s, y - rise], [tx + 1.5 * c.s, y - rise + 4 * c.s], [tx + 2 * c.s, y + 1]], col(c, [70, 92, 120]), 1.1);
+          shape(
+            c,
+            [
+              [tx - 2 * c.s, y + 1],
+              [tx - 1.5 * c.s, y - rise + 4 * c.s],
+              [tx - 9 * c.s, y - rise],
+              [tx, y - rise + 2.5 * c.s],
+              [tx + 9 * c.s, y - rise],
+              [tx + 1.5 * c.s, y - rise + 4 * c.s],
+              [tx + 2 * c.s, y + 1],
+            ],
+            col(c, [70, 92, 120]),
+            1.1,
+          );
         }
         c.g.strokeStyle = "rgba(255,255,255,0.8)";
-        line(c, [[tx - 10 * c.s, y + 2 * c.s], [tx + 10 * c.s, y + 2 * c.s]], 1);
+        line(
+          c,
+          [
+            [tx - 10 * c.s, y + 2 * c.s],
+            [tx + 10 * c.s, y + 2 * c.s],
+          ],
+          1,
+        );
       }
     },
   },
@@ -913,9 +1508,40 @@ const DEFS: Def[] = [
         c.g.translate(x, y);
         c.g.rotate(-ang * r.dir);
         c.g.scale(r.dir * c.s, c.s);
-        shp(c, [[-9, 0], [-3, -3], [5, -2.5], [10, 0], [5, 1.5], [-3, 2]], col(c, [120, 140, 170]), 1);
-        shp(c, [[-1, -3], [1, -7], [3, -2.5]], col(c, [120, 140, 170]), 0.9);
-        shp(c, [[-9, 0], [-13, -3], [-12, 0], [-13, 3]], col(c, [120, 140, 170]), 0.9);
+        shp(
+          c,
+          [
+            [-9, 0],
+            [-3, -3],
+            [5, -2.5],
+            [10, 0],
+            [5, 1.5],
+            [-3, 2],
+          ],
+          col(c, [120, 140, 170]),
+          1,
+        );
+        shp(
+          c,
+          [
+            [-1, -3],
+            [1, -7],
+            [3, -2.5],
+          ],
+          col(c, [120, 140, 170]),
+          0.9,
+        );
+        shp(
+          c,
+          [
+            [-9, 0],
+            [-13, -3],
+            [-12, 0],
+            [-13, 3],
+          ],
+          col(c, [120, 140, 170]),
+          0.9,
+        );
         c.g.restore();
       }
     },
@@ -933,15 +1559,73 @@ const DEFS: Def[] = [
       pen(c, 1.2);
       // the wave curling behind them
       c.g.strokeStyle = "rgba(255,255,255,0.95)";
-      line(c, [[x - r.dir * 30 * c.s, y + 3 * c.s], [x - r.dir * 14 * c.s, y - 6 * c.s], [x - r.dir * 8 * c.s, y - 8 * c.s], [x - r.dir * 5 * c.s, y - 5 * c.s]], 1.6);
+      line(
+        c,
+        [
+          [x - r.dir * 30 * c.s, y + 3 * c.s],
+          [x - r.dir * 14 * c.s, y - 6 * c.s],
+          [x - r.dir * 8 * c.s, y - 8 * c.s],
+          [x - r.dir * 5 * c.s, y - 5 * c.s],
+        ],
+        1.6,
+      );
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-9, 2], [8, 1], [10, 2], [8, 3.5], [-9, 3.5]], col(c, [255, 220, 90]), 1);
-        ln(c, [[-3, 1.5], [-1, -5]], 1.3);
-        ln(c, [[3, 1.5], [1, -5]], 1.3);
-        shp(c, [[-2, -5], [2, -5], [1.5, -11], [-1.5, -11]], col(c, [255, 94, 87]), 1);
-        ln(c, [[-1, -10], [-7, -9]], 1.1);
-        ln(c, [[1, -10], [7, -12]], 1.1);
+        shp(
+          c,
+          [
+            [-9, 2],
+            [8, 1],
+            [10, 2],
+            [8, 3.5],
+            [-9, 3.5],
+          ],
+          col(c, [255, 220, 90]),
+          1,
+        );
+        ln(
+          c,
+          [
+            [-3, 1.5],
+            [-1, -5],
+          ],
+          1.3,
+        );
+        ln(
+          c,
+          [
+            [3, 1.5],
+            [1, -5],
+          ],
+          1.3,
+        );
+        shp(
+          c,
+          [
+            [-2, -5],
+            [2, -5],
+            [1.5, -11],
+            [-1.5, -11],
+          ],
+          col(c, [255, 94, 87]),
+          1,
+        );
+        ln(
+          c,
+          [
+            [-1, -10],
+            [-7, -9],
+          ],
+          1.1,
+        );
+        ln(
+          c,
+          [
+            [1, -10],
+            [7, -12],
+          ],
+          1.1,
+        );
         circ(c, 0, -13.5, 2.3, col(c, [210, 160, 120]), 1);
       });
     },
@@ -960,14 +1644,42 @@ const DEFS: Def[] = [
       pen(c, 1);
       facing(c, x, y, 1, () => {
         for (let i = -1; i <= 1; i++) {
-          ln(c, [[-4, -3 + i], [-8, -1 + i + st]], 0.9);
-          ln(c, [[4, -3 + i], [8, -1 + i - st]], 0.9);
+          ln(
+            c,
+            [
+              [-4, -3 + i],
+              [-8, -1 + i + st],
+            ],
+            0.9,
+          );
+          ln(
+            c,
+            [
+              [4, -3 + i],
+              [8, -1 + i - st],
+            ],
+            0.9,
+          );
         }
         ell(c, 0, -4, 5, 3, col(c, [232, 92, 64]), 1);
         circ(c, -6, -8, 1.8, col(c, [232, 92, 64]), 0.9);
         circ(c, 6, -8, 1.8, col(c, [232, 92, 64]), 0.9);
-        ln(c, [[-1.5, -6.5], [-1.5, -9]], 0.8);
-        ln(c, [[1.5, -6.5], [1.5, -9]], 0.8);
+        ln(
+          c,
+          [
+            [-1.5, -6.5],
+            [-1.5, -9],
+          ],
+          0.8,
+        );
+        ln(
+          c,
+          [
+            [1.5, -6.5],
+            [1.5, -9],
+          ],
+          0.8,
+        );
       });
     },
   },
@@ -982,10 +1694,46 @@ const DEFS: Def[] = [
         y = c.h * GROUND.coast.horizon;
       pen(c, 1, 0.75);
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-22, -3], [20, -3], [16, 2], [-20, 2]], col(c, [70, 82, 104], 0.3), 0.9);
-        const box: C[] = [[255, 94, 87], [90, 160, 230], [255, 220, 90], [120, 200, 120]];
-        for (let i = 0; i < 6; i++) shp(c, [[-16 + i * 5, -3], [-12 + i * 5, -3], [-12 + i * 5, -6], [-16 + i * 5, -6]], col(c, box[i % 4], 0.3), 0.6);
-        shp(c, [[13, -3], [18, -3], [18, -9], [13, -9]], col(c, [255, 253, 246], 0.3), 0.8);
+        shp(
+          c,
+          [
+            [-22, -3],
+            [20, -3],
+            [16, 2],
+            [-20, 2],
+          ],
+          col(c, [70, 82, 104], 0.3),
+          0.9,
+        );
+        const box: C[] = [
+          [255, 94, 87],
+          [90, 160, 230],
+          [255, 220, 90],
+          [120, 200, 120],
+        ];
+        for (let i = 0; i < 6; i++)
+          shp(
+            c,
+            [
+              [-16 + i * 5, -3],
+              [-12 + i * 5, -3],
+              [-12 + i * 5, -6],
+              [-16 + i * 5, -6],
+            ],
+            col(c, box[i % 4], 0.3),
+            0.6,
+          );
+        shp(
+          c,
+          [
+            [13, -3],
+            [18, -3],
+            [18, -9],
+            [13, -9],
+          ],
+          col(c, [255, 253, 246], 0.3),
+          0.8,
+        );
         if (c.I.lit) circ(c, 15.5, -7, 0.8, [255, 210, 120], 0);
       });
       c.g.globalAlpha = 1;
@@ -1003,14 +1751,52 @@ const DEFS: Def[] = [
         y = c.h * (G.sea![0] + 0.03) + Math.sin(c.t * 9) * 1.2 * c.s;
       pen(c, 1.1);
       c.g.strokeStyle = "rgba(255,255,255,0.9)";
-      line(c, [[x - r.dir * 8 * c.s, y + 1 * c.s], [x - r.dir * 40 * c.s, y + 2 * c.s]], 1.4);
-      line(c, [[x - r.dir * 10 * c.s, y - 1 * c.s], [x - r.dir * 16 * c.s, y - 6 * c.s]], 1);
+      line(
+        c,
+        [
+          [x - r.dir * 8 * c.s, y + 1 * c.s],
+          [x - r.dir * 40 * c.s, y + 2 * c.s],
+        ],
+        1.4,
+      );
+      line(
+        c,
+        [
+          [x - r.dir * 10 * c.s, y - 1 * c.s],
+          [x - r.dir * 16 * c.s, y - 6 * c.s],
+        ],
+        1,
+      );
       pen(c, 1.1);
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-7, 0], [6, -1], [9, 1], [-7, 2]], col(c, [255, 220, 90]), 1);
-        ln(c, [[-1, -1], [1, -8]], 1.3);
+        shp(
+          c,
+          [
+            [-7, 0],
+            [6, -1],
+            [9, 1],
+            [-7, 2],
+          ],
+          col(c, [255, 220, 90]),
+          1,
+        );
+        ln(
+          c,
+          [
+            [-1, -1],
+            [1, -8],
+          ],
+          1.3,
+        );
         circ(c, 1, -10, 2, col(c, [210, 160, 120]), 0.9);
-        ln(c, [[1, -7], [5, -4]], 1);
+        ln(
+          c,
+          [
+            [1, -7],
+            [5, -4],
+          ],
+          1,
+        );
       });
     },
   },
@@ -1033,12 +1819,61 @@ const DEFS: Def[] = [
       ellipse(c, fx, fy, 5 * c.s, 1.6 * c.s, col(c, [255, 94, 87]), 1);
       facing(c, x, y - bounce * c.s, r.dir, () => {
         const fur = col(c, [150, 100, 64]);
-        ln(c, [[-5, -4], [-7 + Math.sin(run) * 3, 0]], 1.3);
-        ln(c, [[4, -4], [6 - Math.sin(run) * 3, 0]], 1.3);
-        shp(c, [[-7, -9], [5, -9], [7, -5], [-6, -4]], fur, 1);
-        shp(c, [[5, -9], [7, -13], [12, -12], [12, -9], [7, -7]], fur, 1);
-        ln(c, [[7, -12], [6, -9]], 1.2);
-        ln(c, [[-7, -8], [-11, -11]], 1.2);
+        ln(
+          c,
+          [
+            [-5, -4],
+            [-7 + Math.sin(run) * 3, 0],
+          ],
+          1.3,
+        );
+        ln(
+          c,
+          [
+            [4, -4],
+            [6 - Math.sin(run) * 3, 0],
+          ],
+          1.3,
+        );
+        shp(
+          c,
+          [
+            [-7, -9],
+            [5, -9],
+            [7, -5],
+            [-6, -4],
+          ],
+          fur,
+          1,
+        );
+        shp(
+          c,
+          [
+            [5, -9],
+            [7, -13],
+            [12, -12],
+            [12, -9],
+            [7, -7],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [7, -12],
+            [6, -9],
+          ],
+          1.2,
+        );
+        ln(
+          c,
+          [
+            [-7, -8],
+            [-11, -11],
+          ],
+          1.2,
+        );
       });
     },
   },
@@ -1054,7 +1889,14 @@ const DEFS: Def[] = [
       const x = across(c, p, r.dir, 40),
         y = c.h * GROUND.farm.road! + Math.sin(c.t * 18) * 0.5 * c.s;
       pen(c, 1.2);
-      const paint: C = ([[90, 160, 230], [255, 94, 87], [120, 200, 120], [255, 220, 90]] as C[])[Math.floor(r.seed * 4)];
+      const paint: C = (
+        [
+          [90, 160, 230],
+          [255, 94, 87],
+          [120, 200, 120],
+          [255, 220, 90],
+        ] as C[]
+      )[Math.floor(r.seed * 4)];
       // a cloud of road dust behind it
       for (let i = 0; i < 5; i++) {
         c.g.fillStyle = `rgba(210,195,160,${0.35 - i * 0.06})`;
@@ -1063,8 +1905,32 @@ const DEFS: Def[] = [
         c.g.fill();
       }
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-16, -3], [-16, -9], [0, -9], [3, -15], [11, -15], [15, -9], [17, -8], [17, -3]], col(c, paint), 1.2);
-        shp(c, [[4, -14], [10, -14], [13, -9.5], [2, -9.5]], col(c, [200, 230, 250]), 0.9);
+        shp(
+          c,
+          [
+            [-16, -3],
+            [-16, -9],
+            [0, -9],
+            [3, -15],
+            [11, -15],
+            [15, -9],
+            [17, -8],
+            [17, -3],
+          ],
+          col(c, paint),
+          1.2,
+        );
+        shp(
+          c,
+          [
+            [4, -14],
+            [10, -14],
+            [13, -9.5],
+            [2, -9.5],
+          ],
+          col(c, [200, 230, 250]),
+          0.9,
+        );
         if (c.I.lit) {
           c.g.fillStyle = "rgba(255,240,180,0.35)";
           c.g.beginPath();
@@ -1076,7 +1942,14 @@ const DEFS: Def[] = [
         const spin = c.t * 12;
         for (const wx of [-10, 10]) {
           circ(c, wx, -2, 3.2, c.I.inkC, 0);
-          ln(c, [[wx + Math.cos(spin) * 1.5, -2 + Math.sin(spin) * 1.5], [wx - Math.cos(spin) * 1.5, -2 - Math.sin(spin) * 1.5]], 0.8);
+          ln(
+            c,
+            [
+              [wx + Math.cos(spin) * 1.5, -2 + Math.sin(spin) * 1.5],
+              [wx - Math.cos(spin) * 1.5, -2 - Math.sin(spin) * 1.5],
+            ],
+            0.8,
+          );
         }
       });
       c.g.strokeStyle = c.I.ink;
@@ -1096,16 +1969,68 @@ const DEFS: Def[] = [
       for (let i = 0; i < 8; i++) {
         const q = (c.t * 1.5 + i / 8) % 1;
         c.g.fillStyle = `rgba(230,200,110,${0.7 * (1 - q)})`;
-        c.g.fillRect(x - r.dir * (16 + q * 22) * c.s, y - (16 - q * 6 + Math.sin(i * 3) * 3) * c.s, 1.6 * c.s, 1.6 * c.s);
+        c.g.fillRect(
+          x - r.dir * (16 + q * 22) * c.s,
+          y - (16 - q * 6 + Math.sin(i * 3) * 3) * c.s,
+          1.6 * c.s,
+          1.6 * c.s,
+        );
       }
       facing(c, x, y, r.dir, () => {
         const g1 = col(c, [120, 200, 120]);
-        shp(c, [[-14, -4], [-14, -16], [4, -16], [6, -22], [12, -22], [12, -4]], g1, 1.2);
-        shp(c, [[6, -21], [11, -21], [11, -16], [6, -16]], col(c, [200, 230, 250]), 0.9);
-        shp(c, [[12, -10], [22, -10], [24, -3], [12, -3]], col(c, [255, 220, 90]), 1);
+        shp(
+          c,
+          [
+            [-14, -4],
+            [-14, -16],
+            [4, -16],
+            [6, -22],
+            [12, -22],
+            [12, -4],
+          ],
+          g1,
+          1.2,
+        );
+        shp(
+          c,
+          [
+            [6, -21],
+            [11, -21],
+            [11, -16],
+            [6, -16],
+          ],
+          col(c, [200, 230, 250]),
+          0.9,
+        );
+        shp(
+          c,
+          [
+            [12, -10],
+            [22, -10],
+            [24, -3],
+            [12, -3],
+          ],
+          col(c, [255, 220, 90]),
+          1,
+        );
         const sp = c.t * 5;
-        for (let i = 0; i < 4; i++) ln(c, [[18, -6.5], [18 + Math.cos(sp + (i * Math.PI) / 2) * 3.4, -6.5 + Math.sin(sp + (i * Math.PI) / 2) * 3.4]], 0.8);
-        ln(c, [[-14, -14], [-20, -18]], 1.6);
+        for (let i = 0; i < 4; i++)
+          ln(
+            c,
+            [
+              [18, -6.5],
+              [18 + Math.cos(sp + (i * Math.PI) / 2) * 3.4, -6.5 + Math.sin(sp + (i * Math.PI) / 2) * 3.4],
+            ],
+            0.8,
+          );
+        ln(
+          c,
+          [
+            [-14, -14],
+            [-20, -18],
+          ],
+          1.6,
+        );
         circ(c, -8, -3, 4, c.I.inkC, 0);
         circ(c, 7, -2.5, 2.8, c.I.inkC, 0);
       });
@@ -1125,18 +2050,79 @@ const DEFS: Def[] = [
         if (q < 0) break;
         c.g.fillStyle = `rgba(255,255,255,${0.4 - i * 0.035})`;
         c.g.beginPath();
-        c.g.arc(across(c, q, r.dir, 40), c.h * (0.66 + 0.08 * Math.sin(q * Math.PI)) + (4 + i * 1.6) * c.s, (2 + i * 0.8) * c.s, 0, TAU);
+        c.g.arc(
+          across(c, q, r.dir, 40),
+          c.h * (0.66 + 0.08 * Math.sin(q * Math.PI)) + (4 + i * 1.6) * c.s,
+          (2 + i * 0.8) * c.s,
+          0,
+          TAU,
+        );
         c.g.fill();
       }
       pen(c, 1.1);
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-10, 0], [8, -1.5], [11, 0], [8, 2], [-10, 1.5]], col(c, [255, 220, 90]), 1);
-        shp(c, [[-2, -4], [4, -4], [4, -2.5], [-2, -2.5]], col(c, [255, 220, 90]), 0.9);
-        shp(c, [[-2, 3], [4, 3], [4, 4.5], [-2, 4.5]], col(c, [255, 220, 90]), 0.9);
-        ln(c, [[1, -2.5], [1, 3]], 0.8);
-        shp(c, [[-10, 0], [-12, -4], [-9, -4], [-7, 0]], col(c, [255, 94, 87]), 0.9);
+        shp(
+          c,
+          [
+            [-10, 0],
+            [8, -1.5],
+            [11, 0],
+            [8, 2],
+            [-10, 1.5],
+          ],
+          col(c, [255, 220, 90]),
+          1,
+        );
+        shp(
+          c,
+          [
+            [-2, -4],
+            [4, -4],
+            [4, -2.5],
+            [-2, -2.5],
+          ],
+          col(c, [255, 220, 90]),
+          0.9,
+        );
+        shp(
+          c,
+          [
+            [-2, 3],
+            [4, 3],
+            [4, 4.5],
+            [-2, 4.5],
+          ],
+          col(c, [255, 220, 90]),
+          0.9,
+        );
+        ln(
+          c,
+          [
+            [1, -2.5],
+            [1, 3],
+          ],
+          0.8,
+        );
+        shp(
+          c,
+          [
+            [-10, 0],
+            [-12, -4],
+            [-9, -4],
+            [-7, 0],
+          ],
+          col(c, [255, 94, 87]),
+          0.9,
+        );
         const prop = Math.sin(c.t * 40) * 3;
-        ln(c, [[11.5, -prop], [11.5, prop]], 1);
+        ln(
+          c,
+          [
+            [11.5, -prop],
+            [11.5, prop],
+          ],
+          1,
+        );
       });
     },
   },
@@ -1154,31 +2140,127 @@ const DEFS: Def[] = [
       pen(c, 1.1);
       facing(c, x, y + bob * c.s, r.dir, () => {
         const coat: C = col(c, r.seed > 0.5 ? [120, 80, 54] : [240, 236, 228]);
-        ln(c, [[-8, -10], [-11 + Math.sin(g) * 5, 0]], 1.4);
-        ln(c, [[-6, -10], [-4 - Math.sin(g) * 5, 0]], 1.4);
-        ln(c, [[6, -10], [3 + Math.sin(g + 1) * 5, 0]], 1.4);
-        ln(c, [[8, -10], [11 - Math.sin(g + 1) * 5, 0]], 1.4);
-        shp(c, [[-11, -11], [-9, -17], [8, -17], [11, -12], [8, -9], [-9, -9]], coat, 1.1);
-        shp(c, [[7, -16], [12, -23], [17, -21], [16, -18], [12, -17], [10, -12]], coat, 1);
-        ln(c, [[7, -16], [11, -23]], 1.6);
-        ln(c, [[-11, -15], [-16, -12 + Math.sin(g) * 2]], 1.6);
+        ln(
+          c,
+          [
+            [-8, -10],
+            [-11 + Math.sin(g) * 5, 0],
+          ],
+          1.4,
+        );
+        ln(
+          c,
+          [
+            [-6, -10],
+            [-4 - Math.sin(g) * 5, 0],
+          ],
+          1.4,
+        );
+        ln(
+          c,
+          [
+            [6, -10],
+            [3 + Math.sin(g + 1) * 5, 0],
+          ],
+          1.4,
+        );
+        ln(
+          c,
+          [
+            [8, -10],
+            [11 - Math.sin(g + 1) * 5, 0],
+          ],
+          1.4,
+        );
+        shp(
+          c,
+          [
+            [-11, -11],
+            [-9, -17],
+            [8, -17],
+            [11, -12],
+            [8, -9],
+            [-9, -9],
+          ],
+          coat,
+          1.1,
+        );
+        shp(
+          c,
+          [
+            [7, -16],
+            [12, -23],
+            [17, -21],
+            [16, -18],
+            [12, -17],
+            [10, -12],
+          ],
+          coat,
+          1,
+        );
+        ln(
+          c,
+          [
+            [7, -16],
+            [11, -23],
+          ],
+          1.6,
+        );
+        ln(
+          c,
+          [
+            [-11, -15],
+            [-16, -12 + Math.sin(g) * 2],
+          ],
+          1.6,
+        );
       });
     },
   },
   {
     name: "school-bus",
-    places: ["farm"],
+    places: ["farm", "suburb"],
     when: (c) => day(c) && ((c.hour > 7 && c.hour < 9) || (c.hour > 14.5 && c.hour < 16.5)),
     weight: 4,
     dur: [12, 15],
     draw(c, p, r) {
       const x = across(c, p, r.dir, 50),
-        y = c.h * GROUND.farm.road! + Math.sin(c.t * 14) * 0.5 * c.s;
+        y = c.h * GROUND[c.place].road! + Math.sin(c.t * 14) * 0.5 * c.s;
       pen(c, 1.2);
       facing(c, x, y, r.dir, () => {
-        shp(c, [[-24, -3], [-24, -16], [14, -16], [16, -12], [22, -10], [22, -3]], col(c, [255, 200, 40]), 1.2);
-        for (let i = 0; i < 6; i++) shp(c, [[-21 + i * 6, -14], [-17 + i * 6, -14], [-17 + i * 6, -10], [-21 + i * 6, -10]], col(c, [200, 230, 250]), 0.8);
-        ln(c, [[-24, -7], [22, -7]], 0.8);
+        shp(
+          c,
+          [
+            [-24, -3],
+            [-24, -16],
+            [14, -16],
+            [16, -12],
+            [22, -10],
+            [22, -3],
+          ],
+          col(c, [255, 200, 40]),
+          1.2,
+        );
+        for (let i = 0; i < 6; i++)
+          shp(
+            c,
+            [
+              [-21 + i * 6, -14],
+              [-17 + i * 6, -14],
+              [-17 + i * 6, -10],
+              [-21 + i * 6, -10],
+            ],
+            col(c, [200, 230, 250]),
+            0.8,
+          );
+        ln(
+          c,
+          [
+            [-24, -7],
+            [22, -7],
+          ],
+          0.8,
+        );
         circ(c, -15, -2, 3.2, c.I.inkC, 0);
         circ(c, 13, -2, 3.2, c.I.inkC, 0);
       });
@@ -1197,13 +2279,500 @@ const DEFS: Def[] = [
       pen(c, 1);
       facing(c, x, y - Math.abs(Math.sin(run)) * 2 * c.s, r.dir, () => {
         const fur = col(c, [40, 36, 40]);
-        ln(c, [[-5, -4], [-7 + Math.sin(run) * 3, 0]], 1.3);
-        ln(c, [[4, -4], [6 - Math.sin(run) * 3, 0]], 1.3);
-        shp(c, [[-7, -9], [5, -9], [7, -5], [-6, -4]], fur, 1);
+        ln(
+          c,
+          [
+            [-5, -4],
+            [-7 + Math.sin(run) * 3, 0],
+          ],
+          1.3,
+        );
+        ln(
+          c,
+          [
+            [4, -4],
+            [6 - Math.sin(run) * 3, 0],
+          ],
+          1.3,
+        );
+        shp(
+          c,
+          [
+            [-7, -9],
+            [5, -9],
+            [7, -5],
+            [-6, -4],
+          ],
+          fur,
+          1,
+        );
         ell(c, 1, -6.5, 3, 2, [255, 255, 255], 0);
-        shp(c, [[5, -9], [7, -13], [12, -12], [12, -9], [7, -7]], fur, 1);
-        ln(c, [[-7, -8], [-11, -11 + Math.sin(c.t * 20)]], 1.2);
+        shp(
+          c,
+          [
+            [5, -9],
+            [7, -13],
+            [12, -12],
+            [12, -9],
+            [7, -7],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [-7, -8],
+            [-11, -11 + Math.sin(c.t * 20)],
+          ],
+          1.2,
+        );
       });
+    },
+  },
+  // -------------------------------------------------------------- the city
+  {
+    name: "cyclist",
+    places: ["city", "suburb"],
+    when: (c) => dry(c) && !night(c),
+    weight: 3,
+    dur: [9, 12],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 30),
+        y = c.h * GROUND[c.place].near;
+      const spin = c.t * 9;
+      const shirt: C = (
+        [
+          [255, 94, 87],
+          [120, 200, 120],
+          [90, 160, 230],
+          [255, 220, 90],
+        ] as C[]
+      )[Math.floor(r.seed * 4)];
+      pen(c, 1.1);
+      facing(c, x, y, r.dir, () => {
+        for (const wx of [-8, 8]) {
+          circ(c, wx, -5, 5, null, 1.1);
+          ln(
+            c,
+            [
+              [wx + Math.cos(spin) * 5, -5 + Math.sin(spin) * 5],
+              [wx - Math.cos(spin) * 5, -5 - Math.sin(spin) * 5],
+            ],
+            0.6,
+          );
+        }
+        ln(
+          c,
+          [
+            [-8, -5],
+            [-2, -13],
+            [6, -13],
+            [8, -5],
+          ],
+          1.1,
+        );
+        ln(
+          c,
+          [
+            [-2, -13],
+            [0, -5],
+            [6, -13],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [6, -13],
+            [7, -16],
+            [9, -16],
+          ],
+          1,
+        );
+        // rider: legs pedalling, body leaning over the bars
+        const k = Math.sin(spin) * 2.5;
+        ln(
+          c,
+          [
+            [-3, -15],
+            [0 + k, -9],
+            [0 + k * 0.6, -5],
+          ],
+          1.4,
+        );
+        shp(
+          c,
+          [
+            [-4, -15],
+            [5, -21],
+            [7, -19],
+            [-2, -13],
+          ],
+          col(c, shirt),
+          1,
+        );
+        ln(
+          c,
+          [
+            [5, -20],
+            [8, -16],
+          ],
+          1.2,
+        );
+        circ(c, 6.5, -24, 2.6, col(c, [236, 196, 160]), 1);
+        shp(
+          c,
+          [
+            [3.5, -25],
+            [6.5, -28],
+            [9.5, -25],
+          ],
+          col(c, [70, 80, 100]),
+          0.9,
+        );
+      });
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  {
+    name: "ice-cream-truck",
+    places: ["city", "suburb"],
+    when: (c) => day(c) && dry(c) && (c.season === "summer" || c.season === "spring"),
+    weight: 2,
+    dur: [14, 18],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 50),
+        y = c.h * GROUND[c.place].road! + 6 * c.s + Math.sin(c.t * 14) * 0.4 * c.s;
+      pen(c, 1.2);
+      facing(c, x, y, r.dir, () => {
+        shp(
+          c,
+          [
+            [-22, -3],
+            [-22, -24],
+            [10, -24],
+            [10, -14],
+            [20, -12],
+            [22, -8],
+            [22, -3],
+          ],
+          col(c, [250, 248, 240]),
+          1.2,
+        );
+        shp(
+          c,
+          [
+            [11, -22],
+            [11, -15],
+            [19, -13.5],
+            [15, -22],
+          ],
+          col(c, [200, 230, 250]),
+          0.9,
+        );
+        // pink stripe, serving window, a cone on the roof
+        shp(
+          c,
+          [
+            [-22, -9],
+            [10, -9],
+            [10, -6],
+            [-22, -6],
+          ],
+          col(c, [255, 160, 190]),
+          0.9,
+        );
+        shp(
+          c,
+          [
+            [-17, -20],
+            [3, -20],
+            [3, -12],
+            [-17, -12],
+          ],
+          col(c, [255, 220, 150]),
+          0.9,
+        );
+        shp(
+          c,
+          [
+            [-9, -24],
+            [-6, -33],
+            [-3, -24],
+          ],
+          col(c, [226, 170, 100]),
+          1,
+        );
+        circ(c, -6, -33.5, 3.2, col(c, [255, 160, 190]), 1);
+        const spin = c.t * 12;
+        for (const wx of [-13, 13]) {
+          circ(c, wx, -2, 3.6, c.I.inkC, 0);
+          ln(
+            c,
+            [
+              [wx + Math.cos(spin) * 1.6, -2 + Math.sin(spin) * 1.6],
+              [wx - Math.cos(spin) * 1.6, -2 - Math.sin(spin) * 1.6],
+            ],
+            0.8,
+          );
+        }
+      });
+      // its little tune, as notes floating up
+      for (let i = 0; i < 3; i++) {
+        const q = (c.t * 0.6 + i / 3) % 1;
+        c.g.globalAlpha = Math.sin(q * Math.PI) * 0.9;
+        c.g.font = hand(11 * c.s);
+        c.g.fillStyle = css(c.I.inkC);
+        c.g.fillText(i % 2 ? "\u266A" : "\u266B", x + (i - 1) * 9 * c.s - r.dir * 10 * c.s, y - (38 + q * 22) * c.s);
+      }
+      c.g.globalAlpha = 1;
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  {
+    name: "city-bus",
+    places: ["city"],
+    when: () => true,
+    weight: 3,
+    dur: [11, 14],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 60),
+        y = c.h * GROUND.city.road! - 3 * c.s;
+      pen(c, 1.2);
+      facing(c, x, y, r.dir, () => {
+        shp(
+          c,
+          [
+            [-36, -3],
+            [-36, -22],
+            [34, -22],
+            [36, -18],
+            [36, -3],
+          ],
+          col(c, [90, 160, 230]),
+          1.2,
+        );
+        shp(
+          c,
+          [
+            [-36, -9],
+            [36, -9],
+            [36, -6],
+            [-36, -6],
+          ],
+          col(c, [255, 220, 90]),
+          0.8,
+        );
+        for (let i = 0; i < 6; i++)
+          shp(
+            c,
+            [
+              [-32 + i * 10, -19],
+              [-25 + i * 10, -19],
+              [-25 + i * 10, -12],
+              [-32 + i * 10, -12],
+            ],
+            c.I.lit ? c.I.window : col(c, [200, 230, 250]),
+            0.8,
+          );
+        shp(
+          c,
+          [
+            [29, -20],
+            [35, -20],
+            [35, -9],
+            [29, -9],
+          ],
+          col(c, [200, 230, 250]),
+          0.8,
+        );
+        const spin = c.t * 10;
+        for (const wx of [-24, 22]) {
+          circ(c, wx, -2, 3.8, c.I.inkC, 0);
+          ln(
+            c,
+            [
+              [wx + Math.cos(spin) * 1.7, -2 + Math.sin(spin) * 1.7],
+              [wx - Math.cos(spin) * 1.7, -2 - Math.sin(spin) * 1.7],
+            ],
+            0.8,
+          );
+        }
+      });
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  // ------------------------------------------------------------ the desert
+  {
+    name: "roadrunner",
+    places: ["desert"],
+    when: (c) => !night(c),
+    weight: 3,
+    dur: [4, 6],
+    draw(c, p, r) {
+      const x = across(c, p, r.dir, 30),
+        y = c.h * GROUND.desert.near;
+      const run = Math.sin(c.t * 30);
+      pen(c, 1);
+      // a little dust behind it
+      for (let i = 0; i < 4; i++) {
+        c.g.fillStyle = `rgba(220,200,160,${0.4 - i * 0.09})`;
+        c.g.beginPath();
+        c.g.arc(x - r.dir * (12 + i * 6) * c.s, y - 2 * c.s, (2 + i) * c.s, 0, TAU);
+        c.g.fill();
+      }
+      facing(c, x, y, r.dir, () => {
+        ln(
+          c,
+          [
+            [-2, -7],
+            [-4 + run * 3, 0],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [1, -7],
+            [3 - run * 3, 0],
+          ],
+          1,
+        );
+        shp(
+          c,
+          [
+            [-14, -14],
+            [-4, -8],
+            [6, -9],
+            [9, -13],
+            [4, -14],
+            [-4, -12],
+          ],
+          col(c, [150, 130, 110]),
+          1,
+        );
+        shp(
+          c,
+          [
+            [5, -13],
+            [9, -18],
+            [13, -17],
+            [12, -14],
+          ],
+          col(c, [150, 130, 110]),
+          1,
+        );
+        ln(
+          c,
+          [
+            [12, -16],
+            [18, -15.5],
+          ],
+          1.1,
+        );
+        ln(
+          c,
+          [
+            [8, -18],
+            [6, -22],
+            [9, -19],
+          ],
+          0.9,
+        );
+        circ(c, 10.5, -16.2, 0.8, c.I.inkC, 0);
+      });
+      c.g.strokeStyle = c.I.ink;
+    },
+  },
+  {
+    name: "coyote",
+    places: ["desert"],
+    when: (c) => night(c),
+    weight: 2,
+    dur: [12, 16],
+    draw(c, p, r) {
+      // trots in, stops on a rise, howls, trots off
+      const stop = p > 0.35 && p < 0.7;
+      const q = p < 0.35 ? p / 0.35 / 2 : p > 0.7 ? 0.5 + (p - 0.7) / 0.3 / 2 : 0.5;
+      const x = across(c, q, r.dir, 30),
+        y = c.h * GROUND.desert.near - 6 * c.s;
+      const step = stop ? 0 : Math.sin(c.t * 12);
+      pen(c, 1);
+      const fur = col(c, [176, 150, 120]);
+      facing(c, x, y, r.dir, () => {
+        for (const [lx, ph] of [
+          [-9, 0],
+          [-6, 1],
+          [6, 1],
+          [9, 0],
+        ] as [number, number][])
+          ln(
+            c,
+            [
+              [lx, -8],
+              [lx + (ph ? step : -step) * 2, 0],
+            ],
+            1.1,
+          );
+        shp(
+          c,
+          [
+            [-12, -12],
+            [8, -13],
+            [10, -8],
+            [-10, -7],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [-12, -11],
+            [-18, -8],
+            [-20, -5],
+          ],
+          2,
+        );
+        const up = stop ? -6 : 0;
+        shp(
+          c,
+          [
+            [7, -12],
+            [11, -18 + up],
+            [14, -17 + up],
+            [18, -15 + up * 1.3],
+            [12, -11],
+          ],
+          fur,
+          1,
+        );
+        ln(
+          c,
+          [
+            [11, -18 + up],
+            [11, -22 + up],
+          ],
+          1,
+        );
+        ln(
+          c,
+          [
+            [13, -17.5 + up],
+            [14, -21.5 + up],
+          ],
+          1,
+        );
+      });
+      if (stop) {
+        c.g.globalAlpha = Math.sin(((p - 0.35) / 0.35) * Math.PI);
+        c.g.font = hand(12 * c.s);
+        c.g.fillStyle = css(c.I.inkC);
+        c.g.fillText("awoo", x + r.dir * 14 * c.s, y - 30 * c.s);
+        c.g.globalAlpha = 1;
+      }
+      c.g.strokeStyle = c.I.ink;
     },
   },
 ];
@@ -1237,13 +2806,26 @@ export class Moments {
     // we've just had
     const max = this.only ? 1 : this.busy ? 3 : 2;
     if (t >= this.next && this.runs.length < max) {
-      const ok = DEFS.filter((d) => (!d.places || d.places.includes(c.place)) && (this.only ? d.name === this.only : d.when(c) && !this.recent.includes(d.name) && !this.runs.some((r) => r.def === d)));
+      const ok = DEFS.filter(
+        (d) =>
+          (!d.places || d.places.includes(c.place)) &&
+          (this.only
+            ? d.name === this.only
+            : d.when(c) && !this.recent.includes(d.name) && !this.runs.some((r) => r.def === d)),
+      );
       const total = ok.reduce((a, d) => a + d.weight, 0);
       if (total > 0) {
         let pick = Math.random() * total;
         const def = ok.find((d) => (pick -= d.weight) < 0) ?? ok[ok.length - 1];
         const dur = def.dur[0] + Math.random() * (def.dur[1] - def.dur[0]);
-        this.runs.push({ def, t0: t, dur, seed: Math.random(), dir: Math.random() < 0.5 ? 1 : -1, y: Math.random() });
+        this.runs.push({
+          def,
+          t0: t,
+          dur,
+          seed: Math.random(),
+          dir: Math.random() < 0.5 ? 1 : -1,
+          y: Math.random(),
+        });
         this.recent = [def.name, ...this.recent].slice(0, Math.min(6, Math.max(1, ok.length - 1)));
       }
       this.next = t + (this.only ? 1.5 : this.busy ? 2 + Math.random() * 3 : 7 + Math.random() * 16);

@@ -5,7 +5,17 @@ import { skyBands } from "./sky";
 import { drawLinePano, lineOffset, liveLines, paintLinePano, type LinePano } from "./line";
 import { Moments } from "./events";
 import { liveWorld, paintWorldPano, type WorldKind, type WorldPano } from "./world";
-import { PIX, drawPano, livePixels, paintPano, panoOffset, pixLayout, type Comp, type Pano, type PixLayout } from "./pixel";
+import {
+  PIX,
+  drawPano,
+  livePixels,
+  paintPano,
+  panoOffset,
+  pixLayout,
+  type Comp,
+  type Pano,
+  type PixLayout,
+} from "./pixel";
 
 // ?pix=1|2|3 picks a pixel style while we try them out
 // the stretches the loop is made of, in order; ?scene= shows just one
@@ -77,8 +87,13 @@ const smooth = (a: number, b: number, x: number) => {
   const t = clamp01((x - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
-const mix = (a: C, b: C, t: number): C => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const css = (c: C, a = 1) => `rgba(${Math.round(Math.max(0, Math.min(255, c[0])))},${Math.round(Math.max(0, Math.min(255, c[1])))},${Math.round(Math.max(0, Math.min(255, c[2])))},${a.toFixed(3)})`;
+const mix = (a: C, b: C, t: number): C => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+const css = (c: C, a = 1) =>
+  `rgba(${Math.round(Math.max(0, Math.min(255, c[0])))},${Math.round(Math.max(0, Math.min(255, c[1])))},${Math.round(Math.max(0, Math.min(255, c[2])))},${a.toFixed(3)})`;
 const hash = (n: number) => {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
@@ -141,7 +156,17 @@ function lightFor(f: SettingFrame, wx: Weather | null): Light {
   const space = smooth(-3, -11, elDeg);
   const k = wx?.kind ?? "clear";
   const overcast =
-    k === "clear" ? 0 : k === "partly" ? Math.max(0, (wx!.cloud - 0.35) * 0.8) : k === "cloudy" ? 0.7 : k === "fog" ? 0.85 : k === "storm" ? 1 : 0.85;
+    k === "clear"
+      ? 0
+      : k === "partly"
+        ? Math.max(0, (wx!.cloud - 0.35) * 0.8)
+        : k === "cloudy"
+          ? 0.7
+          : k === "fog"
+            ? 0.85
+            : k === "storm"
+              ? 1
+              : 0.85;
   const fog = k === "fog" ? 1 : k === "drizzle" || k === "rain" ? 0.35 : k === "snow" ? 0.45 : k === "storm" ? 0.5 : 0;
   const night = clamp01(f.dk);
   let haze: C = mix(mix(low as C, mid as C, 0.25), [12, 18, 40], space * 0.85);
@@ -151,8 +176,16 @@ function lightFor(f: SettingFrame, wx: Weather | null): Light {
   const sunC: C = mix([1, 0.97, 0.92], warmC, f.warm).map((v) => v * sunOn * 0.95) as C;
   const day = clamp01(f.day);
   // night: a cold moonlit blue, brighter with snow on the ground
-  const amb: C = mix(k === "snow" ? [0.2, 0.23, 0.34] : [0.12, 0.14, 0.24], mix([0.5, 0.56, 0.66], [0.62, 0.64, 0.68], overcast), day);
-  const sun: [number, number, number] = [Math.sin(f.az) * Math.cos(f.el), Math.sin(f.el), -Math.cos(f.az) * Math.cos(f.el)];
+  const amb: C = mix(
+    k === "snow" ? [0.2, 0.23, 0.34] : [0.12, 0.14, 0.24],
+    mix([0.5, 0.56, 0.66], [0.62, 0.64, 0.68], overcast),
+    day,
+  );
+  const sun: [number, number, number] = [
+    Math.sin(f.az) * Math.cos(f.el),
+    Math.sin(f.el),
+    -Math.cos(f.az) * Math.cos(f.el),
+  ];
   // windows: on through dusk, thinning out after midnight, back on before dawn
   const late = f.hour < 5 ? smooth(0.5, 3, f.hour) * (1 - smooth(4, 5.5, f.hour)) : 0;
   const lights = smooth(0.2, 0.75, night) * (1 - 0.6 * late) + 0.08 * (1 - night);
@@ -184,7 +217,9 @@ const MOON: [number, number, number] = [-0.55, 0.62, 0.56];
 function lit(base: C, n: [number, number, number], L: Light, gloss = 0): C {
   const d = Math.max(0, n[0] * L.sun[0] + n[1] * L.sun[1] + n[2] * L.sun[2]);
   const m = Math.max(0, n[0] * MOON[0] + n[1] * MOON[1] + n[2] * MOON[2]);
-  return [0, 1, 2].map((i) => base[i] * (L.amb[i] + L.sunC[i] * d * 1.05 + L.moonC[i] * m) + gloss * 255 * L.sunC[i] * d * d) as C;
+  return [0, 1, 2].map(
+    (i) => base[i] * (L.amb[i] + L.sunC[i] * d * 1.05 + L.moonC[i] * m) + gloss * 255 * L.sunC[i] * d * d,
+  ) as C;
 }
 // then the air between you and it (depth 0 near, 1 far)
 const air = (c: C, depth: number, L: Light) => mix(c, L.haze, clamp01(depth * L.hazeK));
@@ -209,13 +244,23 @@ function palette(L: Light): Pal {
   let ink = mix(day, dusk, Math.max(L.alpen, (1 - L.night) * L.sunC[0] > 0 ? 0 : 0) + L.alpen * 0.8);
   ink = mix(ink, night, L.night);
   const sunK = clamp01(Math.max(L.sunC[0], L.sunC[1]) * 1.1);
-  return { ink, sky: L.haze, sunTint: mix([255, 246, 228], mix(L.warmC.map((v) => v * 255) as C, [255, 170, 120], 0.3), clamp01(L.alpen * 1.5)), sunK, win: [255, 196, 118] };
+  return {
+    ink,
+    sky: L.haze,
+    sunTint: mix([255, 246, 228], mix(L.warmC.map((v) => v * 255) as C, [255, 170, 120], 0.3), clamp01(L.alpen * 1.5)),
+    sunK,
+    win: [255, 196, 118],
+  };
 }
 // a layer's flat colour at depth d (0 near .. 1 far)
 const tone = (P: Pal, d: number, L: Light) => mix(P.ink, P.sky, clamp01(Math.pow(d, 1.15) * (0.72 + 0.25 * L.hazeK)));
 // a bold flat colour, sunk into the night and faded with distance
 const paint = (P: Pal, col: C, d: number, L: Light) =>
-  mix(mix(col, P.ink, 0.05 + 0.5 * L.night + 0.25 * L.overcast), P.sky, clamp01(Math.pow(d, 1.3) * (0.45 + 0.25 * L.hazeK)));
+  mix(
+    mix(col, P.ink, 0.05 + 0.5 * L.night + 0.25 * L.overcast),
+    P.sky,
+    clamp01(Math.pow(d, 1.3) * (0.45 + 0.25 * L.hazeK)),
+  );
 
 // the city's colours: cheerful, a little chalky
 const BRIGHT: C[] = [
@@ -287,7 +332,11 @@ type Pop = {
 function pop(L: Light): Pop {
   const n = L.night;
   const deep = smooth(0.55, 1, n);
-  let wall = mix([248, 244, 236], mix([255, 222, 184], [255, 196, 170], L.alpen), clamp01(L.alpen * 1.2 + (1 - n) * L.sunC[2] * 0));
+  let wall = mix(
+    [248, 244, 236],
+    mix([255, 222, 184], [255, 196, 170], L.alpen),
+    clamp01(L.alpen * 1.2 + (1 - n) * L.sunC[2] * 0),
+  );
   wall = mix(wall, mix([128, 142, 220], [62, 72, 148], deep), smooth(0.15, 0.7, n));
   let shade = mix([120, 142, 216], [52, 62, 134], smooth(0.1, 0.9, n));
   // cloud flattens it all: greyer walls, softer shadows
@@ -384,8 +433,25 @@ function palm(g: CanvasRenderingContext2D, x: number, y: number, s: number, Q: P
 // ---------------------------------------------------------------------------
 
 type Win = "ribbon" | "tall" | "curtain";
-type Block = { x: number; w: number; top: number; depth: number; win: Win; trim: boolean; balcony: boolean; roof: "none" | "pent" | "antenna" | "pool"; seed: number; fh: number };
-type CityLayout = { kind: "city"; b: Block[]; beacons: [number, number][]; trees: [number, number, number, "round" | "palm", number][]; hedge: number };
+type Block = {
+  x: number;
+  w: number;
+  top: number;
+  depth: number;
+  win: Win;
+  trim: boolean;
+  balcony: boolean;
+  roof: "none" | "pent" | "antenna" | "pool";
+  seed: number;
+  fh: number;
+};
+type CityLayout = {
+  kind: "city";
+  b: Block[];
+  beacons: [number, number][];
+  trees: [number, number, number, "round" | "palm", number][];
+  hedge: number;
+};
 
 function cityLayout(w: number, h: number, seed: number): CityLayout {
   const r = rng(seed);
@@ -421,7 +487,18 @@ function cityLayout(w: number, h: number, seed: number): CityLayout {
     [edge, 0.34, 34],
     [1 - edge, 0.4, 30],
   ] as [number, number, number][])
-    b.push({ x: Math.round(w * fx - (bw * s) / 2), w: Math.round(bw * s), top: Math.round(h * top), depth: 0.75, win: "curtain", trim: true, balcony: false, roof: "antenna", seed: Math.floor(r() * 1e6), fh: 8 * s });
+    b.push({
+      x: Math.round(w * fx - (bw * s) / 2),
+      w: Math.round(bw * s),
+      top: Math.round(h * top),
+      depth: 0.75,
+      win: "curtain",
+      trim: true,
+      balcony: false,
+      roof: "antenna",
+      seed: Math.floor(r() * 1e6),
+      fh: 8 * s,
+    });
   row(0.55, 38 * s, 66 * s, 0.67, 0.78, 10 * s);
   row(0.22, 56 * s, 92 * s, 0.79, 0.87, 15 * s);
   b.sort((a, c) => c.depth - a.depth);
@@ -514,10 +591,11 @@ function block(g: CanvasRenderingContext2D, q: Block, h: number, w: number, L: L
     // the far row: little lit squares after dark, nothing by day
     if (L.night < 0.25) return;
     for (let j = 0; j < floors; j++)
-      for (let i = 0; i < 3; i++) if (on(q.seed + j * 13 + i)) {
-        g.fillStyle = css(lamp, L.night);
-        g.fillRect(x + margin + i * ((bw - 2 * margin) / 3), top + fh * (0.8 + j), 2 * s, 1.6 * s);
-      }
+      for (let i = 0; i < 3; i++)
+        if (on(q.seed + j * 13 + i)) {
+          g.fillStyle = css(lamp, L.night);
+          g.fillRect(x + margin + i * ((bw - 2 * margin) / 3), top + fh * (0.8 + j), 2 * s, 1.6 * s);
+        }
     return;
   }
   for (let j = 0; j < floors; j++) {
@@ -587,9 +665,27 @@ function block(g: CanvasRenderingContext2D, q: Block, h: number, w: number, L: L
 // the mountains
 // ---------------------------------------------------------------------------
 
-type Cabin = { x: number; y: number; w: number; chimney: [number, number]; seed: number };
-type Ridge = { pts: [number, number][]; depth: number; trees: [number, number, number][]; snow: number; k: number };
-type MtnLayout = { kind: "mountain"; ridges: Ridge[]; cabins: Cabin[]; cable: [[number, number], [number, number]]; firs: [number, number, number][] };
+type Cabin = {
+  x: number;
+  y: number;
+  w: number;
+  chimney: [number, number];
+  seed: number;
+};
+type Ridge = {
+  pts: [number, number][];
+  depth: number;
+  trees: [number, number, number][];
+  snow: number;
+  k: number;
+};
+type MtnLayout = {
+  kind: "mountain";
+  ridges: Ridge[];
+  cabins: Cabin[];
+  cable: [[number, number], [number, number]];
+  firs: [number, number, number][];
+};
 
 function mountainLayout(w: number, h: number, seed: number): MtnLayout {
   const r = rng(seed);
@@ -603,17 +699,36 @@ function mountainLayout(w: number, h: number, seed: number): MtnLayout {
     return pts;
   };
   // a mountain as a clean triangle-ish shape with a slightly lumpy edge
-  const peak = (x: number, px: number, py: number, half: number, base: number) => py + (base - py) * Math.min(1, Math.abs(x - px) / half);
+  const peak = (x: number, px: number, py: number, half: number, base: number) =>
+    py + (base - py) * Math.min(1, Math.abs(x - px) / half);
   const ridges: Ridge[] = [];
   ridges.push({
-    pts: line(60, (x) => Math.min(peak(x, w * 0.08, h * 0.3, w * 0.48, h * 0.8), peak(x, w * 0.95, h * 0.36, w * 0.42, h * 0.8), peak(x, w * 0.56, h * 0.54, w * 0.35, h * 0.8)) + fbm(x / 40, seed) * 5 * s),
+    pts: line(
+      60,
+      (x) =>
+        Math.min(
+          peak(x, w * 0.08, h * 0.3, w * 0.48, h * 0.8),
+          peak(x, w * 0.95, h * 0.36, w * 0.42, h * 0.8),
+          peak(x, w * 0.56, h * 0.54, w * 0.35, h * 0.8),
+        ) +
+        fbm(x / 40, seed) * 5 * s,
+    ),
     depth: 1,
     trees: [],
     snow: 1,
     k: 0,
   });
   ridges.push({
-    pts: line(50, (x) => Math.min(peak(x, w * 0.3, h * 0.5, w * 0.3, h * 0.82), peak(x, w * 0.8, h * 0.54, w * 0.3, h * 0.82), h * 0.68) + fbm(x / 50, seed + 4) * 6 * s),
+    pts: line(
+      50,
+      (x) =>
+        Math.min(
+          peak(x, w * 0.3, h * 0.5, w * 0.3, h * 0.82),
+          peak(x, w * 0.8, h * 0.54, w * 0.3, h * 0.82),
+          h * 0.68,
+        ) +
+        fbm(x / 50, seed + 4) * 6 * s,
+    ),
     depth: 0.72,
     trees: [],
     snow: 0.4,
@@ -635,9 +750,13 @@ function mountainLayout(w: number, h: number, seed: number): MtnLayout {
     [0.12, 0.87, 0.03, 0.8],
   ];
   hills.forEach(([depth, base, amp, freq], k) => {
-    const pts = line(40, (x) => h * base + Math.sin((x / w) * Math.PI * 2 * freq + k * 2) * h * amp + fbm(x / 70, seed + 10 + k) * 8 * s);
+    const pts = line(
+      40,
+      (x) => h * base + Math.sin((x / w) * Math.PI * 2 * freq + k * 2) * h * amp + fbm(x / 70, seed + 10 + k) * 8 * s,
+    );
     const trees: [number, number, number][] = [];
-    for (let x = -4; x < w + 4; x += (5 + r() * 9) * s * (1 + (0.5 - depth))) if (r() < 0.75) trees.push([x, yAt(pts, x) + 2, (7 + r() * 7) * s * (1.6 - depth)]);
+    for (let x = -4; x < w + 4; x += (5 + r() * 9) * s * (1 + (0.5 - depth)))
+      if (r() < 0.75) trees.push([x, yAt(pts, x) + 2, (7 + r() * 7) * s * (1.6 - depth)]);
     ridges.push({ pts, depth, trees, snow: 0, k: k + 2 });
   });
   const near = ridges[ridges.length - 1].pts;
@@ -646,7 +765,13 @@ function mountainLayout(w: number, h: number, seed: number): MtnLayout {
     const cw = (20 + r() * 8) * s;
     const x = w * fx;
     const y = yAt(near, x) + (6 + r() * 6) * s;
-    cabins.push({ x, y, w: cw, chimney: [x + cw * 0.22, y - cw * 0.95], seed: Math.floor(r() * 1e6) });
+    cabins.push({
+      x,
+      y,
+      w: cw,
+      chimney: [x + cw * 0.22, y - cw * 0.95],
+      seed: Math.floor(r() * 1e6),
+    });
   }
   const mid = ridges[3].pts;
   const cable: [[number, number], [number, number]] = [
@@ -700,7 +825,12 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
   const snowLit = mix(Q.wall, [255, 255, 255], 0.3);
   const snowShade = mix(Q.shade, [255, 255, 255], 0.25);
   // the hills by season, in the city-pop greens (and oranges in autumn)
-  const greens: Record<Season, C> = { spring: [40, 112, 66], summer: [32, 100, 58], autumn: [44, 100, 58], winter: [52, 92, 80] };
+  const greens: Record<Season, C> = {
+    spring: [40, 112, 66],
+    summer: [32, 100, 58],
+    autumn: [44, 100, 58],
+    winter: [52, 92, 80],
+  };
   for (const r of lay.ridges) {
     const outline = () => {
       g.beginPath();
@@ -724,7 +854,8 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
         g.fillStyle = css(far(snowLit, r.depth * 0.3, L, Q));
         g.beginPath();
         g.moveTo(-10, top - 5);
-        for (let x = -10; x <= w + 10; x += 5 * s) g.lineTo(x, top + capH + Math.abs(Math.sin(x / (7 * s))) * 6 * s + fbm(x / 30, 77) * 12 * s);
+        for (let x = -10; x <= w + 10; x += 5 * s)
+          g.lineTo(x, top + capH + Math.abs(Math.sin(x / (7 * s))) * 6 * s + fbm(x / 30, 77) * 12 * s);
         g.lineTo(w + 10, top - 5);
         g.fill();
       }
@@ -753,7 +884,16 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
     outline();
     g.fill();
     const dark = far(L.snow >= 0.5 ? mix(Q.leaf[0], [255, 255, 255], 0.1) : Q.leaf[0], r.depth, L, Q);
-    const lit = far(L.snow >= 0.5 ? mix(Q.leaf[1], [255, 255, 255], 0.35) : season === "autumn" ? mix(Q.leaf[1], [214, 120, 50], 0.35) : Q.leaf[1], r.depth, L, Q);
+    const lit = far(
+      L.snow >= 0.5
+        ? mix(Q.leaf[1], [255, 255, 255], 0.35)
+        : season === "autumn"
+          ? mix(Q.leaf[1], [214, 120, 50], 0.35)
+          : Q.leaf[1],
+      r.depth,
+      L,
+      Q,
+    );
     for (const [x, y, ts] of r.trees) litFir(g, x, y, ts, dark, up ? lit : dark, sunX);
     if (r === lay.ridges[3]) {
       const [[ax, ay], [bx, by]] = lay.cable;
@@ -803,7 +943,7 @@ function paintMountain(g: CanvasRenderingContext2D, lay: MtnLayout, w: number, h
 export class SettingScene {
   private still: CanvasRenderingContext2D;
   private live: CanvasRenderingContext2D;
-  private kind: "city" | "mountain" | "coast" | "country" | null = null;
+  private kind: "city" | "mountain" | "coast" | "suburb" | "desert" | "woods" | "country" | null = null;
   private wpano: WorldPano | null = null;
   private moments = new Moments();
   private wxKind = "clear";
@@ -831,7 +971,19 @@ export class SettingScene {
   }
 
   set(kind: SettingKind | null) {
-    const k = kind === "city" || kind === "mountain" || kind === "coast" || kind === "country" ? kind : null;
+    // a town gets the suburbs scene for now
+    const k =
+      kind === "town"
+        ? "suburb"
+        : kind === "city" ||
+            kind === "mountain" ||
+            kind === "coast" ||
+            kind === "suburb" ||
+            kind === "desert" ||
+            kind === "woods" ||
+            kind === "country"
+          ? kind
+          : null;
     if (k === this.kind) return;
     this.kind = k;
     this.lay = null;
@@ -867,7 +1019,8 @@ export class SettingScene {
         cv.height = Math.round(f.h * this.dpr);
       }
       this.lay = this.kind === "city" ? cityLayout(f.w, f.h, 7) : mountainLayout(f.w, f.h, 11);
-      this.pix = this.kind === "mountain" ? pixComps().map((c, i) => pixLayout(f.w, f.h, 11 + i * 7, pixStyle(), c)) : null;
+      this.pix =
+        this.kind === "mountain" ? pixComps().map((c, i) => pixLayout(f.w, f.h, 11 + i * 7, pixStyle(), c)) : null;
       this.key = "";
     }
     // repaint the still layer only when the light has really changed
@@ -892,9 +1045,11 @@ export class SettingScene {
       const wk = this.world();
       if (wk) this.lpano = this.wpano = paintWorldPano(wk, f.w, f.h, this.L, f.season, lineStyle(), this.dpr);
       else if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
-      else if (this.pix && this.art === "line") this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
+      else if (this.pix && this.art === "line")
+        this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
       else if (this.pix) this.pano = paintPano(this.pix, this.L, f.season);
-      if (process.env.NODE_ENV !== "production") (window as unknown as { __pano?: LinePano | null }).__pano = this.lpano;
+      if (process.env.NODE_ENV !== "production")
+        (window as unknown as { __pano?: LinePano | null }).__pano = this.lpano;
       if (!this.pix && !wk) this.aura(g, f);
       this.panoKey = "";
     }
@@ -926,7 +1081,16 @@ export class SettingScene {
 
   // the line-drawn worlds beyond Montana
   private world(): WorldKind | null {
-    return this.kind === "coast" ? "coast" : this.kind === "country" ? "farm" : null;
+    if (this.kind === "country") return "farm";
+    if (
+      this.kind === "coast" ||
+      this.kind === "city" ||
+      this.kind === "suburb" ||
+      this.kind === "desert" ||
+      this.kind === "woods"
+    )
+      return this.kind;
+    return null;
   }
 
   private aura(g: CanvasRenderingContext2D, f: SettingFrame) {
@@ -952,19 +1116,30 @@ export class SettingScene {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, f.w, f.h);
     const wp = this.wpano;
-    if (wp) liveWorld(g, wp, [0, 1, 2].map((k) => lineOffset(wp, f.yaw ?? 0, f.R, k)), this.t);
+    if (wp)
+      liveWorld(
+        g,
+        wp,
+        [0, 1, 2].map((k) => lineOffset(wp, f.yaw ?? 0, f.R, k)),
+        this.t,
+      );
     else if (this.lay.kind === "city") this.liveCity(g, this.lay, f);
     else if (this.pix && this.lpano) {
       const lp = this.lpano;
       const off = lineOffset(lp, f.yaw ?? 0, f.R, 2);
-      this.pix.forEach((lay, i) => liveLines(g, lay, lp.I, this.L!, this.t + i * 23, i * lay.W * PIX - off, lp.W, i === 0));
+      this.pix.forEach((lay, i) =>
+        liveLines(g, lay, lp.I, this.L!, this.t + i * 23, i * lay.W * PIX - off, lp.W, i === 0),
+      );
     } else if (this.pix && this.pano) {
       const off = panoOffset(this.pano, f.yaw ?? 0, f.R, 2);
-      this.pix.forEach((lay, i) => livePixels(g, lay, this.L!, this.t + i * 23, i * lay.W - off, this.pano!.W, i === 0));
+      this.pix.forEach((lay, i) =>
+        livePixels(g, lay, this.L!, this.t + i * 23, i * lay.W - off, this.pano!.W, i === 0),
+      );
     }
     // and every so often, something happens (events.ts)
     const lp = this.lpano;
-    if (lp && this.L && this.kind !== "city") {
+    if (lp && this.L) {
+      if (process.env.NODE_ENV !== "production") Object.assign(window, { __mom: this.moments, __t: this.t });
       this.moments.step({
         g,
         w: f.w,
@@ -972,7 +1147,10 @@ export class SettingScene {
         s: Math.max(0.8, Math.min(1.6, f.w / 390)),
         I: lp.I,
         L: this.L,
-        place: this.kind === "country" ? "farm" : (this.kind as "mountain" | "coast"),
+        place:
+          this.kind === "country"
+            ? "farm"
+            : (this.kind as "mountain" | "coast" | "city" | "suburb" | "desert" | "woods"),
         season: f.season,
         weather: this.wxKind,
         hour: f.hour,
@@ -1094,7 +1272,6 @@ export class SettingScene {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // finding it
 // ---------------------------------------------------------------------------
@@ -1106,7 +1283,11 @@ const WEEK = 7 * 24 * 3600_000;
 export async function settingFor(lat: number, lon: number): Promise<SettingKind | null> {
   const at = `${lat.toFixed(1)},${lon.toFixed(1)}`;
   try {
-    const c = JSON.parse(localStorage.getItem(CACHE) ?? "null") as { at: string; kind: SettingKind | null; t: number } | null;
+    const c = JSON.parse(localStorage.getItem(CACHE) ?? "null") as {
+      at: string;
+      kind: SettingKind | null;
+      t: number;
+    } | null;
     if (c && c.at === at && Date.now() - c.t < WEEK) return c.kind;
   } catch {}
   try {

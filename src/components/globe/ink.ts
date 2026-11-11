@@ -1,6 +1,6 @@
 // The drawn look: the whole Globe as simple ink lines, to match the
-// line-drawn places behind it (line.ts, world.ts). A preview for now:
-// ?ink=1 turns it on (and remembers it), ?ink=0 turns it off.
+// line-drawn places behind it (line.ts, world.ts). On for everyone;
+// ?ink=0 turns it off on this device (remembered), ?ink=1 turns it back on.
 //
 // What changes: the glass ball becomes an ink circle with a few lines of
 // latitude and longitude turning with it and a couple of shine marks (no
@@ -21,10 +21,10 @@ export function inkMode(): boolean {
   const q = new URLSearchParams(window.location.search).get("ink");
   try {
     if (q === "1") localStorage.setItem(KEY, "1");
-    if (q === "0") localStorage.removeItem(KEY);
-    on = q === "1" || (q !== "0" && localStorage.getItem(KEY) === "1");
+    if (q === "0") localStorage.setItem(KEY, "0");
+    on = localStorage.getItem(KEY) !== "0";
   } catch {
-    on = q === "1";
+    on = q !== "0";
   }
   return on;
 }

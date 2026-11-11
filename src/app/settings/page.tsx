@@ -4,6 +4,7 @@ import { LegalLinks } from "@/components/Legal";
 import { Card, Shell, buttonClass, ghostButtonClass } from "@/components/Shell";
 import { requireProfile } from "@/lib/data";
 import { DeleteAccount } from "./DeleteAccount";
+import { ScenePicker } from "./ScenePicker";
 
 const SPOTIFY_NOTES: Record<string, string> = {
   linked: "Spotify is connected. Press play on any song to hear it on your Spotify app.",
@@ -35,6 +36,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       <p className="mt-3 text-xs text-muted">
         Saving also updates your timezone to this device&apos;s, which decides when your midnight is.
       </p>
+
+      <h2 className="display mb-3 mt-10 text-xl">Your scene</h2>
+      <Card>
+        <ScenePicker />
+      </Card>
 
       <h2 className="display mb-3 mt-10 text-xl">Spotify</h2>
       <Card>
