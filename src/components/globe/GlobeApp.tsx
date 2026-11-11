@@ -806,7 +806,7 @@ function Globe({
         el = R.current;
       if (!w.scene && !w.failed && el.wxSky && el.wxBack && el.wxFront)
         try {
-          w.scene = new Scene(el.wxSky, el.wxBack, el.wxFront, el.wxFlash, weatherOverride() !== null || seasonOverride() !== null);
+          w.scene = new Scene(el.wxSky, el.wxBack, el.wxFront, el.wxFlash, weatherOverride() !== null || seasonOverride() !== null, inkMode());
         } catch {
           w.failed = true; // no WebGL here: the globe just goes without
         }

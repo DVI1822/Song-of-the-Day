@@ -105,6 +105,20 @@ function leafy(pen: Pen, x: number, base: number, size: number, leaf: C, bare: b
     pts.push([x + Math.cos(a) * size * 0.5 * r, base - size * 0.95 + Math.sin(a) * size * 0.42 * r]);
   }
   pen.shape(pts, leaf, 1.3, x);
+  if (pen.I.season === "spring") bloom(pen, x, base - size * 0.95, size * 0.5, size * 0.42);
+}
+
+// spring: little pink blossoms dotted over a crown
+function bloom(pen: Pen, cx: number, cy: number, rx: number, ry: number) {
+  const n = Math.max(5, Math.round((rx * ry) / 45));
+  for (let i = 0; i < n; i++) {
+    const a = hash(i * 7 + cx) * TAU,
+      r = Math.sqrt(hash(i * 13 + cx * 0.3)) * 0.8;
+    const bx = cx + Math.cos(a) * rx * r,
+      by = cy + Math.sin(a) * ry * r;
+    const d = 1.1 + hash(i * 3 + cx) * 0.9;
+    pen.fillOnly(ellipse(bx, by, d, d, 8), i % 4 ? [247, 168, 196] : [255, 236, 242]);
+  }
 }
 
 // ---------------------------------------------------------------------------

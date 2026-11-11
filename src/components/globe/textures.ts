@@ -11,6 +11,7 @@ export const TEX = {
   petal: 4,
   petalWhite: 5,
   seed: 6,
+  flake: 7, // the drawn look only: an inked snowflake
   daisy: 9,
   crocus: 10,
   sprout: 11,
@@ -39,6 +40,7 @@ function leafPath(ctx: CanvasRenderingContext2D, r: (a: number) => number, n = 1
 
 // A leaf: its outline, a soft colour change from the middle out, a stem and veins.
 function leaf(ctx: CanvasRenderingContext2D, r: (a: number) => number, inner: string, outer: string, vein: string, veins: number[]) {
+  if (inkOn) return inkLeaf(ctx, r, inner, veins);
   ctx.save();
   ctx.translate(64, 60);
   leafPath(ctx, r);
@@ -75,6 +77,37 @@ function leaf(ctx: CanvasRenderingContext2D, r: (a: number) => number, inner: st
   ctx.restore();
 }
 
+// The drawn look (ink.ts): one flat colour, a firm ink outline, inked veins.
+const INK = "#1d2433";
+let inkOn = false;
+function inkLeaf(ctx: CanvasRenderingContext2D, r: (a: number) => number, fill: string, veins: number[]) {
+  ctx.save();
+  ctx.translate(64, 62);
+  ctx.scale(0.86, 0.86);
+  leafPath(ctx, r, 90);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.lineWidth = 7;
+  ctx.stroke();
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 74);
+  ctx.lineTo(0, -r(0) * 0.55);
+  ctx.stroke();
+  ctx.lineWidth = 3.2;
+  for (const a of veins) {
+    const k = r(a) * 0.62;
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.quadraticCurveTo(Math.sin(a) * k * 0.4, 8 - Math.cos(a) * k * 0.5, Math.sin(a) * k, -Math.cos(a) * k);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function blade(ctx: CanvasRenderingContext2D, x: number, h: number, bend: number, w: number, col: [string, string]) {
   const g = ctx.createLinearGradient(0, C, 0, C - h);
   g.addColorStop(0, col[0]);
@@ -99,9 +132,13 @@ function stem(ctx: CanvasRenderingContext2D, top: number, bend: number) {
 }
 
 let atlasCache: HTMLCanvasElement | null = null;
+let inkCache: HTMLCanvasElement | null = null;
 
-export function atlas(): HTMLCanvasElement {
-  if (atlasCache) return atlasCache;
+// ink: the drawn look, where everything is a flat colour with an inked edge
+export function atlas(ink = false): HTMLCanvasElement {
+  if (!ink && atlasCache) return atlasCache;
+  if (ink && inkCache) return inkCache;
+  inkOn = ink;
   rnd = 7;
   const cv = document.createElement("canvas");
   cv.width = cv.height = C * CELLS;
@@ -176,6 +213,30 @@ export function atlas(): HTMLCanvasElement {
 
   // blossom petals: a soft rounded teardrop with a notch at the tip
   const petal = (base: string, tip: string) => {
+    if (ink) {
+      ctx.save();
+      ctx.translate(64, 64);
+      ctx.scale(0.8, 0.8);
+      ctx.beginPath();
+      ctx.moveTo(0, 46);
+      ctx.bezierCurveTo(-44, 20, -40, -40, -10, -44);
+      ctx.quadraticCurveTo(0, -34, 10, -44);
+      ctx.bezierCurveTo(40, -40, 44, 20, 0, 46);
+      ctx.fillStyle = base === "#F2A6BC" ? "#F7B3C6" : "#FFF6F8";
+      ctx.fill();
+      ctx.strokeStyle = INK;
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, 34);
+      ctx.lineTo(0, 4);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.translate(64, 64);
     ctx.beginPath();
@@ -202,7 +263,30 @@ export function atlas(): HTMLCanvasElement {
   cell(TEX.petalWhite, () => petal("#F4E6EA", "#FFFFFF"));
 
   // a dandelion seed: a fine stalk and a puff of silk
-  cell(TEX.seed, () => {
+  if (ink)
+    cell(TEX.seed, () => {
+      ctx.strokeStyle = INK;
+      ctx.lineCap = "round";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(64, 118);
+      ctx.lineTo(64, 52);
+      ctx.stroke();
+      ctx.lineWidth = 3.6;
+      for (let i = 0; i < 9; i++) {
+        const a = -Math.PI / 2 + (i / 8 - 0.5) * 2.4;
+        ctx.beginPath();
+        ctx.moveTo(64, 52);
+        ctx.quadraticCurveTo(64 + Math.cos(a) * 20, 52 + Math.sin(a) * 26, 64 + Math.cos(a) * 42, 48 + Math.sin(a) * 34);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#A07A4A";
+      ctx.beginPath();
+      ctx.ellipse(64, 112, 6, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+  else cell(TEX.seed, () => {
     ctx.strokeStyle = "rgba(255,255,255,0.9)";
     ctx.lineWidth = 1.4;
     ctx.beginPath();
@@ -222,8 +306,38 @@ export function atlas(): HTMLCanvasElement {
     }
   });
 
-  // a daisy on a stem
-  cell(TEX.daisy, () => {
+  // an inked snowflake: six white arms with ink round them
+  if (ink)
+    cell(TEX.flake, () => {
+      ctx.save();
+      ctx.translate(64, 64);
+      ctx.lineCap = "round";
+      for (const [col, w] of [
+        [INK, 17],
+        ["#FFFFFF", 7],
+      ] as const) {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = w;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const c = Math.cos(a),
+            sn = Math.sin(a);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(c * 44, sn * 44);
+          // a little V near the tip
+          ctx.moveTo(c * 26, sn * 26);
+          ctx.lineTo(c * 26 + Math.cos(a + 0.9) * 13, sn * 26 + Math.sin(a + 0.9) * 13);
+          ctx.moveTo(c * 26, sn * 26);
+          ctx.lineTo(c * 26 + Math.cos(a - 0.9) * 13, sn * 26 + Math.sin(a - 0.9) * 13);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    });
+
+  // a daisy on a stem (the flowers are left out of the drawn look)
+  if (!ink) cell(TEX.daisy, () => {
     stem(ctx, 40, 6);
     ctx.save();
     ctx.translate(68, 36);
@@ -241,7 +355,7 @@ export function atlas(): HTMLCanvasElement {
     ctx.restore();
   });
   // a crocus: a little purple cup
-  cell(TEX.crocus, () => {
+  if (!ink) cell(TEX.crocus, () => {
     stem(ctx, 56, -4);
     blade(ctx, 58, 64, -16, 2.4, ["#3E6B2E", "#7CAE4E"]);
     blade(ctx, 70, 58, 16, 2.4, ["#3E6B2E", "#7CAE4E"]);
@@ -263,7 +377,7 @@ export function atlas(): HTMLCanvasElement {
     ctx.restore();
   });
   // a sprout: two round leaves just opening
-  cell(TEX.sprout, () => {
+  if (!ink) cell(TEX.sprout, () => {
     stem(ctx, 70, 2);
     ctx.fillStyle = "#7DB24A";
     for (const s of [-1, 1]) {
@@ -277,7 +391,9 @@ export function atlas(): HTMLCanvasElement {
     }
   });
 
-  atlasCache = cv;
+  inkOn = false;
+  if (ink) inkCache = cv;
+  else atlasCache = cv;
   return cv;
 }
 

@@ -217,6 +217,18 @@ function cotton(pen: Pen, x: number, base: number, h: number, poplar: boolean) {
   );
   if (poplar) blob(pen, X, B - Hh * 0.6, Hh * 0.13, Hh * 0.4, pen.I.snowy ? pen.I.snow : pen.I.leaf, x);
   else blob(pen, X, B - Hh * 0.65, Hh * 0.38, Hh * 0.3, pen.I.snowy ? pen.I.snow : pen.I.leaf, x);
+  // spring: blossom dotted over the crown
+  if (pen.I.season === "spring" && !pen.I.snowy)
+    for (let i = 0; i < 9; i++) {
+      const a = i * 2.39 + x,
+        r = Math.sqrt((((i * 0.618 + x * 0.1) % 1) + 1) % 1) * 0.75;
+      const bx = X + Math.cos(a) * Hh * (poplar ? 0.12 : 0.34) * r,
+        by = B - Hh * (poplar ? 0.6 : 0.65) + Math.sin(a) * Hh * (poplar ? 0.36 : 0.27) * r;
+      const d = Hh * 0.035 + 0.8;
+      const pts: [number, number][] = [];
+      for (let j = 0; j < 8; j++) pts.push([bx + Math.cos((j / 8) * Math.PI * 2) * d, by + Math.sin((j / 8) * Math.PI * 2) * d]);
+      pen.fillOnly(pts, i % 4 ? [247, 168, 196] : [255, 236, 242]);
+    }
 }
 
 // one layout, drawn into the three layers (each a 2D context already moved

@@ -150,7 +150,8 @@ export type Light = {
   warmC: C;
 };
 
-function lightFor(f: SettingFrame, wx: Weather | null): Light {
+// warm: a place where winter doesn't bring snow (desert, coast)
+function lightFor(f: SettingFrame, wx: Weather | null, warm = false): Light {
   const elDeg = (f.el * 180) / Math.PI;
   const [, mid, low] = skyBands(elDeg, f.az);
   const space = smooth(-3, -11, elDeg);
@@ -191,7 +192,9 @@ function lightFor(f: SettingFrame, wx: Weather | null): Light {
   const lights = smooth(0.2, 0.75, night) * (1 - 0.6 * late) + 0.08 * (1 - night);
   const wintry = f.season === "winter" ? 1 : f.season === "autumn" || f.season === "spring" ? 0.35 : 0;
   const cold = f.temp === null ? 0 : smooth(3, -3, f.temp);
-  const snow = Math.max(k === "snow" ? 1 : 0, f.season === "winter" ? 0.55 * Math.max(cold, 0.4) : 0, cold * 0.4);
+  // winter lies white on the ground, unless it's mild there or it's a warm place
+  const mild = f.temp !== null && f.temp > 6;
+  const snow = Math.max(k === "snow" ? 1 : 0, f.season === "winter" && !warm ? (mild ? 0.3 : 0.7) : 0, warm ? 0 : cold * 0.4);
   const snowline = 0.25 + 0.4 * wintry + 0.2 * cold;
   const alpen = smooth(-4, 0, elDeg) * (1 - smooth(4, 11, elDeg)) * (1 - overcast);
   return {
@@ -1037,7 +1040,7 @@ export class SettingScene {
     ].join("|");
     if (key !== this.key) {
       this.key = key;
-      this.L = lightFor(f, wx);
+      this.L = lightFor(f, wx, this.kind === "desert" || this.kind === "coast");
       this.P = palette(this.L);
       const g = this.still;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
