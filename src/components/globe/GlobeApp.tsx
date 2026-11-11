@@ -30,7 +30,7 @@ import { settingOverride, type SettingKind } from "@/lib/setting";
 import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
-import { drawInkGlobe, inkMode } from "./ink";
+import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -138,6 +138,7 @@ export type Live = {
   friends: Friend[];
   beam: Beam;
   look: CoreLook | null;
+  composing: boolean; // the add-a-song sheet is up
 };
 // what's playing, for the energy streak: its tile, and how to find its beat
 export type Beam = { k: number; paused: boolean; beat: Beat | null; clipTime: () => number | null } | null;
@@ -185,6 +186,8 @@ function newMotion(posted: boolean) {
     drops: new Map<number, number>(),
     dropNext: 0,
     dropSeen: new Set<string>(),
+    // the ones already moved to the front of the globe to land where you can see them
+    dropPlaced: new Set<number>(),
     // a drag: where it began, the last point, and which way sideways turns
     // the globe (reversed once it's been tipped upside down)
     drag: null as null | { x: number; y: number; lx: number; ly: number; yaw: number; pitch: number; side: number },
@@ -398,9 +401,9 @@ function Globe({
   }, [friends]);
 
   // Everything the frame loop needs from the latest render.
-  const live = useRef<Live>({ keys, half, Rb, L, zFeat, friends, beam, look });
+  const live = useRef<Live>({ keys, half, Rb, L, zFeat, friends, beam, look, composing: compose });
   useLayoutEffect(() => {
-    live.current = { keys, half, Rb, L, zFeat, friends, beam, look };
+    live.current = { keys, half, Rb, L, zFeat, friends, beam, look, composing: compose };
   });
 
   // -------------------------------------------------------------------------
@@ -688,6 +691,14 @@ function Globe({
           afterFeat.current?.();
           afterFeat.current = null;
         }
+      }
+      // A friend's new song lands in the middle of the globe, so hold the
+      // queue while that isn't on screen (a song or a core open, zoomed in,
+      // adding your own song, or yours still dropping in) and let them fall
+      // once you're back.
+      if (s.drops.size && (s.lens !== null || s.featOn || s.coreOn || s.pendingCore || s.launch !== null || live.current.composing || s.zoom > 1.15)) {
+        for (const [k, d] of s.drops) if (!s.dropPlaced.has(k)) s.drops.set(k, d + dt);
+        s.dropNext += dt;
       }
       if (s.launch !== null) {
         s.launch += dt / 1.25;
@@ -1604,18 +1615,25 @@ sim: TileSim,
     const lockAt = k === ME ? s.myLock : null;
     const lockAge = wait || lockAt === null ? 99 : s.t - lockAt;
     const grow = 1 - Math.pow(1 - Math.min(1, (b === undefined ? 99 : s.t - b) / 0.9), 3);
-    // falling straight down onto its spot from high above the water, so it
-    // comes in from wherever on screen that is, quicker and quicker, and splashes
+    // A friend's new song: just before it falls it moves to an open spot in
+    // the middle of the globe, facing you, so you always see it land. Then it
+    // slams straight down onto it, quicker and quicker, and splashes.
     let lift = 0,
       unborn = false;
     const d0 = s.drops.get(k);
     if (d0 !== undefined) {
       const u = (s.t - d0) / FALL;
+      if (u >= 0 && !s.dropPlaced.has(k)) {
+        s.dropPlaced.add(k);
+        landFront(sim, k, keys, cam, half, Rb);
+      }
       if (u >= 1) {
         s.drops.delete(k);
+        s.dropPlaced.delete(k);
         sim.splash(k, keys);
       } else if (u < 0) unborn = true;
-      else lift = (1 - u * u) * DROP_HEIGHT;
+      // dropped from in front of the globe, so keep it from flying past the camera
+      else lift = (1 - u * u) * Math.min(DROP_HEIGHT, PERSPECTIVE * 0.58 - Rb);
     }
     const lockE = 1 - Math.pow(1 - Math.min(1, lockAge / 0.7), 3);
     const sla = Math.sin(lat),
@@ -1823,9 +1841,44 @@ sim: TileSim,
       r.launch.style.top = (L.cy + y * L.s - box / 2).toFixed(1) + "px";
       r.launch.style.opacity = op.toFixed(3);
       r.launch.style.transform = `scale(${sc.toFixed(3)})`;
-      r.launch.style.boxShadow = `0 30px 70px -20px rgba(13,42,63,0.5), 0 0 ${Math.round(30 + 50 * p)}px ${Math.round(6 + 10 * p)}px rgba(13,42,63,${(0.06 + 0.1 * p).toFixed(2)})`;
+      if (inkMode()) {
+        // the drawn look: a fat ink edge and a hard drawn shadow, like the songs
+        r.launch.style.outline = `${(2.5 / sc).toFixed(2)}px solid #1d2433`;
+        r.launch.style.boxShadow = `${(4 + 6 * (1 - p)).toFixed(1)}px ${(6 + 10 * (1 - p)).toFixed(1)}px 0 rgba(29,36,51,0.22)`;
+      } else r.launch.style.boxShadow = `0 30px 70px -20px rgba(13,42,63,0.5), 0 0 ${Math.round(30 + 50 * p)}px ${Math.round(6 + 10 * p)}px rgba(13,42,63,${(0.06 + 0.1 * p).toFixed(2)})`;
     }
   }
+}
+
+// Where a friend's new song lands: the open spot nearest the middle of what
+// you're looking at, a little above centre so it reads as coming down.
+function landFront(sim: TileSim, k: number, keys: number[], cam: Camera, half: number, Rb: number) {
+  const w = camInv([0, -Math.sin(0.18), Math.cos(0.18)], cam);
+  const front: V3 = [w[0], -w[1], w[2]]; // the sim's y runs the other way
+  const others = keys.filter((j) => j !== k).map((j) => sim.pos(j));
+  // room for a whole tile, corners and all
+  const need = (2 * half * 1.45) / Rb;
+  const clear = (p: V3) => Math.abs(p[1]) < 0.85 && others.every((o) => Math.acos(Math.max(-1, Math.min(1, o[0] * p[0] + o[1] * p[1] + o[2] * p[2]))) >= need);
+  const a = norm3(Math.abs(front[1]) < 0.9 ? cross([0, 1, 0], front) : cross([1, 0, 0], front)),
+    b = cross(front, a);
+  let spot: V3 = front;
+  if (!clear(front)) {
+    // spiral out from the middle, staying well on the near side
+    search: for (let ring = 1; ring <= 6; ring++) {
+      const th = ring * need * 0.5;
+      if (th > 0.75) break;
+      const n = 6 * ring;
+      for (let i = 0; i < n; i++) {
+        const f = (i / n) * Math.PI * 2 + ring;
+        const q = norm3([0, 1, 2].map((j) => front[j] * Math.cos(th) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(th)) as V3);
+        if (clear(q)) {
+          spot = q;
+          break search;
+        }
+      }
+    }
+  }
+  sim.moveTo(k, spot);
 }
 
 const cross = (u: V3, v: V3): V3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
@@ -1863,22 +1916,68 @@ function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb
     const p = r.p,
       a = norm3(Math.abs(p[1]) < 0.9 ? cross([0, 1, 0], p) : cross([1, 0, 0], p)),
       b = cross(p, a);
-    const color = look ? drift(look.colors, s.t * 0.3 + r.t, night ? 0.35 : 0.15) : night ? "rgb(190,225,255)" : "rgb(255,255,255)";
-    ctx.strokeStyle = color;
+    // a point on the globe, t radians out from where it landed, toward f
+    const at = (t: number, f: number): [number, number, number] => {
+      const q: V3 = [0, 1, 2].map((j) => p[j] * Math.cos(t) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(t)) as V3;
+      const { lat, lon } = latLon(q);
+      const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam!);
+      const z = v[2] * Rb * s.zoom,
+        kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
+      return [L.cx + v[0] * Rb * kz, L.cy + v[1] * Rb * kz, v[2]];
+    };
     const ring = (back: number) => {
       const t = Math.max(0.01, th - back),
         pts: [number, number, number][] = [];
-      for (let i = 0; i <= 72; i++) {
-        const f = (i / 72) * Math.PI * 2;
-        const q: V3 = [0, 1, 2].map((j) => p[j] * Math.cos(t) + (a[j] * Math.cos(f) + b[j] * Math.sin(f)) * Math.sin(t)) as V3;
-        const { lat, lon } = latLon(q);
-        const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam!);
-        const z = v[2] * Rb * s.zoom,
-          kz = (s.zoom * PERSPECTIVE) / Math.max(1, PERSPECTIVE - z);
-        pts.push([L.cx + v[0] * Rb * kz, L.cy + v[1] * Rb * kz, v[2]]);
-      }
+      for (let i = 0; i <= 72; i++) pts.push(at(t, (i / 72) * Math.PI * 2));
       return pts;
     };
+    if (inkMode()) {
+      // the drawn look: a pencilled ring rolling out with a coral one behind
+      // it, and a burst of little slam lines round the song as it hits
+      const ink = night ? CHALK : INK,
+        seed = boil(s.t) * 7 + r.k;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      const near = (pts: [number, number, number][]) => {
+        // only the side facing you, split where it turns away
+        const runs: [number, number][][] = [];
+        let cur: [number, number][] = [];
+        for (const q of pts) {
+          if (q[2] < 0.02) {
+            if (cur.length > 1) runs.push(cur);
+            cur = [];
+          } else cur.push([q[0], q[1]]);
+        }
+        if (cur.length > 1) runs.push(cur);
+        return runs;
+      };
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = css(ink);
+      ctx.lineWidth = 2 * L.s;
+      for (const run of near(ring(0))) wobbly(ctx, run, seed, 1.4 * L.s);
+      ctx.strokeStyle = css(CORAL);
+      ctx.lineWidth = 1.6 * L.s;
+      for (const run of near(ring(0.16))) wobbly(ctx, run, seed + 3, 1.4 * L.s);
+      if (age < 0.3) {
+        ctx.globalAlpha = 1 - age / 0.3;
+        ctx.strokeStyle = css(ink);
+        ctx.lineWidth = 2.2 * L.s;
+        const r0 = 0.24 + age * 0.5;
+        for (let i = 0; i < 8; i++) {
+          const f = (i / 8) * Math.PI * 2 + r.k,
+            q0 = at(r0, f),
+            q1 = at(r0 + 0.1, f);
+          if (q0[2] < 0.05) continue;
+          ctx.beginPath();
+          ctx.moveTo(q0[0], q0[1]);
+          ctx.lineTo(q1[0], q1[1]);
+          ctx.stroke();
+        }
+      }
+      continue;
+    }
+    const color = look ? drift(look.colors, s.t * 0.3 + r.t, night ? 0.35 : 0.15) : night ? "rgb(190,225,255)" : "rgb(255,255,255)";
+    ctx.strokeStyle = color;
     // a faint wake trailing behind a thin bright edge, near side only
     const passes: [number, number, number][] = [
       [0.12, 7, 0.07],
