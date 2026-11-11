@@ -4,19 +4,23 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SCENE_KEY, scenePick, type ScenePick } from "@/lib/setting";
 import { glass } from "./ui";
 
-// The backdrop dial in the bottom-right corner: a big wheel whose middle sits
-// off the screen, so only the scene you're on peeks out of the corner and the
-// others wait round the rim, out of sight. Spin it (or tap for the next one)
+// The backdrop dial on the right-hand side, under the chat tab: a wheel whose
+// middle sits just off the screen's edge, so only the scene you're on peeks
+// out and the others wait round the rim, out of sight. Spin it (or tap for the next one)
 // to change what's drawn behind the Globe. Kept on this device, the same
 // choice as the picker in Settings.
 
 export const SCENE_EVENT = "tt-scene";
 
-const W = 116; // the corner window
-const OFF = 34; // how far past the corner the wheel's middle sits
-const RIM = 92; // emblems sit this far from the middle
+const RO = 80; // the dial's outer edge
+const OFF = 28; // how far past the screen's edge its middle sits
+const RIM = 54; // emblems sit this far from the middle
+const W = RO - OFF + 4; // the slice of it that shows
+const H = 2 * Math.ceil(Math.sqrt(RO * RO - OFF * OFF)) + 4;
+const CX = W + OFF,
+  CY = H / 2;
 const STEP = 40; // degrees between emblems
-const HOME = 225; // where the shown emblem sits: up and left of the middle
+const HOME = 180; // where the shown emblem sits: straight in from the edge
 
 const ink = {
   fill: "none",
@@ -148,11 +152,13 @@ export function choose(p: ScenePick) {
 }
 
 export function SceneWheel({
+  top,
   dark,
   wheelRef,
 }: {
   dark: boolean;
   wheelRef?: (el: HTMLDivElement | null) => void;
+  top: number;
 }) {
   // the wheel's turn in degrees; the emblem at HOME is SCENES[slot]
   const [turn, setTurn] = useState(0);
@@ -193,10 +199,7 @@ export function SceneWheel({
   // angle of a point round the wheel's middle, in degrees
   const angle = (x: number, y: number) => {
     const r = box.current!.getBoundingClientRect();
-    return (
-      (Math.atan2(y - (r.top + W + OFF), x - (r.left + W + OFF)) * 180) /
-      Math.PI
-    );
+    return (Math.atan2(y - (r.top + CY), x - (r.left + CX)) * 180) / Math.PI;
   };
 
   return (
@@ -204,10 +207,11 @@ export function SceneWheel({
       {/* which one it is, for a moment after a turn */}
       <span
         aria-hidden
-        className="pointer-events-none absolute right-[12px] z-[6] whitespace-nowrap rounded-full px-2.5 py-[3px] text-[11px] font-semibold transition-opacity duration-300"
+        className="pointer-events-none absolute z-[6] -translate-y-1/2 whitespace-nowrap rounded-full px-2.5 py-[3px] text-[11px] font-semibold transition-opacity duration-300"
         style={{
           ...glass(dark),
-          bottom: `calc(${W + 4}px + env(safe-area-inset-bottom))`,
+          right: W + 6,
+          top: top + CY,
           opacity: label ? 1 : 0,
         }}
       >
@@ -218,8 +222,14 @@ export function SceneWheel({
           box.current = el;
           wheelRef?.(el);
         }}
-        className="absolute bottom-[env(safe-area-inset-bottom)] right-0 z-[6] select-none overflow-hidden"
-        style={{ width: W, height: W, touchAction: "none" }}
+        className="absolute right-0 z-[6] select-none overflow-hidden"
+        style={{
+          top,
+          width: W,
+          height: H,
+          touchAction: "none",
+          clipPath: `circle(${RO}px at ${CX}px ${CY}px)`,
+        }}
         onPointerDown={(e) => {
           // only the rim near the shown emblem catches a touch
           const a = angle(e.clientX, e.clientY);
@@ -276,17 +286,17 @@ export function SceneWheel({
           overflow="visible"
         >
           <circle
-            cx={W + OFF}
-            cy={W + OFF}
-            r={RIM + 26}
+            cx={CX}
+            cy={CY}
+            r={RO - 1}
             fill={dark ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.32)"}
             stroke="rgba(13,42,63,0.18)"
             strokeWidth="1"
           />
           <circle
-            cx={W + OFF}
-            cy={W + OFF}
-            r={RIM - 24}
+            cx={CX}
+            cy={CY}
+            r={RIM - 26}
             fill="none"
             stroke="rgba(13,42,63,0.14)"
             strokeWidth="1"
@@ -295,7 +305,7 @@ export function SceneWheel({
           <g
             style={{
               transform: `rotate(${turn}deg)`,
-              transformOrigin: `${W + OFF}px ${W + OFF}px`,
+              transformOrigin: `${CX}px ${CY}px`,
               transition: dragging
                 ? "none"
                 : "transform 420ms cubic-bezier(.2,1.4,.4,1)",
@@ -303,15 +313,15 @@ export function SceneWheel({
           >
             {Array.from({ length: N * 4 }, (_, i) => {
               const a = ((HOME + (i * STEP) / 4) * Math.PI) / 180;
-              const r1 = RIM + 20,
-                r2 = RIM + (i % 4 === 0 ? 13 : 17);
+              const r1 = RO - 5,
+                r2 = RO - (i % 4 === 0 ? 12 : 8);
               return (
                 <line
                   key={i}
-                  x1={+(W + OFF + Math.cos(a) * r1).toFixed(2)}
-                  y1={+(W + OFF + Math.sin(a) * r1).toFixed(2)}
-                  x2={+(W + OFF + Math.cos(a) * r2).toFixed(2)}
-                  y2={+(W + OFF + Math.sin(a) * r2).toFixed(2)}
+                  x1={+(CX + Math.cos(a) * r1).toFixed(2)}
+                  y1={+(CY + Math.sin(a) * r1).toFixed(2)}
+                  x2={+(CX + Math.cos(a) * r2).toFixed(2)}
+                  y2={+(CY + Math.sin(a) * r2).toFixed(2)}
                   stroke="rgba(13,42,63,0.35)"
                   strokeWidth={i % 4 === 0 ? 1.4 : 0.8}
                   strokeLinecap="round"
@@ -323,8 +333,12 @@ export function SceneWheel({
         {/* the emblems round the rim; all but one are off the screen */}
         {SCENES.map((s, i) => {
           const a = ((HOME + i * STEP + turn) * Math.PI) / 180;
-          const x = W + OFF + Math.cos(a) * RIM,
-            y = W + OFF + Math.sin(a) * RIM;
+          const x = Math.round((CX + Math.cos(a) * RIM) * 10) / 10,
+            y = Math.round((CY + Math.sin(a) * RIM) * 10) / 10;
+          // the ones turned away slip off the edge and fade
+          let off =
+            ((((HOME + i * STEP + turn - HOME) % 360) + 540) % 360) - 180;
+          off = Math.abs(off);
           return (
             <span
               key={s.pick}
@@ -332,11 +346,12 @@ export function SceneWheel({
               className="pointer-events-none absolute flex h-10 w-10 items-center justify-center rounded-full"
               style={{
                 left: x - 20,
+                opacity: Math.round(Math.max(0, 1 - Math.max(0, off - 8) / 22) * 100) / 100,
                 top: y - 20,
                 ...glass(dark),
                 transition: dragging
                   ? "none"
-                  : "left 420ms cubic-bezier(.2,1.4,.4,1), top 420ms cubic-bezier(.2,1.4,.4,1)",
+                  : "left 420ms cubic-bezier(.2,1.4,.4,1), top 420ms cubic-bezier(.2,1.4,.4,1), opacity 300ms",
               }}
             >
               {s.icon}

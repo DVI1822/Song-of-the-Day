@@ -1336,8 +1336,8 @@ function Globe({
         style={{ left: L.cx - L.R * 0.8 - 20, top: L.cy + L.R * 0.8 - 20 }}
       />
 
-      {/* the backdrop: a wheel in the corner, spun to pick the scene behind the Globe */}
-      <SceneWheel dark={darkOn} wheelRef={(el) => void (R.current.chrome[8] = el)} />
+      {/* the backdrop: a dial on the right-hand side under the chat tab, spun to pick the scene behind the Globe */}
+      <SceneWheel dark={darkOn} top={tabTop + 132} wheelRef={(el) => void (R.current.chrome[8] = el)} />
 
       {/* what this is, any time */}
       <HelpButton dark={darkOn} onClick={() => setHelp(true)} buttonRef={(el) => void (R.current.chrome[5] = el)} />
