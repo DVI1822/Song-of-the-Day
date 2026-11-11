@@ -10,6 +10,7 @@ import { ShuffleIcon } from "./Shuffle";
 import { SignalCore } from "./SignalCore";
 import { CompassStar } from "./SongFacts";
 import { CloseIcon, glass, RecenterIcon, TabIcon } from "./ui";
+import { SCENES } from "./SceneWheel";
 
 // The key: what every button on TopTrack does, drawn with the real icons.
 // It opens from the little key at the top left, the twin of the ? at the
@@ -123,6 +124,7 @@ const PAGES: Page[] = [
       { icon: <Round><ShuffleIcon /></Round>, name: "Shuffle all", text: "Plays every song on your globe in a row. The little pill shows what's playing and who picked it. Tap it to fly there." },
       { icon: <Words top="12" bottom="SONGS" size={17} />, name: "Songs today", text: "How many songs are on your globe right now." },
       { icon: <Words top="4:12" bottom="NEXT SONG" size={14} />, name: "Countdown", text: "Time until midnight. Then everyone picks a new song, and today's goes into your core." },
+      { icon: <Round>{SCENES[1].icon}</Round>, name: "Backdrop wheel", text: "The dial in the bottom corner picks the scene behind your Globe. Tap it for the next one, or spin it. The pin means where you really are." },
       { icon: <Plain><SkyIcon /></Plain>, name: "Your sky", text: "The sky follows the real sun, weather and season where you are." },
       { icon: <Round><span className="text-sm font-semibold">?</span></Round>, name: "About TopTrack", text: "What TopTrack is, and how to put it on your home screen." },
     ],
