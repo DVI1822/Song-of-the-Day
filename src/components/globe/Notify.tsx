@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import type { GlobeApi } from "./api";
 import { installPending } from "./Install";
 import { LATER_KEY, enablePush, notifyLater } from "./Welcome";
+import { ASKED_KEY } from "./Locate";
+import { scenePick } from "@/lib/setting";
 
 // Asks again for notifications, for anyone who hasn't turned them on: a
 // friend posting their song, likes and notes on yours, and the nudges. If
@@ -20,6 +22,8 @@ function askNow(api: GlobeApi): Ask | null {
   if (Notification.permission === "granted" || installPending()) return null;
   try {
     if (Date.now() < Number(localStorage.getItem(LATER_KEY) || 0)) return null;
+    // the location card goes first; this one waits for the next visit
+    if (localStorage.getItem(ASKED_KEY) === null && scenePick() === "auto" && "geolocation" in navigator) return null;
   } catch {
     return null;
   }

@@ -13,6 +13,7 @@
 import type { Weather } from "@/lib/weather";
 import { pulseAt } from "./beat";
 import { halloween } from "./halloween";
+import { inkMode, inkRing, boil } from "./ink";
 import type { Live, Motion } from "./GlobeApp";
 import { PERSPECTIVE, TILT, camV, latLon, type Camera, type TileSim, type V3 } from "./math";
 
@@ -189,6 +190,33 @@ export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: L
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.setTransform(dpr, 0, 0, dpr, (size / 2) * dpr, (size / 2) * dpr);
+  // the drawn look: the same rings, as plain ink lines that boil a little
+  if (inkMode()) {
+    const nightI = e.night > 0.6;
+    const t = s.mt,
+      lvl = s.beamLvl * s.beamA,
+      fl = Math.min(1.5, flareNow);
+    const rings = corePoints(13, Rc, s.cam, Math.floor(t * 4) / 4, 0.13 * (1 + 0.8 * lvl + 1.6 * fl));
+    const b = boil(t);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (const front of [false, true])
+      rings.forEach((pts, i) => {
+        const c = inkRing(i, nightI);
+        for (const run of runs(pts, front)) {
+          ctx.beginPath();
+          run.forEach(([x, y], j) => {
+            const o = (hash(j * 3.1 + i * 17 + b * 101) - 0.5) * 0.5;
+            if (j) ctx.lineTo(x + o, y - o);
+            else ctx.moveTo(x + o, y - o);
+          });
+          ctx.strokeStyle = `rgba(${c.join(",")},${front ? 0.95 : 0.28})`;
+          ctx.lineWidth = front ? 1.3 * (1 + 0.5 * fl) : 0.9;
+          ctx.stroke();
+        }
+      });
+    return;
+  }
   // glowing light against the dark; crisp coloured lines against a bright sky
   const night = e.night > 0.5;
   ctx.globalCompositeOperation = night ? "lighter" : "source-over";

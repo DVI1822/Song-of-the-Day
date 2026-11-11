@@ -103,3 +103,40 @@ export function Face({
     </span>
   );
 }
+
+// The left tabs' icons (GlobeApp), also drawn in the key.
+export function TabIcon({ name }: { name: "friends" | "find" | "songs" }) {
+  const p = { "aria-hidden": true, width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8 };
+  if (name === "friends")
+    return (
+      <svg {...p}>
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M16 14.5c2.6 0 4.6 1.6 5.5 4.5" />
+      </svg>
+    );
+  if (name === "find")
+    return (
+      <svg {...p}>
+        <circle cx="10.5" cy="10.5" r="6" />
+        <path d="M15 15l5.5 5.5" />
+      </svg>
+    );
+  return (
+    <svg {...p}>
+      <path d="M9 18V5l11-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="17" cy="16" r="3" />
+    </svg>
+  );
+}
+
+// Bring the songs to the front: the button at the globe's bottom right.
+export const RecenterIcon = () => (
+  <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <circle cx="12" cy="12" r="6.5" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+  </svg>
+);

@@ -262,3 +262,93 @@ body {
   45% { transform: scale(1.18); filter: brightness(1.5); }
   100% { transform: scale(1); filter: brightness(1); }
 }
+
+/* ---------------------------------------------------------------------------
+   The drawn look (components/globe/ink.ts, ?ink=1): paper and ink instead of
+   glass, to match the line-drawn places behind the Globe.
+   --------------------------------------------------------------------------- */
+.ink-word { display: none; }
+:root[data-ink] {
+  --ink: #1d2433;
+  --paper: #fffdf6;
+}
+[data-ink] .display, [data-ink] h1, [data-ink] h2 {
+  font-family: var(--font-hand), var(--font-sans) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
+}
+/* the name, hand-lettered in coral with a fat ink edge and a drawn shadow */
+[data-ink] svg[aria-label="TopTrack"] { display: none !important; }
+[data-ink] .ink-word {
+  display: block;
+  font-family: var(--font-hand), var(--font-sans);
+  font-weight: 700;
+  font-size: 42px;
+  line-height: 1;
+  color: var(--color-coral);
+  -webkit-text-stroke: 2.5px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 2px 3px 0 var(--ink);
+  transform: rotate(-2deg);
+}
+/* glass buttons, tabs, panels and cards become paper with a wobbly ink edge
+   (full-screen frosted backdrops keep their blur) */
+[data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0) {
+  background: var(--paper) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 0 !important;
+  box-shadow: 2px 3px 0 rgba(29, 36, 51, 0.18) !important;
+  color: var(--ink) !important;
+}
+[data-ink] [style*="backdrop-filter"]:not(.inset-0) { overflow: visible !important; }
+[data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0):not(.absolute):not(.fixed) { position: relative; }
+[data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 2px solid var(--ink);
+  border-radius: inherit;
+  filter: url(#ink-wobble);
+}
+/* the opened song's cover gets an ink outline too */
+[data-ink] button[aria-label^="Flip"] > div > div {
+  outline: 2.5px solid var(--ink);
+  box-shadow: 4px 6px 0 rgba(29, 36, 51, 0.22) !important;
+}
+[data-ink] button[aria-label="My friends"]::after,
+[data-ink] button[aria-label="Find a friend"]::after,
+[data-ink] button[aria-label="My songs"]::after,
+[data-ink] button[aria-label^="Core"]::after { border-left: 0; }
+[data-ink] button[aria-label="Globe chat"]::after { border-right: 0; }
+/* the add button: coral with a fat ink line and a hard drawn shadow */
+[data-ink] button[aria-label="Add today's song"] {
+  background: var(--color-coral) !important;
+  color: var(--ink) !important;
+  box-shadow: 3px 4px 0 var(--ink) !important;
+  position: relative;
+}
+[data-ink] button[aria-label="Add today's song"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  filter: url(#ink-wobble);
+}
+[data-ink] .bg-accent { box-shadow: 0 0 0 1.5px var(--ink) !important; }
+/* the songs on the Globe: an ink outline round each cover */
+[data-ink] [data-facet]:not([data-wait]) { border: 0 solid var(--ink); }
+[data-ink] [data-facet]:not([data-wait])[data-t] { border-top-width: 2px; }
+[data-ink] [data-facet]:not([data-wait])[data-b] { border-bottom-width: 2px; }
+[data-ink] [data-facet]:not([data-wait])[data-l] { border-left-width: 2px; }
+[data-ink] [data-facet]:not([data-wait])[data-r] { border-right-width: 2px; }
+/* an empty spot waiting for a song: a pencilled dashed square */
+[data-ink] [data-facet][data-wait] {
+  border-color: rgba(29, 36, 51, 0.45) !important;
+  border-style: dashed !important;
+  background-color: rgba(255, 253, 246, 0.12) !important;
+}
+/* flatter light on the covers, closer to a drawing than a photo of glass */
+[data-ink] [data-facet]:not([data-wait]) > div:last-child { opacity: 0.45; }

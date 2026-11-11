@@ -31,7 +31,7 @@ const seen = {
 };
 export const useWelcomeSeen = () => useSyncExternalStore(seen.sub, seen.get, () => true);
 
-export function Welcome({ api, onClose, onApp }: { api: GlobeApi; onClose(): void; onApp(): void }) {
+export function Welcome({ api, onClose, onApp, onKey }: { api: GlobeApi; onClose(): void; onApp(): void; onKey(): void }) {
   const close = () => {
     seen.set();
     notifyLater(3); // it's asking right now, so the notifications card holds off
@@ -63,6 +63,16 @@ export function Welcome({ api, onClose, onApp }: { api: GlobeApi; onClose(): voi
         </p>
         <button type="button" onClick={close} className="mt-1.5 h-12 rounded-full bg-accent text-[15px] font-semibold text-white">
           Let&apos;s go
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            onKey();
+          }}
+          className="-mt-1 h-10 text-sm font-semibold text-card-ink underline-offset-4 hover:underline"
+        >
+          What every button does
         </button>
         <button
           type="button"

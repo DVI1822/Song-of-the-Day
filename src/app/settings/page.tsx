@@ -4,6 +4,7 @@ import { LegalLinks } from "@/components/Legal";
 import { Card, Shell, ghostButtonClass } from "@/components/Shell";
 import { requireProfile } from "@/lib/data";
 import { DeleteAccount } from "./DeleteAccount";
+import { ScenePicker } from "./ScenePicker";
 
 export default async function SettingsPage() {
   const { supabase, profile } = await requireProfile();
@@ -19,6 +20,11 @@ export default async function SettingsPage() {
       <p className="mt-3 text-xs text-muted">
         Saving also updates your timezone to this device&apos;s, which decides when your midnight is.
       </p>
+
+      <h2 className="display mb-3 mt-10 text-xl">Your scene</h2>
+      <Card>
+        <ScenePicker />
+      </Card>
 
       {blocked.length > 0 && (
         <>
