@@ -62,7 +62,7 @@ function fit(cv: HTMLCanvasElement, w: number, h: number, dpr: number) {
 }
 
 // a line through points, wobbled sideways a little along its length
-function wobbly(g: CanvasRenderingContext2D, pts: [number, number][], seed: number, amp = 0.9) {
+export function wobbly(g: CanvasRenderingContext2D, pts: [number, number][], seed: number, amp = 0.9) {
   if (pts.length < 2) return;
   g.beginPath();
   let d = 0;
