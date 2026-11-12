@@ -643,52 +643,6 @@ const DEFS: Def[] = [
     },
   },
   {
-    name: "rainbow",
-    when: (c) =>
-      day(c) &&
-      c.weather !== "storm" &&
-      c.weather !== "rain" &&
-      c.weather !== "snow" &&
-      c.weather !== "fog" &&
-      (c.weather === "partly" || c.weather === "drizzle" || c.weather === "cloudy" || hashDay(c) > 0.8),
-    weight: 1.5,
-    dur: [25, 35],
-    draw(c, p) {
-      const cx = c.w * 0.5,
-        cy = c.h * GROUND[c.place].horizon,
-        R = c.w * 0.62;
-      const bands: C[] = [
-        [255, 94, 87],
-        [255, 170, 60],
-        [255, 226, 90],
-        [120, 200, 120],
-        [90, 160, 230],
-        [150, 120, 220],
-      ];
-      // drawn like everything else: flat bands of colour, inked along the
-      // outside and the inside edge, fading in and out as a whole
-      const bw = 5 * c.s;
-      c.g.save();
-      c.g.globalAlpha = fade(p, 0.25) * 0.85;
-      c.g.lineCap = "butt";
-      c.g.lineWidth = bw + 0.6;
-      bands.forEach((b, i) => {
-        c.g.strokeStyle = css(b, 1);
-        c.g.beginPath();
-        c.g.arc(cx, cy, R - i * bw, Math.PI * 1.02, Math.PI * 1.98);
-        c.g.stroke();
-      });
-      c.g.strokeStyle = c.I.ink;
-      c.g.lineWidth = 1.3 * c.s;
-      for (const r of [R + bw / 2, R - (bands.length - 0.5) * bw]) {
-        c.g.beginPath();
-        c.g.arc(cx, cy, r, Math.PI * 1.02, Math.PI * 1.98);
-        c.g.stroke();
-      }
-      c.g.restore();
-    },
-  },
-  {
     name: "bats",
     when: (c) => dusk(c) && c.season !== "winter",
     weight: 2,
