@@ -13,7 +13,7 @@ import type { StorySky } from "./storyVideo";
 import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon } from "./ui";
-import { Eraser, RedoButton } from "./Redo";
+import { RedoButton, Singularity } from "./Redo";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
@@ -181,26 +181,24 @@ export function Feature({
     if (flagging) hint.current?.cancel();
   }, [flagging]);
 
-  // the redo: the pencil rubs the cover out while today's song is taken back
-  const eraseClip = useRef<HTMLDivElement>(null);
-  const eraseGhost = useRef<HTMLDivElement>(null);
-  const [erasing, setErasing] = useState(0);
+  // the redo: the cover sinks into a point while today's song is taken back
+  const sinkRef = useRef<HTMLDivElement>(null);
+  const [sinking, setSinking] = useState(0);
   const [redoError, setRedoError] = useState<string | null>(null);
   const taking = useRef<Promise<string | undefined> | null>(null);
   const redo = () => {
-    if (!onRedo || erasing) return;
+    if (!onRedo || sinking) return;
     hint.current?.cancel();
     setRedoError(null);
     taking.current = onRedo().catch(() => "Couldn't redo it. Try again.");
-    setErasing((n) => n + 1);
+    setSinking((n) => n + 1);
   };
-  const erased = async () => {
+  const sunk = async () => {
     const err = await taking.current;
     taking.current = null;
     if (err) {
       // it didn't go through: the cover comes back
-      if (eraseClip.current) eraseClip.current.style.clipPath = "";
-      setErasing(0);
+      setSinking(0);
       setRedoError(err);
     } else onRedone?.();
   };
@@ -261,18 +259,6 @@ export function Feature({
           </div>
         </div>
         <div className="relative">
-          {/* what's left once the pencil's been over it, faintly */}
-          {erasing > 0 && (
-            <div ref={eraseGhost} aria-hidden className="pointer-events-none absolute inset-0 opacity-0">
-              <Cover
-                src={post.artwork_url}
-                seed={post.title}
-                size={cover}
-                className="blur-[3px] grayscale"
-                style={{ borderRadius: radius }}
-              />
-            </div>
-          )}
           {flagging ? (
           <div className="relative overflow-hidden" style={{ width: cover, height: cover, borderRadius: radius }}>
             <Cover
@@ -296,7 +282,7 @@ export function Feature({
             </div>
           </div>
         ) : (
-          <div ref={eraseClip} className={erasing ? "pointer-events-none" : ""}>
+          <div ref={sinkRef} className={sinking ? "pointer-events-none origin-center overflow-hidden" : ""}>
           <button
             type="button"
             onClick={tapCover}
@@ -359,11 +345,11 @@ export function Feature({
           </button>
           </div>
           )}
-          <Eraser size={cover} clip={eraseClip} ghost={eraseGhost} run={erasing} onErased={erased} />
+          <Singularity size={cover} target={sinkRef} run={sinking} onDone={sunk} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && !erasing && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
           {/* your one redo today, on the bottom left */}
-          {!flagging && !erasing && onRedo && <RedoButton error={redoError} onRedo={redo} />}
+          {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>
         {/* "Added to core", a moment over the bottom of the cover */}
         {toast > 0 && (

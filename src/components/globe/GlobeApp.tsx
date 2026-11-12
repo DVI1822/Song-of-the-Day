@@ -965,7 +965,7 @@ function Globe({
   };
 
   // Your one redo a day, from your song's card: the song's taken back while
-  // the pencil rubs its cover out, then the card goes and the paste sheet
+  // the cover sinks into a point, then the card goes and the paste sheet
   // comes up for another song.
   const canRedo = !redoUsed && !launching && !!myPost && myPost.day === todayIn(me.timezone);
   const onRedo = async (post: Post) => {

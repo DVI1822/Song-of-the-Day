@@ -165,7 +165,7 @@ const PAGES: Page[] = [
     rows: [
       { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "Core", text: "Flies into the middle of your globe, where your profile lives." },
       { icon: <Tab><TabIcon name="songs" /></Tab>, name: "My songs", text: "Every song you've ever picked, newest first." },
-      { icon: <Round><RedoArrows /></Round>, name: "One redo a day", text: "Changed your mind? Open your song and tap the arrows on its cover. A pencil rubs it out and you pick another, once a day." },
+      { icon: <Round><RedoArrows /></Round>, name: "One redo a day", text: "Changed your mind? Open your song and tap the arrows on its cover. It sinks away and you pick another, once a day." },
       { icon: <Round><CalendarIcon /></Round>, name: "Your archive", text: "At midnight your song moves into your core, sorted into a playlist for each month." },
       { icon: <Half><CoreIcon on /></Half>, name: "Saved", text: "Songs you saved from friends, kept in your core." },
       { icon: <Round><PersonIcon /></Round>, name: "Your picture", text: "Tap your picture in your core to add or change it." },
