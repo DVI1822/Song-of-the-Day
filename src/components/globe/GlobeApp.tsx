@@ -1218,11 +1218,7 @@ function Globe({
             "TopTrack"
           ) : (
             <>
-              <Wordmark light={inkLight} size={31} />
-              {/* the drawn look's hand-lettered name (globals.css, [data-ink]) */}
-              <span className="ink-word" aria-hidden>
-                TopTrack
-              </span>
+              <Wordmark size={31} />
             </>
           )}
         </h1>

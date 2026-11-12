@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bungee, Creepster, Fredoka, Gaegu, Nosifer, Outfit, UnifrakturMaguntia } from "next/font/google";
+import { Creepster, Fredoka, Gaegu, Londrina_Solid, Nosifer, Outfit, UnifrakturMaguntia } from "next/font/google";
 import { PreviewProvider } from "@/components/globe/Preview";
 import { HandoffWaiter } from "@/components/HandoffWaiter";
 import { SessionFromLink } from "@/components/SessionFromLink";
@@ -20,7 +20,7 @@ const fredoka = Fredoka({
 });
 
 // The TopTrack name on the Globe (components/globe/Wordmark.tsx).
-const bungee = Bungee({ variable: "--font-bungee", subsets: ["latin"], weight: "400" });
+const londrina = Londrina_Solid({ variable: "--font-londrina", subsets: ["latin"], weight: "900" });
 
 // The drawn look's hand lettering (components/globe/ink.ts); fetched only
 // when the drawn look is on.
@@ -51,7 +51,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${outfit.variable} ${fredoka.variable} ${bungee.variable} ${creepster.variable} ${gothic.variable} ${nosifer.variable} ${gaegu.variable} h-full antialiased`}>
+    <html lang="en" className={`${outfit.variable} ${fredoka.variable} ${londrina.variable} ${creepster.variable} ${gothic.variable} ${nosifer.variable} ${gaegu.variable} h-full antialiased`}>
       {/* The home screen icon and name, always in <head>. Pages that look
           something up for their title (invite links, profiles) make Next send
           its metadata late, inside <body>, and Safari's Add to Home Screen

@@ -283,7 +283,6 @@ body {
    The drawn look (components/globe/ink.ts, ?ink=1): paper and ink instead of
    glass, to match the line-drawn places behind the Globe.
    --------------------------------------------------------------------------- */
-.ink-word { display: none; }
 :root[data-ink] {
   --ink: #1d2433;
   --paper: #fffdf6;
@@ -292,20 +291,6 @@ body {
   font-family: var(--font-hand), var(--font-sans) !important;
   font-weight: 700 !important;
   letter-spacing: 0.01em;
-}
-/* the name, hand-lettered in coral with a fat ink edge and a drawn shadow */
-[data-ink] svg[aria-label="TopTrack"] { display: none !important; }
-[data-ink] .ink-word {
-  display: block;
-  font-family: var(--font-hand), var(--font-sans);
-  font-weight: 700;
-  font-size: 42px;
-  line-height: 1;
-  color: var(--color-coral);
-  -webkit-text-stroke: 2.5px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 2px 3px 0 var(--ink);
-  transform: rotate(-2deg);
 }
 /* glass buttons, tabs, panels and cards become paper with a wobbly ink edge
    (full-screen frosted backdrops keep their blur) */
