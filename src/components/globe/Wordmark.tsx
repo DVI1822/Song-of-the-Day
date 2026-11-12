@@ -1,82 +1,44 @@
-// The TopTrack name at the top of the Globe: the icon's raised hand, then TOP
-// and TRACK in Bungee, drawn like glass: a faint tint inside a crisp coral rim, so the
-// sky, clouds and rain clearly show through. `light` is true when the sky is dark.
+"use client";
 
-const HAND = `<rect x="35" y="78" width="27" height="30"/>
-  <rect x="27" y="11" width="13.5" height="50" rx="6.75"/>
-  <rect x="62" y="47" width="10.5" height="25" rx="5.25"/><rect x="51.5" y="44" width="11" height="28" rx="5.5"/><rect x="40.5" y="42" width="11" height="30" rx="5.5"/>
-  <path d="M27 50 V72 C27 80 33 86 41 86 H60 C68 86 72.5 80 72.5 72 V64 Z"/>
-  <path d="M24 66 C24 60 30 58 36 60 L58 64 C63 65 64 72 59 73 L36 74 C29 74 24 72 24 66 Z"/>`;
-// the knuckle, thumb and nail lines: cut out of the hand, then drawn back in the rim colour
-const DETAIL = `<path d="M40.5 50 V60 M51.5 50 V62 M62 52 V63"/><path d="M24 66 C24 60 30 58 36 60 L58 64 C63 65 64 72 59 73 L36 74 C29 74 24 72 24 66 Z"/><path d="M30.5 22 H37" stroke-linecap="round"/>`;
+import { useId } from "react";
 
-// the icon's coral, for the glass rim; `blend` fades it into deep blue across the name
-const CORAL = "#ff5e57";
-const BLUE = "#2f5fd0";
-const RIM: "coral" | "blend" = "coral";
+// The TopTrack name at the top of the Globe, drawn in the app's ink style:
+// coral Londrina Solid letters with a navy ink edge and a drawn shadow, and
+// the O is the Globe itself, tilted on its 23.4° axis and wearing a gold
+// crown that floats just above its north pole. The pen lines wobble through
+// an SVG noise filter. Exported from the logo rounds in project files
+// (ink-logos/toptrack-crowned-globe.html, "No axis", small gap).
+const ART = `<defs>
+    <filter id="WMIDw" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="1.3" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="WMIDv" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.058" numOctaves="2" seed="11"/><feDisplacementMap in="SourceGraphic" scale="1.819" xChannelSelector="G" yChannelSelector="R"/></filter>
+    <pattern id="WMIDh" patternUnits="userSpaceOnUse" width="4.2" height="4.2" patternTransform="rotate(40)"><line x1="0" y1="0" x2="0" y2="4.2" stroke="#0d2a3f" stroke-width="1.5"/></pattern>
+    <pattern id="WMIDhc" patternUnits="userSpaceOnUse" width="4.2" height="4.2" patternTransform="rotate(40)"><line x1="0" y1="0" x2="0" y2="4.2" stroke="#ff5e57" stroke-width="1.7"/></pattern>
+    <linearGradient id="WMIDg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9f0a8"/><stop offset="1" stop-color="#8fd0ff"/></linearGradient>
+  </defs><g transform="translate(4 4)" filter="url(#WMIDv)"><text x="14" y="96" style="font-family:var(--font-londrina),'Londrina Solid',sans-serif" font-size="96"    fill="#0d2a3f" stroke="#0d2a3f" stroke-width="3" stroke-linejoin="round">T</text></g><g filter="url(#WMIDw)"><text x="14" y="96" style="font-family:var(--font-londrina),'Londrina Solid',sans-serif" font-size="96"    fill="#ff5e57" stroke="#0d2a3f" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">T</text></g><g transform="translate(1.2 -1)" filter="url(#WMIDv)" opacity=".25"><text x="14" y="96" style="font-family:var(--font-londrina),'Londrina Solid',sans-serif" font-size="96"    fill="none" stroke="#0d2a3f" stroke-width="1.049">T</text></g><g filter="url(#WMIDw)">
+    <clipPath id="WMIDc60"><circle cx="91" cy="69" r="28"/></clipPath>
+    <circle cx="95" cy="73" r="28" fill="#0d2a3f"/>
+    <circle cx="91" cy="69" r="28" fill="#fffdf6"/>
+    <g clip-path="url(#WMIDc60)"><circle cx="82.6" cy="60.6" r="40.6" fill="none" stroke="url(#WMIDh)" stroke-width="25.2" opacity="0.55"/><g transform="rotate(23.4 91 69)"><ellipse cx="91" cy="69" rx="10.08" ry="28" fill="none" stroke="#0d2a3f" stroke-width="1.799"/><ellipse cx="91" cy="69" rx="22.400" ry="28" fill="none" stroke="#0d2a3f" stroke-width="1.799"/><ellipse cx="91" cy="54.44" rx="23.916" ry="5.739" fill="none" stroke="#0d2a3f" stroke-width="1.799"/><ellipse cx="91" cy="69" rx="28" ry="6.72" fill="none" stroke="#0d2a3f" stroke-width="1.799"/><ellipse cx="91" cy="83.56" rx="23.916" ry="5.739" fill="none" stroke="#0d2a3f" stroke-width="1.799"/></g></g> <circle cx="91" cy="69" r="28" fill="none" stroke="#0d2a3f" stroke-width="3"/>
+    <path d="M72.52 60.6 q 3.36 -8.4 11.76 -11.76" stroke="#0d2a3f" stroke-width="2.400" fill="none" stroke-linecap="round"/>
+    <g transform="translate(104.701 37.337) rotate(23.4) scale(0.875)">
+    <path d="M-20 0 L-23 -21 L-11 -10 L0 -27 L11 -10 L23 -21 L20 0 Z" transform="translate(3.428 3.428)" fill="#0d2a3f"/> <path d="M-20 0 L-23 -21 L-11 -10 L0 -27 L11 -10 L23 -21 L20 0 Z" fill="#ffc94a" stroke="#0d2a3f" stroke-width="3.428" stroke-linejoin="round"/>
+    <path d="M-20.5 -5.5 H20.5" stroke="#0d2a3f" stroke-width="2.742" stroke-linecap="round"/>
+    <circle cx="-23" cy="-21" r="3.2" fill="#ff5e57" stroke="#0d2a3f" stroke-width="2.742"/><circle cx="0" cy="-27" r="3.2" fill="#ff5e57" stroke="#0d2a3f" stroke-width="2.742"/><circle cx="23" cy="-21" r="3.2" fill="#ff5e57" stroke="#0d2a3f" stroke-width="2.742"/> </g>
+  </g><g transform="translate(4 4)" filter="url(#WMIDv)"><text x="128" y="96" style="font-family:var(--font-londrina),'Londrina Solid',sans-serif" font-size="96" letter-spacing="1"   fill="#0d2a3f" stroke="#0d2a3f" stroke-width="3" stroke-linejoin="round">pTrack</text></g><g filter="url(#WMIDw)"><text x="128" y="96" style="font-family:var(--font-londrina),'Londrina Solid',sans-serif" font-size="96" letter-spacing="1"   fill="#ff5e57" stroke="#0d2a3f" stroke-width="3" stroke-linejoin="round" paint-order="stroke fill">pTrack</text></g><g transform="translate(1.2 -1)" filter="url(#WMIDv)" opacity=".25"><text x="128" y="96" style="font-family:var(--font-londrina),'Londrina Solid',sans-serif" font-size="96" letter-spacing="1"   fill="none" stroke="#0d2a3f" stroke-width="1.049">pTrack</text></g><metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTpiODc4Yzc1Yi0wMmZlLTQ3NDQtOTY2OS0yMjllZDU0NDFiMDIAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaPIdb5N8EL+LRQ9WAVhHEg8AAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo2M2Y1ZTExYy05YzhmLTRhYmMtOTA2OC1jMGVhZTg1MDM3ZDBscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoZXZoktK/QmOgjBOoHR+vPAAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg5ehS5MjyLwIRzwb47SHmgq+RdlnTMJvNqKjPYO3om/6kZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaBhNuA718pntEBeRN+ANpmoAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRMAAAAAAAAAAAAAAAAZGhhc2hYIPFcIrYcyGIekfIvZO3RS6vxVN02Vq7ru7/DlxOilplBZG5hbWVuanVtYmYgbWFuaWZlc3RqZXhjbHVzaW9uc4GiZXN0YXJ0GRIsZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmI4NzhjNzViLTAyZmUtNDc0NC05NjY5LTIyOWVkNTQ0MWIwMi9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjI3Y2Q5MWE2LTkzNjgtNDA0OC05M2JhLWNlODQ5MzgzNDVjNnJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDl6FLkyPIvAhHPBvjtIeaCr5F2WdMwm82oqM9g7eib/qJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggz5GetAUY1cUZlIS57R8Y2uIwtpActaAT4A33bFlN9AyiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggZEXNt5pQREquRlvHF3Ss0Gyx6DSdgg3zZgG8J0nQQx10Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQDyV0Ebs/GI5dHW5RFcc7hhoX1qSNF1bIiuTFQnXCcQSQLPdPu8MBuisdQl4ebLPdH0BEb1BpaUGDOCcwnVK0io=</c2pa:manifest></metadata>`;
 
-export function Wordmark({ light, size = 26 }: { light: boolean; size?: number }) {
-  // by day the pale brand colours would vanish into the blue sky, so they deepen a little
-  const [g1, g2] = light ? ["185,240,168", "143,208,255"] : ["70,170,96", "48,132,206"];
-  const id = light ? "wm-night" : "wm-day";
-  const rim = RIM === "blend" ? `url(#${id}-rim-g)` : CORAL;
-  // one drawing in the hand's own units, so the rim colour runs across hand and letters alike;
-  // TOP and TRACK are Bungee at 1em, sitting on the hand's baseline just as before
+export function Wordmark({ size = 31 }: { size?: number }) {
+  // the drawing's filters, patterns and clips need ids unique on the page
+  const id = "wm" + useId().replace(/[^a-zA-Z0-9]/g, "");
   return (
     <svg
-      viewBox="22 9 404 78"
-      width={size * 6.464}
-      height={size * 1.25}
+      viewBox="0 -6 460 126"
+      width={size * 6.6}
+      height={size * 6.6 * (126 / 460)}
       aria-label="TopTrack"
       role="img"
       overflow="visible"
-      style={{ display: "block", marginBottom: size * -0.06 }}
-    >
-      <defs>
-        <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="0" y1="12" x2="0" y2="86">
-          <stop offset="0" stopColor={`rgb(${g1})`} />
-          <stop offset="1" stopColor={`rgb(${g2})`} />
-        </linearGradient>
-        <linearGradient id={`${id}-glass`} gradientUnits="userSpaceOnUse" x1="0" y1="29" x2="0" y2="74">
-          <stop offset="0" stopColor={`rgb(${g1})`} stopOpacity={0.2} />
-          <stop offset="1" stopColor={`rgb(${g2})`} stopOpacity={0.2} />
-        </linearGradient>
-        <linearGradient id={`${id}-rim-g`} gradientUnits="userSpaceOnUse" x1="24" y1="0" x2="424" y2="0">
-          <stop offset="0" stopColor={CORAL} />
-          <stop offset="1" stopColor={BLUE} />
-        </linearGradient>
-        <mask id={`${id}-m`} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="86">
-          <rect x="0" y="0" width="100" height="86" fill="#fff" />
-          <g fill="none" stroke="#000" strokeWidth="2.2" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: DETAIL }} />
-        </mask>
-        {/* keeps only the outer edge of the hand, for the glass rim */}
-        <filter id={`${id}-rim`} x="-10%" y="-10%" width="120%" height="120%">
-          <feMorphology in="SourceAlpha" operator="erode" radius="1.4" result="in" />
-          <feComposite in="SourceGraphic" in2="in" operator="out" />
-        </filter>
-      </defs>
-      <g mask={`url(#${id}-m)`}>
-        <g opacity={0.2} fill={`url(#${id})`} dangerouslySetInnerHTML={{ __html: HAND }} />
-        <g filter={`url(#${id}-rim)`} opacity={0.95}>
-          <g fill={rim} dangerouslySetInnerHTML={{ __html: HAND }} />
-        </g>
-      </g>
-      {/* the knuckle, thumb and nail lines, drawn in the rim colour */}
-      <g fill="none" stroke={rim} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" opacity={0.95} dangerouslySetInnerHTML={{ __html: DETAIL }} />
-      <text
-        x="80.1"
-        y="73.8"
-        fontSize="62.5"
-        stroke={rim}
-        strokeWidth={1.375}
-        strokeOpacity={0.95}
-        style={{ fontFamily: "var(--font-bungee), var(--font-outfit), sans-serif" }}
-        fill={`url(#${id}-glass)`}
-        aria-hidden
-      >
-        <tspan>TOP</tspan>
-        <tspan>TRACK</tspan>
-      </text>
-    </svg>
+      style={{ display: "block" }}
+      dangerouslySetInnerHTML={{ __html: ART.replaceAll("WMID", id) }}
+    />
   );
 }
