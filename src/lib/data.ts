@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isConfigured } from "./supabase/env";
 import { createClient } from "./supabase/server";
 import { todayIn } from "./day";
+import { needsFullName } from "./types";
 import type { Activity, AddedMe, Core, Friend, Note, Post, Profile, Reactions, SavedSong } from "./types";
 
 export async function getSession() {
@@ -24,7 +25,7 @@ export async function getSession() {
 export async function requireProfile() {
   const s = await getSession();
   if (!s.userId) redirect("/login");
-  if (!s.profile) redirect("/welcome");
+  if (!s.profile || needsFullName(s.profile)) redirect("/welcome");
   return { supabase: s.supabase, profile: s.profile };
 }
 

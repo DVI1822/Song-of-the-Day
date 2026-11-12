@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCore, getNews, getReactions, getSaved, getSession, streaksFor, type News } from "@/lib/data";
 import { supabaseUrl } from "@/lib/supabase/env";
+import { needsFullName } from "@/lib/types";
 import type { Core, Friend, MayKnow, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 import { cleanLinks, parseSongUrl, resolveSong, type ResolvedSong } from "@/lib/songs";
 import { INVITE_COOKIE, cleanInvite } from "@/lib/invite";
@@ -20,15 +21,24 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
   if (!userId) redirect("/login");
 
   const username = String(form.get("username") ?? "").trim().toLowerCase();
-  const displayName = String(form.get("display_name") ?? "").trim();
+  const firstName = String(form.get("first_name") ?? "").trim().replace(/\s+/g, " ");
+  const lastName = String(form.get("last_name") ?? "").trim().replace(/\s+/g, " ");
   const timezone = String(form.get("timezone") ?? "") || "UTC";
 
+  if (!firstName || !lastName) return { error: "Add both your first and last name." };
+  if (firstName.length > 30 || lastName.length > 30)
+    return { error: "Names can be up to 30 characters each." };
   if (!/^[a-z0-9_]{3,20}$/.test(username))
     return { error: "Usernames are 3 to 20 letters, numbers or underscores." };
-  if (!displayName || displayName.length > 40)
-    return { error: "Your name should be 1 to 40 characters." };
 
-  const row = { id: userId, username, display_name: displayName, timezone };
+  const row = {
+    id: userId,
+    username,
+    first_name: firstName,
+    last_name: lastName,
+    display_name: `${firstName} ${lastName}`,
+    timezone,
+  };
   const { error } = profile
     ? await supabase.from("profiles").update(row).eq("id", userId)
     : await supabase.from("profiles").insert(row);
@@ -48,7 +58,8 @@ export async function saveProfile(_: FormState, form: FormData): Promise<FormSta
     }
   }
   revalidatePath("/", "layout");
-  redirect(profile ? `/u/${username}` : "/");
+  // Filling in a missing name goes straight back to the Globe.
+  redirect(profile && !needsFullName(profile) ? `/u/${username}` : "/");
 }
 
 export async function signOut() {
@@ -162,7 +173,7 @@ export type NewPost = {
 export async function createPost(input: NewPost): Promise<{ post?: Post; error?: string }> {
   const { supabase, userId, profile } = await getSession();
   if (!userId) redirect("/login");
-  if (!profile) redirect("/welcome");
+  if (!profile || needsFullName(profile)) redirect("/welcome");
 
   const title = input.title.trim();
   const caption = input.caption.trim();
