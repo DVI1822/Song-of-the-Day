@@ -357,19 +357,70 @@ const coast = {
         }
       };
       if (!I.snowy) {
+        // towels laid out on the sand, each a slanted strip with a stripe
+        const towel = (f: number, dy: number, len: number, c: C, stripe: C, seed: number) => {
+          const xa = x0 + w * f,
+            xb = xa + len;
+          const ya = sh(xa) + h * dy,
+            yb = sh(xb) + h * dy - 2;
+          pen.shape(
+            [
+              [xa, ya],
+              [xb, yb],
+              [xb + 2, yb + 8],
+              [xa + 2, ya + 8],
+            ],
+            I.paint(c, 0.04),
+            1,
+            seed,
+          );
+          pen.fillOnly(
+            [
+              [xa + len * 0.2, ya - (ya - yb) * 0.2 + 0.5],
+              [xa + len * 0.3, ya - (ya - yb) * 0.3 + 0.5],
+              [xa + len * 0.3 + 2, ya - (ya - yb) * 0.3 + 7.5],
+              [xa + len * 0.2 + 2, ya - (ya - yb) * 0.2 + 7.5],
+            ],
+            I.paint(stripe, 0.04),
+          );
+        };
+        towel(0.24, 0.055, w * 0.07, [240, 196, 80], [250, 248, 240], 9);
+        towel(0.08, 0.075, w * 0.065, [90, 170, 200], [250, 248, 240], 10);
+        towel(0.42, 0.07, w * 0.07, [226, 96, 120], [250, 220, 90], 11);
+        towel(0.55, 0.05, w * 0.065, [120, 190, 120], [250, 248, 240], 12);
+        towel(0.82, 0.065, w * 0.07, [240, 140, 70], [70, 120, 190], 13);
+        towel(0.9, 0.095, w * 0.06, [150, 120, 200], [250, 248, 240], 14);
         umbrella(x0 + w * 0.2, sh(x0 + w * 0.2) + h * 0.05, 1, I.paint([226, 84, 70], 0.04));
         umbrella(x0 + w * 0.36, sh(x0 + w * 0.36) + h * 0.04, 0.85, I.paint([70, 140, 200], 0.04));
-        pen.shape(
-          [
-            [x0 + w * 0.24, sh(x0 + w * 0.24) + h * 0.055],
-            [x0 + w * 0.31, sh(x0 + w * 0.31) + h * 0.052],
-            [x0 + w * 0.315, sh(x0 + w * 0.31) + h * 0.06],
-            [x0 + w * 0.245, sh(x0 + w * 0.24) + h * 0.063],
-          ],
-          I.paint([240, 196, 80], 0.04),
-          1,
-          9,
-        );
+        umbrella(x0 + w * 0.06, sh(x0 + w * 0.06) + h * 0.07, 0.95, I.paint([240, 196, 70], 0.04));
+        umbrella(x0 + w * 0.52, sh(x0 + w * 0.52) + h * 0.045, 0.8, I.paint([90, 170, 120], 0.04));
+        umbrella(x0 + w * 0.88, sh(x0 + w * 0.88) + h * 0.09, 1.05, I.paint([226, 96, 140], 0.04));
+        // a cooler and a bucket and spade
+        pen.shape(rect(x0 + w * 0.5, sh(x0 + w * 0.5) + h * 0.085, 12, 8), I.paint([70, 130, 200], 0.04), 1, 15);
+        pen.shape(rect(x0 + w * 0.5 - 1, sh(x0 + w * 0.5) + h * 0.085 - 2, 14, 3), I.paint([250, 248, 240], 0.04), 0.9, 16);
+        {
+          const bx = x0 + w * 0.65,
+            by = sh(bx) + h * 0.08;
+          pen.shape(
+            [
+              [bx - 4, by - 7],
+              [bx + 4, by - 7],
+              [bx + 3, by],
+              [bx - 3, by],
+            ],
+            I.paint([240, 196, 70], 0.04),
+            0.9,
+            17,
+          );
+          pen.stroke(
+            [
+              [bx + 8, by],
+              [bx + 11, by - 12],
+            ],
+            1,
+            18,
+          );
+        }
       }
       // the lifeguard tower
       const tx = x0 + w * 0.72,
@@ -631,143 +682,6 @@ const coast = {
       }
       pen.shape(ellipse(x0 + w * 0.26, sh(x0 + w * 0.26) + h * 0.07, 9, 3, 14), I.paint([210, 190, 150], 0.04), 0.9, 455);
       pen.shape(ellipse(x0 + w * 0.26, sh(x0 + w * 0.26) + h * 0.07, 4, 1.4, 10), null, 0.6, 456);
-    },
-    // sea cliffs: a tall headland with steps down to the sand, a sea stack
-    // and an arch standing out in the water, tide pools at low tide
-    (k: Kit, x0: number) => {
-      const { pens, I, w, h } = k;
-      const pen = pens[2];
-      const sh = (x: number) => coast.shore(k, x);
-      const hz = h * coast.hz;
-      const cliff: C = I.paint([182, 160, 132], 0.05);
-      // the stack and the arch first: they stand in the sea
-      const stack = (sx: number, top: number, half: number, seed: number) => {
-        const base = sh(sx) - 3;
-        pen.shape(
-          [
-            [sx - half, base],
-            [sx - half * 0.8, top + 6],
-            [sx - half * 0.4, top],
-            [sx + half * 0.5, top + 2],
-            [sx + half * 0.85, top + 10],
-            [sx + half, base],
-          ],
-          cliff,
-          1.2,
-          seed,
-        );
-        for (let i = 1; i < 4; i++) {
-          const y = top + ((base - top) * i) / 4;
-          pen.stroke(
-            [
-              [sx - half * 0.7, y],
-              [sx + half * 0.6, y + 1],
-            ],
-            0.6,
-            seed + i,
-          );
-        }
-        if (!I.snowy) pen.shape(ellipse(sx, top + 1, half * 0.5, 2.5, 10, Math.PI, TAU), I.paint([120, 166, 90], 0.06), 0.8, seed + 5);
-      };
-      stack(x0 + w * 0.56, hz - h * 0.04, 13, 460);
-      {
-        const ax = x0 + w * 0.76,
-          base = sh(ax) - 3,
-          top = hz - h * 0.025;
-        pen.shape(
-          [
-            [ax - 30, base],
-            [ax - 28, top + 8],
-            [ax - 18, top],
-            [ax + 20, top + 2],
-            [ax + 30, top + 10],
-            [ax + 31, base],
-            [ax + 16, base],
-            ...ellipse(ax, base, 16, base - top - 12, 14, 0, Math.PI).map(([x, y]) => [x, 2 * base - y] as Pt).reverse(),
-            [ax - 16, base],
-          ],
-          cliff,
-          1.2,
-          470,
-        );
-      }
-      // the headland, rising off the sand to a grassy top
-      const top = h * 0.66;
-      const head: Pt[] = [
-        [x0 + w * 0.02, h * 0.9],
-        [x0 + w * 0.02, top + 6],
-        [x0 + w * 0.12, top],
-        [x0 + w * 0.3, top + 4],
-        [x0 + w * 0.36, top + 14],
-        [x0 + w * 0.4, h * 0.76],
-        [x0 + w * 0.43, h * 0.84],
-        [x0 + w * 0.42, h * 0.9],
-      ];
-      pen.shape(head, cliff, 1.3, 480);
-      pen.shape(
-        [
-          [x0 + w * 0.02, top + 6],
-          [x0 + w * 0.12, top],
-          [x0 + w * 0.3, top + 4],
-          [x0 + w * 0.36, top + 14],
-          [x0 + w * 0.3, top + 10],
-          [x0 + w * 0.02, top + 12],
-        ],
-        I.snowy ? I.snow : I.paint(I.season === "autumn" ? [190, 170, 100] : [120, 166, 90], 0.06),
-        1.1,
-        481,
-      );
-      for (let i = 0; i < 6; i++) {
-        const y = top + 22 + i * 16;
-        pen.stroke(
-          [
-            [x0 + w * (0.05 + hash(i) * 0.05), y],
-            [x0 + w * (0.25 + hash(i + 3) * 0.1), y + 2],
-          ],
-          0.6,
-          482 + i,
-        );
-      }
-      // the stairs zigzagging down the face, a rail along them
-      const st: Pt[] = [
-        [x0 + w * 0.3, top + 8],
-        [x0 + w * 0.12, top + 40],
-        [x0 + w * 0.3, top + 76],
-        [x0 + w * 0.16, top + 112],
-        [x0 + w * 0.3, h * 0.9],
-      ];
-      pen.stroke(st, 1.6, 490);
-      pen.stroke(
-        st.map(([x, y]) => [x, y - 6] as Pt),
-        0.7,
-        491,
-      );
-      for (let i = 0; i < st.length - 1; i++) {
-        const [ax, ay] = st[i],
-          [bx, by] = st[i + 1];
-        for (let u = 0.2; u < 1; u += 0.3) pen.stroke([[ax + (bx - ax) * u, ay + (by - ay) * u], [ax + (bx - ax) * u, ay + (by - ay) * u - 6]], 0.6, 492 + i + u);
-      }
-      // tide pools with a starfish
-      for (const [f, rx] of [
-        [0.6, 22],
-        [0.78, 15],
-      ]) {
-        const px = x0 + w * f,
-          py = sh(px) + h * 0.07;
-        pen.shape(ellipse(px, py, rx, 4, 16), I.snowy ? mix(I.water, I.snow, 0.5) : I.paint([110, 170, 210], 0.04), 1, 495 + f);
-        for (let i = 0; i < 4; i++) pen.shape(ellipse(px - rx + 4 + i * (rx / 2), py + 4, 3, 2, 8, Math.PI, TAU), I.paint([150, 146, 140], 0.04), 0.7, 496 + i + f);
-      }
-      {
-        const sx = x0 + w * 0.6,
-          sy = sh(sx) + h * 0.07;
-        const star: Pt[] = [];
-        for (let i = 0; i < 10; i++) {
-          const a = (i / 10) * TAU - Math.PI / 2,
-            r = i % 2 ? 1.6 : 4;
-          star.push([sx + Math.cos(a) * r, sy + Math.sin(a) * r * 0.6]);
-        }
-        pen.shape(star, I.paint([236, 120, 80], 0.04), 0.7, 499);
-      }
     },
     // the boardwalk: a raised walk along the sand, an ice cream stand with a
     // striped awning, a surf shack with boards leaning on it
@@ -1063,55 +977,154 @@ const coast = {
     }
     g.globalAlpha = 1;
     g.strokeStyle = ink;
-    // a sailboat drifting along, far out, passing behind whatever stands
-    // between us and it: the lighthouse point, the bait shack, the jetty
-    // light, the shacks, the headland, the stack and the arch
+    // boats out on the water, passing behind whatever stands between us
+    // and them: the lighthouse point, the bait shack, the jetty light, the
+    // harbour shacks. Sailboats far out, a fishing boat and a motorboat
+    // with its wake nearer in, a freighter on the horizon
     {
       g.save();
       behind(g, X, PW, [
         [w * 0.58, w * 0.97, h * 0.55, 2],
         [w * 1.7, w * 1.92, h * 0.735, 2],
+        [w * 1.08, w * 1.9, h * 0.778 - 13, 2],
         [w * 4.1, w * 4.2, h * 0.7, 2],
         [w * 4.36, w * 4.76, h * 0.74, 2],
-        [w * 5.0, w * 5.45, h * 0.64, 2],
-        [w * 5.53, w * 5.59, h * 0.7, 2],
-        [w * 5.69, w * 5.83, h * 0.72, 2],
       ]);
-      const x = (t * 3 + w * 1.4) % PW;
-      const y = h * coast.hz + 4;
-      g.fillStyle = css(I.paint([250, 250, 246], 0.2));
-      const hull: Pt[] = [
-        [x - 7, y],
-        [x + 7, y],
-        [x + 5, y + 3],
-        [x - 5, y + 3],
-      ];
-      g.beginPath();
-      hull.forEach(([a, b], i) => (i ? g.lineTo(X(a, 1), b) : g.moveTo(X(a, 1), b)));
-      g.closePath();
-      g.lineWidth = 1;
-      g.stroke();
-      g.beginPath();
-      g.moveTo(X(x, 1), y);
-      g.lineTo(X(x, 1), y - 17);
-      g.lineTo(X(x + 9, 1), y - 2);
-      g.closePath();
-      g.fill();
-      g.stroke();
-      g.beginPath();
-      g.moveTo(X(x - 1, 1), y - 14);
-      g.lineTo(X(x - 7, 1), y - 2);
-      g.lineTo(X(x - 1, 1), y - 2);
-      g.closePath();
-      g.fill();
-      g.stroke();
+      const hz = h * coast.hz;
+      const poly = (pts: Pt[], fill: string | null, lw = 1) => {
+        g.beginPath();
+        pts.forEach(([a, b], i) => (i ? g.lineTo(X(a, 1), b) : g.moveTo(X(a, 1), b)));
+        g.closePath();
+        if (fill) {
+          g.fillStyle = fill;
+          g.fill();
+        }
+        g.lineWidth = lw;
+        g.stroke();
+      };
+      const white = css(I.paint([250, 250, 246], 0.2));
+      const sail = (x: number, y: number, s: number, hullC: string, dir: number) => {
+        poly(
+          [
+            [x - 7 * s, y],
+            [x + 7 * s, y],
+            [x + 5 * s, y + 3 * s],
+            [x - 5 * s, y + 3 * s],
+          ],
+          hullC,
+        );
+        poly(
+          [
+            [x, y],
+            [x, y - 17 * s],
+            [x + 9 * s * dir, y - 2 * s],
+          ],
+          white,
+        );
+        poly(
+          [
+            [x - 1 * dir, y - 14 * s],
+            [x - 7 * s * dir, y - 2 * s],
+            [x - 1 * dir, y - 2 * s],
+          ],
+          white,
+        );
+      };
+      const wrap = (v: number) => ((v % PW) + PW) % PW;
+      // three sailboats at different distances and speeds
+      sail(wrap(t * 3 + w * 1.4), hz + 4, 1, white, 1);
+      sail(wrap(-t * 2.2 + w * 3.6), hz + 2, 0.7, css(I.paint([70, 110, 170], 0.3)), -1);
+      sail(wrap(t * 4 + w * 5.5), hz + 9, 1.25, css(I.paint([214, 84, 70], 0.2)), 1);
+      // a freighter creeping along the horizon
+      {
+        const x = wrap(-t * 0.8 + w * 2.2),
+          y = hz + 0.5;
+        g.globalAlpha = 0.85;
+        poly(
+          [
+            [x - 22, y - 5],
+            [x + 24, y - 5],
+            [x + 20, y],
+            [x - 20, y],
+          ],
+          css(I.paint([90, 96, 110], 0.4)),
+          0.9,
+        );
+        for (let i = 0; i < 4; i++)
+          poly(rect(x - 14 + i * 7, y - 9, 6, 4), css(I.paint([[210, 90, 70], [90, 140, 190], [230, 190, 80], [120, 170, 120]][i] as C, 0.4)), 0.7);
+        poly(rect(x + 14, y - 13, 6, 8), white, 0.8);
+        g.globalAlpha = 1;
+      }
+      // a fishing boat chugging out and back, nearer in
+      {
+        const ph = (t * 0.012) % 1;
+        const dir = ph < 0.5 ? 1 : -1;
+        const x = wrap(w * 0.9 + (ph < 0.5 ? ph : 1 - ph) * 2 * w * 2.6),
+          y = hz + 14;
+        poly(
+          [
+            [x - 14 * dir, y - 4],
+            [x + 16 * dir, y - 6],
+            [x + 12 * dir, y + 1],
+            [x - 12 * dir, y + 1],
+          ],
+          css(I.paint([60, 110, 120], 0.15)),
+          1.1,
+        );
+        poly(rect(x - 6 * dir - (dir < 0 ? 9 : 0), y - 12, 9, 7), white, 1);
+        g.beginPath();
+        g.moveTo(X(x - 10 * dir, 1), y - 4);
+        g.lineTo(X(x - 10 * dir, 1), y - 18);
+        g.lineTo(X(x + 10 * dir, 1), y - 5);
+        g.lineWidth = 0.7;
+        g.stroke();
+      }
+      // a motorboat skimming along with a white wake behind it
+      if (!I.snowy && I.season !== "winter") {
+        const x = wrap(t * 9 + w * 0.3),
+          y = hz + 20;
+        poly(
+          [
+            [x - 10, y - 3],
+            [x + 9, y - 3],
+            [x + 13, y - 5],
+            [x + 10, y + 1],
+            [x - 9, y + 1],
+          ],
+          white,
+          1,
+        );
+        poly(
+          [
+            [x - 2, y - 3],
+            [x + 2, y - 7],
+            [x + 5, y - 7],
+            [x + 4, y - 3],
+          ],
+          css(I.paint([150, 196, 226], 0.15)),
+          0.8,
+        );
+        g.strokeStyle = night ? "rgba(220,230,255,0.6)" : "rgba(255,255,255,0.95)";
+        for (let i = 1; i < 5; i++) {
+          g.globalAlpha = 1 - i / 5;
+          g.beginPath();
+          g.moveTo(X(x - 10 - i * 7, 1), y + 1 - i * 0.6);
+          g.lineTo(X(x - 15 - i * 7, 1), y - 1 - i * 0.6);
+          g.moveTo(X(x - 10 - i * 7, 1), y + 1 + i * 0.4);
+          g.lineTo(X(x - 15 - i * 7, 1), y + 2 + i * 0.6);
+          g.lineWidth = 1;
+          g.stroke();
+        }
+        g.globalAlpha = 1;
+        g.strokeStyle = ink;
+      }
       g.restore();
     }
     // surfers off the boardwalk: paddling out, then riding a wave in
     if (!I.snowy && I.season !== "winter")
       for (let i = 0; i < 2; i++) {
         const cyc = ((t + i * 9) % 18) / 18;
-        const sx = w * (6.3 + i * 0.3) + (cyc < 0.6 ? 0 : (cyc - 0.6) * 60);
+        const sx = w * (5.3 + i * 0.3) + (cyc < 0.6 ? 0 : (cyc - 0.6) * 60);
         const hz = h * coast.hz,
           shore = coast.shore(k, sx);
         const y = cyc < 0.6 ? shore - 8 - cyc * 30 : hz + 10 + ((cyc - 0.6) / 0.4) * (shore - hz - 16);
@@ -3548,7 +3561,7 @@ const city = {
     {
       const s0 = h * city.street[0],
         s1 = h * city.street[1];
-      const lanes = [s0 + (s1 - s0) * 0.42, s1 - 3];
+      const lanes = [s0 + (s1 - s0) * 0.33, s0 + (s1 - s0) * 0.82]; // wheels mid-lane, either side of the dashes
       const cl: C[] = [
         [246, 206, 80],
         [226, 96, 86],
@@ -4733,7 +4746,7 @@ const suburb = {
     // cars and the odd minivan along the street
     {
       const [s0, s1] = suburb.street.map((f) => h * f);
-      const lanes = [s0 + (s1 - s0) * 0.42, s1 - 3];
+      const lanes = [s0 + (s1 - s0) * 0.33, s0 + (s1 - s0) * 0.82]; // wheels mid-lane, either side of the dashes
       const cl: C[] = [
         [120, 170, 220],
         [226, 96, 86],
@@ -5791,7 +5804,7 @@ const desert = {
     // a car and a pickup on the highway, kicking up a little dust
     {
       const [r0, r1] = desert.road.map((f) => h * f);
-      const lanes = [r0 + (r1 - r0) * 0.42, r1 - 3];
+      const lanes = [r0 + (r1 - r0) * 0.33, r0 + (r1 - r0) * 0.82]; // wheels mid-lane, either side of the dashes
       const cl: C[] = [
         [120, 170, 220],
         [226, 96, 86],
@@ -6860,6 +6873,7 @@ export function paintWorldPano(
   else if (kind === "woods") woods.ground(kit);
   else farm.draw(kit);
   def.scenes.forEach((scene, i) => scene(kit, i * w));
+  if (kind === "mountain") mountain.front(kit);
   return { W: PW, H: h, top, scale, layers, lays: [], I, kit, kind };
 }
 

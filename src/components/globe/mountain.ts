@@ -1,8 +1,8 @@
 import { css, mix, type Inks, type Pen } from "./line";
 import type { C } from "./setting";
-import { TAU, curve, ellipse, fir, foliage, hash, lamp, loopWave, rect, windows, type Kit, type Pt } from "./worldkit";
+import { TAU, behind, curve, ellipse, fir, foliage, hash, lamp, loopWave, rect, windows, type Kit, type Pt } from "./worldkit";
 
-// The mountains (Montana), drawn like the other worlds: one loop of eight
+// The mountains (Montana), drawn like the other worlds: one loop of six
 // scenes under a shared range of snowy peaks, a forested ridge and a meadow.
 //
 //   1 homestead: a cabin up on a knoll, a paddock, the river winding out
@@ -11,14 +11,15 @@ import { TAU, curve, ellipse, fir, foliage, hash, lamp, loopWave, rect, windows,
 //                the train only ever runs on its rails, tunnel to tunnel
 //   4 town:      a little main street of false-front shops, a white church,
 //                the water tower up behind
-//   5 canyon:    the river coming out of a red-rock gorge under a steel
-//                truss bridge, the gravel road curving off toward us
-//   6 ski hill:  runs cut down a forested hill, a chairlift, an A-frame lodge
-//   7 falls:     a waterfall dropping between two cliffs, a footbridge
-//   8 ranch:     a log gate, a horse barn, a corral with horses, hay bales
+//   5 ski hill:  runs cut down a forested hill, a chairlift, an A-frame
+//                lodge, a few tents pitched in the meadow below
+//   6 ranch:     a log gate, a horse barn, a corral with horses, hay bales
+//
+// A river runs along the front of the whole loop, like the road in the other
+// worlds; the homestead creek, the gully and the lake's outlet all feed it.
 //
 // Everything that moves keeps to its own ground: the deer graze only on dry
-// meadow, the canoe stays on the lake, the train stays on its track.
+// meadow, the canoes stay on the lake and the river, the train on its track.
 
 // shares of the screen height
 export const MTN = {
@@ -50,17 +51,8 @@ const PEAKS: Peak[][] = [
     [0.8, 0.53, 0.22],
   ],
   [
-    [0.3, 0.555, 0.2],
-    [0.75, 0.515, 0.24],
-  ],
-  [
     [0.1, 0.56, 0.16],
     [0.56, 0.45, 0.3],
-  ],
-  [
-    [0.2, 0.5, 0.22],
-    [0.6, 0.48, 0.22],
-    [0.95, 0.55, 0.18],
   ],
   [
     [0.35, 0.53, 0.25],
@@ -69,9 +61,17 @@ const PEAKS: Peak[][] = [
 ];
 
 const ROCK: C = [176, 164, 156];
-const RED_ROCK: C = [196, 116, 84];
 const WOOD: C = [166, 112, 74];
 const DARK_WOOD: C = [120, 80, 58];
+
+// the river along the front of the whole loop, like the road in the other
+// worlds: its far bank, its near bank
+export function riverTop(k: Kit, x: number) {
+  return k.h * (0.944 + 0.005 * loopWave(x, k.PW, 13));
+}
+export function riverBot(k: Kit, x: number) {
+  return riverTop(k, x) + k.h * (0.03 + 0.004 * loopWave(x, k.PW, 17));
+}
 
 function meadowY(k: Kit, x: number) {
   return k.h * (MTN.edge + 0.006 * loopWave(x, k.PW, 11));
@@ -322,6 +322,109 @@ function ground(k: Kit) {
     }
 }
 
+// drawn over the scenes: the river and its near bank, so the creeks from the
+// homestead, the gully and the lake all run into it
+function front(k: Kit) {
+  const { pens, I, h, PW, w } = k;
+  const pen = pens[2];
+  const water = I.snowy ? mix(I.water, I.snow, 0.55) : I.water;
+  const far = curve((x) => riverTop(k, x), -8, PW + 8, 6);
+  const near = curve((x) => riverBot(k, x), -8, PW + 8, 6);
+  pen.fillOnly([...far, ...near.slice().reverse()], water);
+  pen.stroke(far, 1.2, 301);
+  // little ripple marks, drifting with the current
+  for (let i = 0; i < PW / 26; i++) {
+    const x = hash(i * 2.7 + 5) * PW;
+    const y = riverTop(k, x) + (riverBot(k, x) - riverTop(k, x)) * (0.25 + 0.5 * hash(i * 4.1));
+    const l = 4 + hash(i) * 6;
+    pen.stroke(
+      [
+        [x, y],
+        [x + l * 0.5, y - 0.8],
+        [x + l, y],
+      ],
+      0.6,
+      i + 302,
+    );
+  }
+  // the near bank down to the bottom of the screen
+  const bank: C = I.snowy ? I.snow : I.meadow;
+  pen.fillOnly([...near, [PW + 8, h + 8], [-8, h + 8]], bank);
+  pen.stroke(near, 1.3, 303);
+  // reeds and stones along the near bank, grass tufts below
+  for (let i = 0; i < PW / 30; i++) {
+    const x = hash(i * 5.3 + 7) * PW,
+      y = riverBot(k, x) + 1;
+    if (hash(i * 9.1) < 0.4)
+      pen.shape(ellipse(x, y + 1, 4 + hash(i) * 3, 2.4, 8, Math.PI, TAU), I.paint(ROCK, 0.04), 0.8, i + 310);
+    else if (!I.snowy)
+      for (const d of [-2, 0, 2])
+        pen.stroke(
+          [
+            [x + d, y],
+            [x + d * 1.6, y - 7 - hash(i + d) * 4],
+          ],
+          0.7,
+          i + d + 320,
+        );
+  }
+  if (!I.snowy)
+    for (let i = 0; i < PW / 40; i++) {
+      const x = hash(i * 1.9 + 3) * PW,
+        y = riverBot(k, x) + 6 + hash(i * 3.7) * (h - riverBot(k, x) - 6);
+      pen.stroke(
+        [
+          [x - 3, y - 3.5],
+          [x, y],
+          [x + 3, y - 3.5],
+        ],
+        0.8,
+        i + 330,
+      );
+    }
+  // a plank bridge carrying the ranch lane over the river
+  {
+    const bx = w * 5 + w * 0.15,
+      t = riverTop(k, bx) - 2,
+      b = riverBot(k, bx) + 3;
+    const wood = I.paint(WOOD, 0.04);
+    pen.shape(
+      [
+        [bx - 30, t],
+        [bx + 30, t],
+        [bx + 34, b],
+        [bx - 34, b],
+      ],
+      wood,
+      1.2,
+      340,
+    );
+    for (let i = 1; i < 4; i++) {
+      const y = t + ((b - t) * i) / 4;
+      pen.stroke(
+        [
+          [bx - 30 - i, y],
+          [bx + 30 + i, y],
+        ],
+        0.5,
+        341 + i,
+      );
+    }
+    for (const sd of [-1, 1]) {
+      pen.stroke(
+        [
+          [bx + sd * 30, t],
+          [bx + sd * 30, t - 8],
+          [bx + sd * 34, b - 8],
+          [bx + sd * 34, b],
+        ],
+        1,
+        345 + sd,
+      );
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // the scenes
 // ---------------------------------------------------------------------------
@@ -332,8 +435,69 @@ const AT = {
   lake: { cy: 0.838, rx: 0.4, ry: 0.034 },
   rail: { deck: 0.8, l: 0.21, r: 0.79 },
   ski: { base: [0.42, 0.728] as Pt, top: [0.66, 0.585] as Pt },
-  falls: { lip: 0.69, pool: 0.865 },
 };
+
+// a ridge tent: a coloured fly over two poles, the door flap pinned open,
+// guy lines pegged out at the ends; snow along the ridge in winter
+function tent(pen: Pen, I: Inks, x: number, y: number, s: number, c: C, winter: boolean, seed: number) {
+  const hw = 15 * s,
+    th = 14 * s;
+  pen.shape(
+    [
+      [x - hw, y],
+      [x - hw * 0.55, y - th],
+      [x + hw * 0.75, y - th],
+      [x + hw * 1.1, y],
+    ],
+    mix(c, [40, 30, 30], 0.18),
+    1.2,
+    seed,
+  );
+  pen.shape(
+    [
+      [x - hw, y],
+      [x - hw * 0.55, y - th],
+      [x - hw * 0.1, y],
+    ],
+    c,
+    1.2,
+    seed + 1,
+  );
+  pen.shape(
+    [
+      [x - hw * 0.72, y],
+      [x - hw * 0.55, y - th * 0.55],
+      [x - hw * 0.38, y],
+    ],
+    [50, 44, 44],
+    0.9,
+    seed + 2,
+  );
+  if (winter)
+    pen.shape(
+      [
+        [x - hw * 0.62, y - th * 0.86],
+        [x - hw * 0.55, y - th - 1.5],
+        [x + hw * 0.75, y - th - 1.5],
+        [x + hw * 0.84, y - th * 0.86],
+      ],
+      I.snow,
+      0.8,
+      seed + 3,
+    );
+  for (const [a, b] of [
+    [x - hw * 0.55, x - hw * 1.35],
+    [x + hw * 0.75, x + hw * 1.45],
+  ] as [number, number][])
+    pen.stroke(
+      [
+        [a, y - th],
+        [b, y],
+      ],
+      0.5,
+      seed + 4,
+    );
+}
 
 function knollY(k: Kit, x0: number, x: number) {
   const d = (x - (x0 + k.w * 0.22)) / (k.w * 0.22);
@@ -374,7 +538,7 @@ const SCENES = [
     pen.fillOnly([...left, ...right.slice().reverse()], I.snowy ? mix(I.water, I.snow, 0.5) : I.water);
     pen.stroke(left, 1.3, 21);
     pen.stroke(right, 1.3, 22);
-    fir(pen, I, x0 + w * 0.97, h * 0.985, h * 0.11, 23);
+    fir(pen, I, x0 + w * 0.97, h * 0.93, h * 0.11, 23);
   },
   // 2 lake
   (k: Kit, x0: number) => {
@@ -422,10 +586,27 @@ const SCENES = [
         i + 33,
       );
     }
+    // the outlet: a creek from the lake's near shore down to the river
+    {
+      const sx = x0 + w * 0.3,
+        sy = cy + ry * 0.9;
+      const l: Pt[] = [],
+        r: Pt[] = [];
+      for (let y = sy; y <= h + 4; y += 4) {
+        const u = (y - sy) / (h - sy);
+        const c = sx + Math.sin(u * 5) * 8 + u * w * 0.04;
+        const hw = 3 + u * u * 14;
+        l.push([c - hw, y]);
+        r.push([c + hw, y]);
+      }
+      pen.fillOnly([...l, ...r.slice().reverse()], frozen ? mix(I.water, I.snow, 0.55) : I.water);
+      pen.stroke(l, 1.1, 37);
+      pen.stroke(r, 1.1, 38);
+    }
     // rocks along our shore, firs at each end
     for (let i = 0; i < 5; i++) {
       const rx2 = cx - rx * 0.8 + i * rx * 0.3 + hash(i) * 10;
-      if (Math.abs(rx2 - d0) < 20) continue;
+      if (Math.abs(rx2 - d0) < 20 || Math.abs(rx2 - (x0 + w * 0.3)) < 22) continue;
       pen.shape(ellipse(rx2, cy + ry * 1.05, 5 + hash(i + 2) * 4, 3, 10, Math.PI, TAU), I.paint(ROCK, 0.04), 0.9, i + 40);
     }
     fir(pen, I, x0 + w * 0.06, h * 0.86, h * 0.09, 35);
@@ -672,163 +853,7 @@ const SCENES = [
     fir(pen, I, x0 + w * 0.96, h * 0.9, h * 0.1, 135);
     aspens(pen, I, x0 + w * 0.68, base + 4, 2, h * 0.05, 136);
   },
-  // 5 canyon: the river coming out of a gorge between two red-rock walls,
-  // a steel truss bridge carrying the gravel road over it
-  (k: Kit, x0: number) => {
-    const { pens, I, w, h } = k;
-    const pen = pens[2];
-    const foot = h * 0.875;
-    const rock = I.paint(RED_ROCK, 0.04);
-    const deep = mix(rock, [60, 30, 40], 0.25);
-    // inside the gorge: the far walls, darker, the river winding out
-    pen.fillOnly(
-      [
-        [x0 + w * 0.43, h * 0.66],
-        [x0 + w * 0.57, h * 0.66],
-        [x0 + w * 0.57, foot],
-        [x0 + w * 0.43, foot],
-      ],
-      deep,
-    );
-    const river = I.snowy ? mix(I.water, I.snow, 0.4) : I.water;
-    const rv: Pt[] = [
-      [x0 + w * 0.49, h * 0.78],
-      [x0 + w * 0.51, h * 0.78],
-      [x0 + w * 0.54, foot],
-      [x0 + w * 0.6, h + 4],
-      [x0 + w * 0.38, h + 4],
-      [x0 + w * 0.46, foot],
-    ];
-    pen.shape(rv, river, 1.1, 300);
-    // the two walls, banded
-    const walls: Pt[][] = [
-      [
-        [x0 + w * 0.03, meadowY(k, x0 + w * 0.03) + 2],
-        [x0 + w * 0.07, h * 0.68],
-        [x0 + w * 0.12, h * 0.665],
-        [x0 + w * 0.15, h * 0.63],
-        [x0 + w * 0.3, h * 0.625],
-        [x0 + w * 0.33, h * 0.6],
-        [x0 + w * 0.42, h * 0.605],
-        [x0 + w * 0.455, h * 0.65],
-        [x0 + w * 0.46, foot],
-        [x0 + w * 0.03, foot],
-      ],
-      [
-        [x0 + w * 0.54, h * 0.64],
-        [x0 + w * 0.57, h * 0.615],
-        [x0 + w * 0.7, h * 0.61],
-        [x0 + w * 0.73, h * 0.645],
-        [x0 + w * 0.88, h * 0.65],
-        [x0 + w * 0.92, h * 0.69],
-        [x0 + w * 0.97, meadowY(k, x0 + w * 0.97) + 2],
-        [x0 + w * 0.97, foot],
-        [x0 + w * 0.545, foot],
-      ],
-    ];
-    walls.forEach((c, i) => {
-      pen.fillOnly(c, rock);
-      // strata: level bands across each face, a little darker low down
-      const xs = c.map((p) => p[0]),
-        lo = Math.min(...xs),
-        hi = Math.max(...xs);
-      const topAt = (x: number) => {
-        for (let j = 0; j < c.length - 3; j++) {
-          const [ax, ay] = c[j],
-            [bx, by] = c[j + 1];
-          if ((x - ax) * (x - bx) <= 0 && ax !== bx) return ay + ((by - ay) * (x - ax)) / (bx - ax);
-        }
-        return foot;
-      };
-      for (let b = 1; b < 6; b++) {
-        const y = h * 0.6 + ((foot - h * 0.6) * b) / 6 + 4;
-        const seg = curve((x) => y + Math.sin(x * 0.07 + b) * 1.5, lo + 3, hi - 3, 6).filter(([x, yy]) => yy > topAt(x) + 3);
-        if (b >= 4)
-          pen.fillOnly(
-            [...seg, ...seg.map(([x]) => [x, foot] as Pt).reverse()],
-            mix(rock, [90, 40, 40], 0.06 * (b - 3)),
-          );
-        if (seg.length > 1) pen.stroke(seg, 0.6, 301 + b + i * 9);
-      }
-      pen.stroke(c, 1.3, 320 + i);
-      // junipers clinging along the rim
-      for (let j = 2; j < c.length - 4; j += 2) {
-        const [ax, ay] = c[j],
-          [bx, by] = c[j + 1];
-        fir(pen, I, (ax + bx) / 2, (ay + by) / 2 + 3, h * 0.028, 325 + i * 5 + j);
-      }
-    });
-    // the gravel road: down off the screen toward us on the left, across
-    // the bridge, and round the right wall's foot into the gorge
-    const by = h * 0.895;
-    const road: C = I.snowy ? mix(I.snow, [190, 180, 170], 0.3) : I.paint([206, 186, 148], 0.04);
-    const b0 = x0 + w * 0.33,
-      b1 = x0 + w * 0.67;
-    pen.shape(
-      [
-        [x0 + w * 0.08, h + 4],
-        [x0 + w * 0.2, h + 4],
-        [b0, by + 5],
-        [b0, by - 1],
-      ],
-      road,
-      0.9,
-      330,
-    );
-    pen.shape(
-      [
-        [b1, by - 1],
-        [b1, by + 5],
-        [x0 + w * 0.82, h + 4],
-        [x0 + w * 0.94, h + 4],
-      ],
-      road,
-      0.9,
-      331,
-    );
-    // the truss bridge
-    pen.shape(rect(b0, by - 1, b1 - b0, 5), road, 1.1, 332);
-    const top = by - 16;
-    const panels = 6;
-    const px = (i: number) => b0 + ((b1 - b0) * i) / panels;
-    pen.stroke(
-      [
-        [b0, by - 1],
-        [px(1), top],
-        [px(panels - 1), top],
-        [b1, by - 1],
-      ],
-      1.6,
-      333,
-    );
-    for (let i = 1; i < panels; i++) {
-      pen.stroke(
-        [
-          [px(i), top],
-          [px(i), by - 1],
-        ],
-        1,
-        334 + i,
-      );
-      // diagonals leaning in toward the middle
-      if (i !== panels / 2)
-        pen.stroke(
-          [
-            [px(i), top],
-            [px(i < panels / 2 ? i + 1 : i - 1), by - 1],
-          ],
-          0.7,
-          340 + i,
-        );
-    }
-    // piers down to the water
-    for (const f of [0.42, 0.58]) {
-      const x = x0 + w * f;
-      pen.shape(rect(x - 3, by + 4, 6, h + 4 - by - 4), I.paint([180, 170, 160], 0.04), 1, 350 + f);
-    }
-    fir(pen, I, x0 + w * 0.05, h * 0.99, h * 0.1, 165);
-  },
-  // 6 ski hill
+  // 5 ski hill
   (k: Kit, x0: number) => {
     const { pens, I, w, h } = k;
     const mid = pens[1];
@@ -973,119 +998,35 @@ const SCENES = [
           1,
           197 + i,
         );
-    fir(pen, I, x0 + w * 0.06, h * 0.9, h * 0.1, 199);
-    fir(pen, I, x0 + w * 0.93, h * 0.95, h * 0.12, 200);
-  },
-  // 7 falls
-  (k: Kit, x0: number) => {
-    const { pens, I, w, h } = k;
-    const pen = pens[2];
-    const lip = h * AT.falls.lip,
-      pool = h * AT.falls.pool;
-    const rock = I.paint(ROCK, 0.04);
-    const foot = h * 0.86;
-    const cliffs: Pt[][] = [
-      [
-        [x0 + w * 0.03, meadowY(k, x0 + w * 0.03) + 2],
-        [x0 + w * 0.08, h * 0.71],
-        [x0 + w * 0.2, h * 0.665],
-        [x0 + w * 0.33, h * 0.672],
-        [x0 + w * 0.44, lip - 2],
-        [x0 + w * 0.455, foot],
-        [x0 + w * 0.2, foot + 2],
-        [x0 + w * 0.06, foot - 4],
-      ],
-      [
-        [x0 + w * 0.545, lip],
-        [x0 + w * 0.6, h * 0.66],
-        [x0 + w * 0.74, h * 0.645],
-        [x0 + w * 0.88, h * 0.69],
-        [x0 + w * 0.97, meadowY(k, x0 + w * 0.97) + 2],
-        [x0 + w * 0.94, foot - 4],
-        [x0 + w * 0.8, foot + 2],
-        [x0 + w * 0.545, foot],
-      ],
+    // a few tents pitched in the meadow below the hill, round a fire ring
+    const tents: [number, number, number, C][] = [
+      [0.55, 0.905, 1, [226, 112, 60]],
+      [0.66, 0.925, 1.2, [80, 140, 96]],
+      [0.82, 0.915, 1.05, [230, 186, 70]],
     ];
-    // boulders at the cliffs' feet
-    for (let i = 0; i < 6; i++) {
-      const bx = x0 + w * (0.1 + i * 0.15) + hash(i + 5) * 8;
-      if (bx > x0 + w * 0.4 && bx < x0 + w * 0.6) continue;
-      pen.shape(ellipse(bx, foot + 2, 7 + hash(i) * 5, 5, 12, Math.PI, TAU), I.paint(ROCK, 0.04), 0.9, 236 + i);
+    tents.forEach(([f, yf, s, c], i) => tent(pen, I, x0 + w * f, h * yf, s, I.paint(c, 0.04), winter, 210 + i * 6));
+    {
+      const fx = x0 + w * 0.735,
+        fy = h * 0.932;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU;
+        pen.shape(ellipse(fx + Math.cos(a) * 9, fy + Math.sin(a) * 3, 2.6, 1.8, 8), I.paint(ROCK, 0.04), 0.8, 230 + i);
+      }
+      if (!winter)
+        for (const d of [-4, 0, 4])
+          pen.stroke(
+            [
+              [fx + d - 3, fy + 1],
+              [fx + d + 3, fy - 2],
+            ],
+            1.2,
+            237 + d,
+          );
     }
-    cliffs.forEach((c, i) => {
-      pen.shape(c, rock, 1.3, 210 + i);
-      // cracks running down the faces
-      for (let j = 0; j < 4; j++) {
-        const fx = c[1][0] + (c[3][0] - c[1][0]) * (0.15 + j * 0.25);
-        const fy = Math.max(c[1][1], c[3][1]) + 8 + hash(j + i) * 10;
-        if (fy + 26 > foot - 4) continue;
-        pen.stroke(
-          [
-            [fx, fy],
-            [fx + 2, fy + 14],
-            [fx - 1, fy + 26],
-          ],
-          0.7,
-          212 + i * 5 + j,
-        );
-      }
-      // pines along the clifftops
-      for (let j = 1; j < 3; j++) {
-        const fx = c[j][0] + (c[j + 1][0] - c[j][0]) * 0.5,
-          fy = c[j][1] + (c[j + 1][1] - c[j][1]) * 0.5;
-        fir(pen, I, fx, fy + 3, h * 0.035, 220 + i * 3 + j);
-      }
-    });
-    // the water: the fall itself, the pool, the stream out toward us
-    const frozen = I.snowy || I.season === "winter";
-    const fall: C = frozen ? I.paint([214, 230, 240], 0.04) : mix(I.water, [255, 255, 255], 0.35);
-    pen.shape(
-      [
-        [x0 + w * 0.455, lip],
-        [x0 + w * 0.545, lip],
-        [x0 + w * 0.55, pool],
-        [x0 + w * 0.45, pool],
-      ],
-      fall,
-      1.1,
-      230,
-    );
-    pen.shape(ellipse(x0 + w * 0.5, pool, w * 0.11, h * 0.012, 24), frozen ? mix(I.water, I.snow, 0.5) : I.water, 1.2, 231);
-    pen.shape(
-      [
-        [x0 + w * 0.47, pool + h * 0.01],
-        [x0 + w * 0.53, pool + h * 0.01],
-        [x0 + w * 0.6, h + 4],
-        [x0 + w * 0.46, h + 4],
-      ],
-      frozen ? mix(I.water, I.snow, 0.5) : I.water,
-      1.1,
-      232,
-    );
-    // the footbridge over the stream
-    const fy = h * 0.925,
-      f0 = x0 + w * 0.4,
-      f1 = x0 + w * 0.66;
-    pen.shape(rect(f0, fy, f1 - f0, 4), I.paint(WOOD, 0.04), 1.1, 233);
-    for (let x = f0; x <= f1; x += (f1 - f0) / 6)
-      pen.stroke(
-        [
-          [x, fy],
-          [x, fy - 9],
-        ],
-        0.9,
-        x,
-      );
-    pen.stroke(
-      [
-        [f0, fy - 9],
-        [f1, fy - 9],
-      ],
-      1,
-      234,
-    );
+    fir(pen, I, x0 + w * 0.06, h * 0.9, h * 0.1, 199);
+    fir(pen, I, x0 + w * 0.95, h * 0.93, h * 0.12, 200);
   },
-  // 8 ranch
+  // 6 ranch
   (k: Kit, x0: number) => {
     const { pens, I, w, h } = k;
     const pen = pens[2];
@@ -1121,8 +1062,10 @@ const SCENES = [
       [
         [gx0 + 6, h + 4],
         [gx1 - 6, h + 4],
+        [gx1 - 6, gb],
         [x0 + w * 0.5, h * 0.845],
         [x0 + w * 0.44, h * 0.845],
+        [gx0 + 6, gb - 4],
       ],
       I.snowy ? mix(I.snow, [200, 190, 180], 0.25) : I.paint([206, 180, 140], 0.04),
     );
@@ -1182,11 +1125,11 @@ const SCENES = [
     }
     // the corral in front, two horses in it
     fence(pen, I, x0 + w * 0.56, x0 + w * 0.9, h * 0.875, h * 0.875, 9, 262);
-    fence(pen, I, x0 + w * 0.52, x0 + w * 0.56, h * 0.96, h * 0.875, 11, 265);
-    fence(pen, I, x0 + w * 0.94, x0 + w * 0.9, h * 0.96, h * 0.875, 11, 268);
-    horse(pen, x0 + w * 0.66, h * 0.925, 2.1, I.paint([150, 96, 60], 0.04), 1, 270);
-    horse(pen, x0 + w * 0.84, h * 0.915, 1.9, I.paint([236, 232, 222], 0.04), -1, 275);
-    fence(pen, I, x0 + w * 0.52, x0 + w * 0.94, h * 0.96, h * 0.96, 13, 260);
+    fence(pen, I, x0 + w * 0.52, x0 + w * 0.56, h * 0.935, h * 0.875, 11, 265);
+    fence(pen, I, x0 + w * 0.94, x0 + w * 0.9, h * 0.935, h * 0.875, 11, 268);
+    horse(pen, x0 + w * 0.66, h * 0.912, 2.1, I.paint([150, 96, 60], 0.04), 1, 270);
+    horse(pen, x0 + w * 0.84, h * 0.902, 1.9, I.paint([236, 232, 222], 0.04), -1, 275);
+    fence(pen, I, x0 + w * 0.52, x0 + w * 0.94, h * 0.935, h * 0.935, 13, 260);
     fir(pen, I, x0 + w * 0.32, h * 0.855, h * 0.07, 280);
     aspens(pen, I, x0 + w * 0.94, h * 0.85, 3, h * 0.05, 281);
   },
@@ -1233,15 +1176,15 @@ function live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, lay
   {
     const cb = knollY(k, 0, w * 0.2) + 3;
     puff(w * 0.12 + w * 0.2 * 0.78, cb - h * 0.04 - h * 0.038, 0);
-    puff(w * 5 + w * 0.17 + w * 0.17 * 0.78 + 3, h * 0.855 - h * 0.07 * 0.8, 0.3);
+    puff(w * 4 + w * 0.17 + w * 0.17 * 0.78 + 3, h * 0.855 - h * 0.07 * 0.8, 0.3);
   }
-  // the river glinting in the homestead and the canyon
+  // the river glinting in the homestead
   if (!I.snowy) {
     g.strokeStyle = night ? "rgba(220,235,255,0.45)" : "rgba(255,255,255,0.85)";
     g.lineWidth = 1;
     for (let i = 0; i < 14; i++) {
       const q = (t * 0.12 + i / 14) % 1;
-      const y = h * (0.82 + q * 0.17);
+      const y = h * (0.82 + q * 0.11);
       const [c, hw] = riverAt(k, 0, y);
       const o = Math.sin(i * 2.1) * hw * 0.5;
       g.globalAlpha = Math.sin(q * Math.PI);
@@ -1270,8 +1213,8 @@ function live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, lay
     const dir = back ? -1 : 1;
     const x = w * (0.08 + 0.3 * along);
     const step = Math.floor(t * 4) % 2 ? 1 : -1;
-    deer(g, I, X(x, 2), h * 0.95, 1.6, dir, grazing ? 0 : step, !grazing || Math.sin(t * 0.8) > 0.6);
-    deer(g, I, X(x - dir * 20, 2), h * 0.958, 1.15, dir, grazing ? 0 : -step, !grazing || Math.sin(t * 0.8 + 2) > 0.3);
+    deer(g, I, X(x, 2), h * 0.922, 1.6, dir, grazing ? 0 : step, !grazing || Math.sin(t * 0.8) > 0.6);
+    deer(g, I, X(x - dir * 20, 2), h * 0.93, 1.15, dir, grazing ? 0 : -step, !grazing || Math.sin(t * 0.8 + 2) > 0.3);
   }
   // the canoe on the lake: paddles across and back, always on the water
   if (!I.snowy) {
@@ -1385,7 +1328,7 @@ function live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, lay
       [tx, ty] = AT.ski.top;
     for (let i = 0; i < 6; i++) {
       const u = 0.06 + 0.88 * ((t * 0.02 + i / 6) % 1);
-      const x = w * 5 + w * (bx + (tx - bx) * u),
+      const x = w * 4 + w * (bx + (tx - bx) * u),
         y = h * (by + (ty - by) * u) - 2;
       const sx = X(x, 1);
       g.lineWidth = 1;
@@ -1403,33 +1346,103 @@ function live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, lay
       }
     }
   }
-  // the falls: streaks sliding down, mist rising at the foot
+  // the river: two canoes paddling along it (under the ranch bridge, not
+  // over it), trout jumping clear of them, glints drifting downstream
   if (!(I.snowy || I.season === "winter")) {
-    const fx0 = w * 6 + w * 0.455,
-      fx1 = w * 6 + w * 0.545;
-    const lip = h * AT.falls.lip,
-      pool = h * AT.falls.pool;
-    g.strokeStyle = night ? "rgba(220,235,255,0.55)" : "rgba(255,255,255,0.95)";
+    const mid = (x: number) => (riverTop(k, x) + riverBot(k, x)) / 2;
+    const wrap = (v: number) => ((v % PW) + PW) % PW;
+    g.strokeStyle = night ? "rgba(220,235,255,0.45)" : "rgba(255,255,255,0.85)";
     g.lineWidth = 1;
-    for (let i = 0; i < 9; i++) {
-      const q = (t * 0.7 + hash(i * 3.3)) % 1;
-      const x = fx0 + (fx1 - fx0) * (0.12 + 0.76 * hash(i * 7.1));
-      const y = lip + (pool - lip) * q;
+    for (let i = 0; i < PW / 40; i++) {
+      const life = (t * 0.3 + hash(i * 3.3)) % 1;
+      if (life > 0.5) continue;
+      const a = Math.sin((life / 0.5) * Math.PI);
+      const x = wrap(hash(i * 7.1) * PW + t * 4);
+      const y = riverTop(k, x) + 3 + hash(i * 5.7) * (riverBot(k, x) - riverTop(k, x) - 6);
+      g.globalAlpha = a;
       g.beginPath();
-      g.moveTo(X(x, 2), y);
-      g.lineTo(X(x, 2), y + 8);
-      g.stroke();
-    }
-    g.strokeStyle = ink;
-    for (let i = 0; i < 4; i++) {
-      const q = (t * 0.3 + i / 4) % 1;
-      g.globalAlpha = 0.5 * (1 - q);
-      g.beginPath();
-      g.arc(X(w * 6.5 + (i - 1.5) * 8, 2), pool - 2 - q * 12, 2 + q * 5, 0, TAU);
-      g.lineWidth = 0.8;
+      g.moveTo(X(x, 2) - 3 * a, y);
+      g.lineTo(X(x, 2) + 3 * a, y);
       g.stroke();
     }
     g.globalAlpha = 1;
+    g.strokeStyle = ink;
+    const canoes: [number, number, C][] = [
+      [wrap(t * 5 + w * 0.6), 1, [214, 92, 64]],
+      [wrap(-t * 3.6 + w * 3.4), -1, [70, 130, 170]],
+    ];
+    g.save();
+    const bx = w * 5.15;
+    behind(g, X, PW, [[bx - 34, bx + 34, riverTop(k, bx) - 10, 2]]);
+    canoes.forEach(([x, dir, c], ci) => {
+      const y = mid(x) + 2;
+      const sx = X(x, 2);
+      if (sx < -40 || sx > w + 40) return;
+      g.fillStyle = css(c);
+      g.beginPath();
+      g.moveTo(sx - 15, y - 3);
+      g.quadraticCurveTo(sx, y + 4, sx + 15, y - 3);
+      g.lineTo(sx + 12, y - 1);
+      g.lineTo(sx - 12, y - 1);
+      g.closePath();
+      g.fill();
+      g.lineWidth = 1.1;
+      g.stroke();
+      // two paddlers, stroking in turn
+      for (const [px, ph] of [
+        [-6, 0],
+        [6, Math.PI],
+      ] as [number, number][]) {
+        const hx = sx + px * dir;
+        g.fillStyle = css(I.paint(ci ? [240, 196, 70] : [80, 150, 110], 0.04));
+        g.beginPath();
+        g.moveTo(hx - 2.5, y - 2);
+        g.lineTo(hx - 2, y - 8);
+        g.lineTo(hx + 2, y - 8);
+        g.lineTo(hx + 2.5, y - 2);
+        g.closePath();
+        g.fill();
+        g.stroke();
+        g.beginPath();
+        g.arc(hx, y - 10.5, 2.2, 0, TAU);
+        g.stroke();
+        const sw = Math.sin(t * 2.4 + ph);
+        g.beginPath();
+        g.moveTo(hx + 4 * dir * sw, y - 9);
+        g.lineTo(hx - 5 * dir * sw, y + 3);
+        g.lineWidth = 1;
+        g.stroke();
+      }
+    });
+    g.restore();
+    // a trout jumping somewhere along the river, never near a canoe
+    for (let j = 0; j < 2; j++) {
+      const jn = Math.floor((t + j * 5) / 9),
+        jt = ((t + j * 5) % 9) / 1.2;
+      if (jt >= 1) continue;
+      const fx = hash(jn * 3.7 + j) * PW;
+      if (canoes.some(([x]) => Math.abs(wrap(fx - x + PW / 2) - PW / 2) < 60)) continue;
+      const fy = mid(fx);
+      g.fillStyle = css(I.paint([176, 186, 190], 0.1));
+      g.beginPath();
+      g.ellipse(X(fx + (jt - 0.5) * 14, 2), fy - Math.sin(jt * Math.PI) * 12, 4.5, 1.8, Math.cos(jt * Math.PI) * -0.9, 0, TAU);
+      g.fill();
+      g.lineWidth = 1;
+      g.stroke();
+      for (const [at, dx] of [
+        [0, -7],
+        [1, 7],
+      ]) {
+        const a = (jt - at) * 1.6;
+        if (a > 0 && a < 1) {
+          g.globalAlpha = 1 - a;
+          g.beginPath();
+          g.ellipse(X(fx + dx, 2), fy, 2 + a * 6, 0.8 + a * 1.5, 0, 0, TAU);
+          g.stroke();
+          g.globalAlpha = 1;
+        }
+      }
+    }
   }
   // a hawk circling high over the homestead by day; fireflies on summer nights
   if (!night) {
@@ -1447,10 +1460,10 @@ function live(g: CanvasRenderingContext2D, k: Kit, t: number, X: (x: number, lay
     for (let i = 0; i < 14; i++) {
       const a = Math.max(0, Math.sin(t * 1.4 + i * 2.3));
       // only over the dry meadow of the homestead and the ranch
-      const x = (i % 2 ? w * 7.05 : w * 0.05) + hash(i * 3.1) * w * 0.35 + Math.sin(t * 0.4 + i) * 6;
+      const x = (i % 2 ? w * 5.05 : w * 0.05) + hash(i * 3.1) * w * 0.35 + Math.sin(t * 0.4 + i) * 6;
       g.fillStyle = `rgba(230,255,140,${a})`;
       g.beginPath();
-      g.arc(X(x, 2), h * 0.88 + hash(i * 1.7) * h * 0.1, 1.4, 0, TAU);
+      g.arc(X(x, 2), h * 0.86 + hash(i * 1.7) * h * 0.07, 1.4, 0, TAU);
       g.fill();
     }
   }
@@ -1514,4 +1527,4 @@ function deer(
   g.restore();
 }
 
-export const mountain = { scenes: SCENES, ground, live };
+export const mountain = { scenes: SCENES, ground, front, live };
