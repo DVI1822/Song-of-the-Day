@@ -149,6 +149,51 @@ export class Pen {
     this.g.lineWidth = w;
     this.g.strokeStyle = this.ink;
     this.g.stroke();
+    if (fill && this.I.snowy && fill !== this.I.snow && fill !== this.I.water) this.snowCap(pts, w);
+  }
+  // when snow is lying, it piles on every edge that faces the sky: roofs,
+  // sills, signs, rocks, the tops of walls and cars. Each gets a white
+  // pillow, thicker on longer, flatter edges, inked along its top
+  snowCap(pts: [number, number][], w: number) {
+    const n = pts.length;
+    if (n < 3) return;
+    let area = 0;
+    for (let i = 0; i < n; i++) {
+      const [x0, y0] = pts[i],
+        [x1, y1] = pts[(i + 1) % n];
+      area += x0 * y1 - x1 * y0;
+    }
+    const sg = Math.sign(area);
+    if (!sg) return;
+    const g = this.g;
+    for (let i = 0; i < n; i++) {
+      const [ax, ay] = pts[i],
+        [bx, by] = pts[(i + 1) % n];
+      const dx = bx - ax,
+        dy = by - ay;
+      const len = Math.hypot(dx, dy);
+      if (len < 5) continue;
+      // the edge's outward side must face mostly up
+      const ny = (-dx * sg) / len;
+      if (ny > -0.55) continue;
+      const th = Math.min(4, Math.max(1.4, len * 0.07)) * -ny;
+      const l = ax < bx ? [ax, ay] : [bx, by],
+        r = ax < bx ? [bx, by] : [ax, ay];
+      const top: [number, number][] = [
+        [l[0] - 0.8, l[1] + 0.4],
+        [l[0] + 1, l[1] - th * 0.8],
+        [(l[0] + r[0]) / 2, (l[1] + r[1]) / 2 - th],
+        [r[0] - 1, r[1] - th * 0.8],
+        [r[0] + 0.8, r[1] + 0.4],
+      ];
+      this.path(top, true, i + 77);
+      g.fillStyle = css(this.I.snow);
+      g.fill();
+      this.path(top.slice(0, 4).concat([[r[0] + 0.8, r[1] + 0.4]]), false, i + 77);
+      g.lineWidth = Math.min(w, 1) * 0.8;
+      g.strokeStyle = this.ink;
+      g.stroke();
+    }
   }
   fillOnly(pts: [number, number][], fill: C) {
     this.path(pts, true);

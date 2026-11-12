@@ -145,6 +145,7 @@ export type Light = {
   snowline: number; // 0..1 how far down the peaks the snow comes
   overcast: number;
   wind: number;
+  rain: number; // 0..1 how hard it's raining: rings on the water
   alpen: number; // 0..1 the pink on the peaks at sunrise and sunset
   moonC: C; // 0..1, a soft cold light from high on the left after dark
   warmC: C;
@@ -209,6 +210,7 @@ function lightFor(f: SettingFrame, wx: Weather | null, warm = false): Light {
     snowline,
     overcast,
     wind: wx?.wind ?? 2,
+    rain: k === "storm" ? 1 : k === "rain" ? 0.75 : k === "drizzle" ? 0.4 : 0,
     alpen,
     warmC,
     moonC: [0.2, 0.25, 0.4].map((v) => v * night * (1 - 0.6 * overcast)) as C,

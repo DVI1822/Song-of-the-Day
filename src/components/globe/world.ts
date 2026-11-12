@@ -7122,6 +7122,68 @@ export function liveWorld(g: CanvasRenderingContext2D, pano: WorldPano, offs: nu
     return ((v % PW) + PW) % PW;
   };
   WORLDS[pano.kind].live(g, pano.kit, t, X);
+  if (pano.kit.L.rain > 0) rainRings(g, pano, t, X);
+}
+
+// rain on the water: wherever the still drawing shows open water (the sea,
+// rivers, lakes, ponds, pools), drops land and spread little rings. The
+// spots are found once per painting by sampling the water's blue
+const wetSpots = new WeakMap<WorldPano, [number, number, number][]>();
+function rainRings(g: CanvasRenderingContext2D, pano: WorldPano, t: number, X: (x: number, layer: number) => number) {
+  let spots = wetSpots.get(pano);
+  if (!spots) {
+    spots = [];
+    for (const layer of [1, 2]) {
+      const cv = pano.layers[layer];
+      const cg = cv.getContext("2d");
+      if (!cg) continue;
+      const { data, width, height } = cg.getImageData(0, 0, cv.width, cv.height);
+      const blue = (x: number, y: number) => {
+        if (x < 0 || y < 0 || x >= width || y >= height) return false;
+        const o = (y * width + x) * 4;
+        const r = data[o],
+          gg = data[o + 1],
+          b = data[o + 2];
+        return data[o + 3] > 240 && b > 150 && b > r + 60 && b > gg + 15 && r < 150;
+      };
+      for (let i = 0; i < 6000 && spots.length < 900; i++) {
+        const px = Math.floor(hash(i * 1.37 + layer * 91) * width),
+          py = Math.floor(hash(i * 2.71 + layer * 53) * height);
+        const m = Math.ceil(5 * pano.scale);
+        if (blue(px, py) && blue(px - m, py) && blue(px + m, py) && blue(px, py - 2) && blue(px, py + 2))
+          spots.push([px / pano.scale, py / pano.scale + pano.top, layer]);
+      }
+    }
+    wetSpots.set(pano, spots);
+  }
+  if (!spots.length) return;
+  const { I, L } = pano.kit;
+  const n = Math.round(14 + 46 * L.rain);
+  g.save();
+  g.strokeStyle = I.night > 0.5 ? "rgba(220,232,255,0.7)" : "rgba(255,255,255,0.9)";
+  g.lineCap = "round";
+  for (let i = 0; i < n; i++) {
+    const life = 0.9;
+    const cyc = t / life + hash(i * 4.3);
+    const q = cyc % 1;
+    const spot = spots[Math.floor(hash(i * 7.7 + Math.floor(cyc) * 3.1) * spots.length)];
+    const [x, y, layer] = spot;
+    const near = (y - pano.top) / (pano.H - pano.top);
+    const R = (2 + 7 * q) * (0.6 + near);
+    g.globalAlpha = (1 - q) * 0.95;
+    g.lineWidth = 0.9;
+    g.beginPath();
+    g.ellipse(X(x, layer), y, R, R * 0.32, 0, 0, TAU);
+    g.stroke();
+    if (q < 0.15) {
+      // the splash as it lands
+      g.beginPath();
+      g.moveTo(X(x, layer), y - 1);
+      g.lineTo(X(x, layer), y - 4 * (0.6 + near));
+      g.stroke();
+    }
+  }
+  g.restore();
 }
 
 export { mix };
