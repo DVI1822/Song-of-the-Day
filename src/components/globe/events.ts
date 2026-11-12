@@ -643,34 +643,6 @@ const DEFS: Def[] = [
     },
   },
   {
-    name: "rainbow",
-    when: (c) =>
-      day(c) && (c.weather === "partly" || c.weather === "drizzle" || c.weather === "cloudy" || hashDay(c) > 0.8),
-    weight: 1.5,
-    dur: [25, 35],
-    draw(c, p) {
-      const a = fade(p, 0.25) * 0.55;
-      const cx = c.w * 0.5,
-        cy = c.h * GROUND[c.place].horizon,
-        R = c.w * 0.62;
-      const bands: C[] = [
-        [255, 94, 87],
-        [255, 170, 60],
-        [255, 226, 90],
-        [120, 200, 120],
-        [90, 160, 230],
-        [150, 120, 220],
-      ];
-      c.g.lineWidth = 4 * c.s;
-      bands.forEach((b, i) => {
-        c.g.strokeStyle = css(b, a);
-        c.g.beginPath();
-        c.g.arc(cx, cy, R - i * 4 * c.s, Math.PI * 1.02, Math.PI * 1.98);
-        c.g.stroke();
-      });
-    },
-  },
-  {
     name: "bats",
     when: (c) => dusk(c) && c.season !== "winter",
     weight: 2,
