@@ -1120,6 +1120,89 @@ const coast = {
       }
       g.restore();
     }
+    // a few big waves, far apart: each swells up out at sea, curls over
+    // at one end and peels along as it rolls in, then breaks into foam
+    {
+      const hz = h * coast.hz;
+      const sea = css(mix(I.paint([70, 146, 206], 0.14), [30, 70, 120], 0.18));
+      const face = css(mix(I.paint([70, 146, 206], 0.14), [180, 230, 240], 0.35));
+      const foam = night ? "rgba(225,235,255,0.85)" : "rgba(255,255,255,0.97)";
+      const slots: [number, number, number][] = [
+        [2.3, 0, 1],
+        [3.32, 0.37, -1],
+        [5.5, 0.7, 1],
+      ];
+      g.save();
+      // behind the lifeguard tower, the dune, the stilt houses and the
+      // boardwalk, which all stand nearer than the water
+      behind(g, X, PW, [
+        [w * 2.68, w * 2.79, h * 0.6, 2],
+        [w * 3.05, w * 3.56, h * 0.783, 2],
+        [w * 3.58, w * 4.02, h * 0.7, 2],
+        [w * 5.18, w * 6.0, h * 0.795, 2],
+      ]);
+      for (const [f, off, dir] of slots) {
+        const ph = (t / 16 + off) % 1;
+        if (ph > 0.92) continue;
+        const grow = Math.min(1, ph / 0.3),
+          fall = ph < 0.72 ? 1 : 1 - (ph - 0.72) / 0.2;
+        const x = w * f + dir * ph * 50;
+        const shore = coast.shore(k, x);
+        const y = hz + 30 + ph * (shore - hz - 38);
+        const L = 40 + 34 * grow,
+          H = 24 * grow * fall + 1;
+        const P = (dx: number, dy: number) => [X(x + dx * L * dir, 1), y + dy * H] as Pt;
+        const poly = (pts: Pt[], fill: string | null, lw: number) => {
+          g.beginPath();
+          pts.forEach(([a, b], i) => (i ? g.lineTo(a, b) : g.moveTo(a, b)));
+          if (fill) {
+            g.closePath();
+            g.fillStyle = fill;
+            g.fill();
+          }
+          if (lw) {
+            g.lineWidth = lw;
+            g.stroke();
+          }
+        };
+        // the swell, rising to a crest that pitches forward at one end
+        poly([P(-1, 0), P(-0.5, -0.45), P(0.1, -0.9), P(0.45, -1), P(0.75, -0.92), P(0.95, -0.62), P(0.97, -0.25), P(1.12, 0)], sea, 1.1);
+        // the lighter face under the lip, the dark of the tube inside it
+        poly([P(0.5, 0), P(0.6, -0.5), P(0.76, -0.66), P(0.95, -0.3), P(1.12, 0)], face, 0);
+        g.beginPath();
+        g.ellipse(...P(0.8, -0.36), L * 0.09, H * 0.2, 0, 0, TAU);
+        g.fillStyle = sea;
+        g.fill();
+        g.lineWidth = 0.8;
+        g.stroke();
+        // white water along the lip, curling over and in
+        g.strokeStyle = foam;
+        poly([P(-0.2, -0.78), P(0.1, -0.9), P(0.45, -1), P(0.75, -0.92), P(0.95, -0.62), P(0.95, -0.3), P(0.86, -0.2), P(0.8, -0.32)], null, 2.4);
+        g.fillStyle = foam;
+        for (let j = 0; j < 6; j++) {
+          const q = (t * 1.2 + j / 6) % 1;
+          const [sx, sy] = P(0.9 + q * 0.3, -0.5 - 0.6 * Math.sin(q * Math.PI));
+          g.globalAlpha = 1 - q;
+          g.beginPath();
+          g.arc(sx, sy, 1.5, 0, TAU);
+          g.fill();
+        }
+        g.globalAlpha = 1;
+        // foam rolling along the bottom where it breaks
+        poly([P(0.55, -0.02), P(0.8, 0.02), P(1.12, 0)], null, 2);
+        if (ph > 0.6) {
+          g.lineWidth = 1.3;
+          for (let j = 0; j < 5; j++) {
+            const [sx, sy] = P(-0.7 + j * 0.35, -0.3);
+            g.beginPath();
+            g.arc(sx, sy + 3, 2 + (ph - 0.6) * 10, Math.PI, TAU);
+            g.stroke();
+          }
+        }
+        g.strokeStyle = ink;
+      }
+      g.restore();
+    }
     // surfers off the boardwalk: paddling out, then riding a wave in
     if (!I.snowy && I.season !== "winter")
       for (let i = 0; i < 2; i++) {
@@ -1372,6 +1455,61 @@ const farm = {
         j,
       );
     }
+    // across the road: a rail fence for the near pasture, a hen coop, hay
+    // bales on the verge, and a few more out in the far hay fields
+    {
+      const pen = pens[2];
+      const w = k.w;
+      const fy = h * 0.915;
+      const wood = I.paint([150, 116, 84], 0.04);
+      for (let x = w * 3.05; x <= w * 3.95; x += 22) pen.shape(rect(x - 1.5, fy - 12, 3, 14), wood, 1, x);
+      for (const dy of [-9, -4])
+        pen.stroke(
+          [
+            [w * 3.05, fy + dy],
+            [w * 3.95, fy + dy],
+          ],
+          1.1,
+          dy,
+        );
+      // the coop: a little red shed on legs with a ramp
+      const cx = w * 1.04,
+        cb = h * 0.945;
+      for (const lx of [-12, 12]) pen.stroke([[cx + lx, cb - 8], [cx + lx, cb]], 1.2, lx);
+      pen.shape(rect(cx - 15, cb - 22, 30, 14), I.paint([194, 62, 50], 0.04), 1.2, 400);
+      pen.shape(
+        [
+          [cx - 18, cb - 22],
+          [cx, cb - 31],
+          [cx + 18, cb - 22],
+        ],
+        I.snowy ? I.snow : I.paint([96, 92, 100], 0.04),
+        1.2,
+        401,
+      );
+      pen.shape(rect(cx + 3, cb - 18, 7, 10), I.paint([60, 40, 34], 0.04), 0.9, 402);
+      pen.stroke(
+        [
+          [cx + 6, cb - 8],
+          [cx + 18, cb],
+        ],
+        1.6,
+        403,
+      );
+      if (!I.snowy) {
+        for (const [f, r] of [
+          [0.14, 11],
+          [0.22, 10],
+          [4.62, 11],
+          [4.7, 10],
+          [5.92, 10],
+        ] as [number, number][])
+          bale(pen, I, w * f, h * 0.965 - r, r, f);
+        bale(pen, I, w * 5.96, h * 0.965 - 30, 10, 5.96);
+        for (const f of [1.72, 1.77, 1.83, 4.12, 4.18, 6.85, 6.9])
+          bale(pens[1], I, w * f, this.fields(k, w * f) + h * 0.02, 3.2, f);
+      }
+    }
   },
   scenes: [
     // a red barn, a silo, round hay bales
@@ -1435,29 +1573,13 @@ const farm = {
       // round hay bales
       if (!I.snowy)
         for (const [f, r] of [
-          [0.68, 7],
-          [0.76, 6],
-          [0.83, 7],
-        ]) {
-          // lying on its side: a rounded body, the rolled end facing you
-          const hx = x0 + w * f,
-            hy = base - r + 2;
-          const hay = I.paint([226, 196, 110], 0.04);
-          pen.shape(
-            [
-              [hx - r * 1.5, hy - r],
-              [hx, hy - r],
-              [hx, hy + r],
-              [hx - r * 1.5, hy + r],
-              [hx - r * 1.5 - r * 0.4, hy],
-            ],
-            hay,
-            1.2,
-            f,
-          );
-          pen.shape(ellipse(hx, hy, r * 0.55, r, 16), mix(hay, [255, 240, 200], 0.25), 1.2, f + 2);
-          pen.stroke(ellipse(hx, hy, r * 0.24, r * 0.45, 10, 0, TAU * 0.8), 0.7, f + 1);
-        }
+          [0.66, 7],
+          [0.74, 6],
+          [0.81, 7],
+          [0.88, 6],
+          [0.94, 7],
+        ])
+          bale(pen, I, x0 + w * f, base - r + 2, r, f);
     },
     // a white farmhouse with a porch, a windpump, a big oak
     (k: Kit, x0: number) => {
@@ -2264,42 +2386,104 @@ const farm = {
       }
       g.strokeStyle = css(I.inkC, 0.9);
     }
-    // cows grazing in the pasture, heads going up and down
-    for (let i = 0; i < 3; i++) {
-      const cx = w * (3.18 + i * 0.1),
-        cy = h * (0.832 + (i % 2) * 0.012);
-      const sx = X(cx, 2);
-      const down = Math.sin(t * 0.5 + i * 2) > 0;
-      g.fillStyle = css(I.paint([248, 246, 240], 0.04));
-      g.lineWidth = 1.1;
-      for (const lx of [-5, -3, 3, 5]) {
+    // cows grazing in the pasture, heads going up and down, and a few more
+    // across the road behind the near fence, bigger for being closer
+    {
+      const herd: [number, number, number, number][] = [
+        [3.18, 0.832, 1, 1],
+        [3.28, 0.844, 1, 1],
+        [3.38, 0.832, 1, -1],
+        [3.86, 0.838, 1, -1],
+        [3.94, 0.83, 0.9, 1],
+        [3.24, 0.948, 1.7, 1],
+        [3.52, 0.962, 1.8, -1],
+        [3.8, 0.95, 1.6, 1],
+      ];
+      herd.forEach(([f, yf, sc, dir], i) => cow(g, I, X(w * f + Math.sin(t * 0.05 + i) * 4, 2), h * yf, sc, dir, Math.sin(t * 0.5 + i * 2) > 0));
+    }
+    // small goings-on this side of the road: hens pecking round the coop,
+    // a rabbit hopping along the verge, the farm dog trotting out and back
+    if (!I.snowy && I.season !== "winter") {
+      for (let i = 0; i < 4; i++) {
+        const hx = X(w * (1.06 + i * 0.05) + Math.sin(t * 0.3 + i * 1.7) * 10, 2),
+          hy = h * (0.95 + (i % 2) * 0.012);
+        const peck = Math.sin(t * 3 + i * 1.3) > 0.4;
+        const d = Math.cos(t * 0.3 + i * 1.7) > 0 ? 1 : -1;
+        g.fillStyle = css(I.paint(i % 2 ? [250, 248, 240] : [190, 110, 60], 0.04));
+        g.lineWidth = 1;
         g.beginPath();
-        g.moveTo(sx + lx, cy + 2);
-        g.lineTo(sx + lx, cy + 7);
+        g.ellipse(hx, hy - 4, 4, 3, 0, 0, TAU);
+        g.fill();
+        g.stroke();
+        g.beginPath();
+        g.arc(hx + d * 4, peck ? hy - 1 : hy - 7, 1.8, 0, TAU);
+        g.fill();
+        g.stroke();
+        g.fillStyle = css(I.paint([220, 60, 50], 0.04));
+        g.fillRect(hx + d * 4 - 0.8, (peck ? hy - 1 : hy - 7) - 3.2, 1.6, 1.6);
+        g.beginPath();
+        g.moveTo(hx - 1, hy - 1);
+        g.lineTo(hx - 1, hy + 1);
+        g.moveTo(hx + 1, hy - 1);
+        g.lineTo(hx + 1, hy + 1);
+        g.stroke();
+      }
+      // the rabbit: a few hops, a pause, a few hops back
+      {
+        const ph = (t % 20) / 20;
+        const u = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+        const d = ph < 0.5 ? 1 : -1;
+        const hop = Math.abs(Math.sin(t * 6)) * (Math.abs(u - 0.5) < 0.45 ? 4 : 0);
+        const rx = X(w * (2.2 + 0.4 * u), 2),
+          ry = h * 0.935 - hop;
+        g.fillStyle = css(I.paint([170, 150, 130], 0.04));
+        g.beginPath();
+        g.ellipse(rx, ry - 3, 4, 3, 0, 0, TAU);
+        g.fill();
+        g.stroke();
+        g.beginPath();
+        g.ellipse(rx + d * 4, ry - 6, 2, 1.8, 0, 0, TAU);
+        g.fill();
+        g.stroke();
+        g.beginPath();
+        g.ellipse(rx + d * 4, ry - 10, 0.9, 3, d * 0.2, 0, TAU);
+        g.stroke();
+        g.fillStyle = "#fff";
+        g.beginPath();
+        g.arc(rx - d * 4, ry - 3, 1.4, 0, TAU);
+        g.fill();
+      }
+    }
+    if (!night) {
+      // the dog: out along the verge from the farmhouse and back
+      const ph = (t % 26) / 26;
+      const u = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+      const d = ph < 0.5 ? 1 : -1;
+      const dx = X(w * (1.4 + 0.5 * u), 2),
+        dy = h * 0.97;
+      const st = Math.sin(t * 8) * 2;
+      g.fillStyle = css(I.paint([150, 100, 60], 0.04));
+      g.lineWidth = 1.1;
+      for (const [lx, sw] of [
+        [-5, st],
+        [5, -st],
+      ]) {
+        g.beginPath();
+        g.moveTo(dx + lx, dy - 4);
+        g.lineTo(dx + lx + sw, dy);
         g.stroke();
       }
       g.beginPath();
-      g.ellipse(sx, cy, 7, 3.6, 0, 0, TAU);
-      g.fill();
-      g.stroke();
-      // patches
-      g.fillStyle = css(I.paint([40, 40, 46], 0.04));
-      g.beginPath();
-      g.ellipse(sx - 2, cy - 0.5, 2, 1.6, 0.4, 0, TAU);
-      g.fill();
-      g.beginPath();
-      g.ellipse(sx + 3.5, cy + 0.8, 1.4, 1.2, 0, 0, TAU);
-      g.fill();
-      // head
-      g.fillStyle = css(I.paint([248, 246, 240], 0.04));
-      const hy = down ? cy + 4 : cy - 2;
-      g.beginPath();
-      g.ellipse(sx + 9, hy, 2.6, 2, down ? 0.8 : 0, 0, TAU);
+      g.ellipse(dx, dy - 6, 7, 3, 0, 0, TAU);
       g.fill();
       g.stroke();
       g.beginPath();
-      g.moveTo(sx - 7, cy - 1);
-      g.lineTo(sx - 9, cy + 3);
+      g.ellipse(dx + d * 8, dy - 9, 3, 2.4, 0, 0, TAU);
+      g.fill();
+      g.stroke();
+      g.beginPath();
+      g.moveTo(dx - d * 7, dy - 7);
+      g.lineTo(dx - d * 11, dy - 11 + Math.sin(t * 10) * 1.5);
       g.stroke();
     }
     // crows round the scarecrow by day, fireflies at night
@@ -2329,6 +2513,60 @@ const farm = {
     }
   },
 };
+
+// a round hay bale lying on its side: a rounded body, the rolled end
+// facing you
+function bale(pen: Pen, I: Inks, hx: number, hy: number, r: number, seed: number) {
+  const hay = I.paint([226, 196, 110], 0.04);
+  pen.shape(
+    [
+      [hx - r * 1.5, hy - r],
+      [hx, hy - r],
+      [hx, hy + r],
+      [hx - r * 1.5, hy + r],
+      [hx - r * 1.5 - r * 0.4, hy],
+    ],
+    hay,
+    1.2,
+    seed,
+  );
+  pen.shape(ellipse(hx, hy, r * 0.55, r, 16), mix(hay, [255, 240, 200], 0.25), 1.2, seed + 2);
+  pen.stroke(ellipse(hx, hy, r * 0.24, r * 0.45, 10, 0, TAU * 0.8), 0.7, seed + 1);
+}
+
+// a black and white cow side on, facing dir; its head down to graze or up
+function cow(g: CanvasRenderingContext2D, I: Inks, sx: number, cy: number, s: number, dir: number, down: boolean) {
+  const P = (dx: number) => sx + dx * s * dir;
+  g.fillStyle = css(I.paint([248, 246, 240], 0.04));
+  g.lineWidth = 1.1;
+  for (const lx of [-5, -3, 3, 5]) {
+    g.beginPath();
+    g.moveTo(P(lx), cy + 2 * s);
+    g.lineTo(P(lx), cy + 7 * s);
+    g.stroke();
+  }
+  g.beginPath();
+  g.ellipse(sx, cy, 7 * s, 3.6 * s, 0, 0, TAU);
+  g.fill();
+  g.stroke();
+  g.fillStyle = css(I.paint([40, 40, 46], 0.04));
+  g.beginPath();
+  g.ellipse(P(-2), cy - 0.5 * s, 2 * s, 1.6 * s, 0.4 * dir, 0, TAU);
+  g.fill();
+  g.beginPath();
+  g.ellipse(P(3.5), cy + 0.8 * s, 1.4 * s, 1.2 * s, 0, 0, TAU);
+  g.fill();
+  g.fillStyle = css(I.paint([248, 246, 240], 0.04));
+  const hy = down ? cy + 4 * s : cy - 2 * s;
+  g.beginPath();
+  g.ellipse(P(9), hy, 2.6 * s, 2 * s, down ? 0.8 * dir : 0, 0, TAU);
+  g.fill();
+  g.stroke();
+  g.beginPath();
+  g.moveTo(P(-7), cy - 1 * s);
+  g.lineTo(P(-9), cy + 3 * s);
+  g.stroke();
+}
 
 // one corn stalk: a stem, a few leaves arching out, a tassel
 function g2(pen: Pen, x: number, base: number, h: number, c: C, stubble: boolean) {
