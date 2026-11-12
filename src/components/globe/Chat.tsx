@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { formatTime } from "@/lib/day";
 import type { AddedMe, Friend, Message, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
+import { PullTab } from "./pull";
 import { BackIcon, CloseIcon, Face, glass } from "./ui";
 
 // The globe chat: a tab on the right edge that pulls out a live chat with
@@ -50,6 +51,7 @@ export function Chat({
   open,
   onOpen,
   onClose,
+  onPull,
   dmWith,
   onCore,
   tabTop,
@@ -66,6 +68,7 @@ export function Chat({
   open: boolean;
   onOpen(): void;
   onClose(): void;
+  onPull(): void; // the tab started being dragged out
   // set from someone's core: open straight to a conversation with them
   dmWith: { p: Profile; n: number } | null;
   onCore(p: Profile): void;
@@ -168,9 +171,9 @@ export function Chat({
 
   return (
     <>
-      <button
-        ref={tabRef}
-        type="button"
+      <PullTab
+        buttonRef={tabRef}
+        pull={{ side: "right", open, travel: width + 46, panel: "tt-chat", onStart: onPull, onOpen, onClose }}
         onClick={open ? onClose : onOpen}
         aria-label="Globe chat"
         aria-expanded={open}
@@ -191,9 +194,10 @@ export function Chat({
           </span>
         )}
         <span className="whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">Globe chat</span>
-      </button>
+      </PullTab>
 
       <div
+        id="tt-chat"
         role="dialog"
         aria-label="Globe chat"
         inert={!open}

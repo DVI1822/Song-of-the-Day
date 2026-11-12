@@ -144,7 +144,7 @@ const PAGES: Page[] = [
     tab: "Friends",
     title: "Friends and chat",
     rows: [
-      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "My friends", text: "Who has posted today, newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs." },
+      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "My friends", text: "Who has posted today, newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
       { icon: <Tab><TabIcon name="find" /></Tab>, name: "Find a friend", text: "Search by username. “Added you” shows who added you, “You may know” shows friends of your friends." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full bg-accent px-2 py-1 text-[10px] font-semibold text-white">Add</span></span>,

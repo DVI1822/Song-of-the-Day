@@ -33,6 +33,7 @@ import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
+import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass, RecenterIcon, TabIcon } from "./ui";
@@ -279,6 +280,8 @@ function Globe({
   const [launching, setLaunching] = useState(false);
   const [panel, setPanel] = useState<PanelName | null>(null);
   const [panelOn, setPanelOn] = useState(false);
+  // a left tab being dragged out right now (pull.tsx), which keeps its panel mounted
+  const [pulling, setPulling] = useState<PanelName | null>(null);
   const [chatOn, setChatOn] = useState(false);
   const welcomeSeen = useWelcomeSeen();
   const [help, setHelp] = useState(false);
@@ -608,10 +611,10 @@ function Globe({
 
   // Panels slide away before they unmount.
   useEffect(() => {
-    if (panelOn) return;
+    if (panelOn || pulling) return;
     const t = setTimeout(() => setPanel(null), 260);
     return () => clearTimeout(t);
-  }, [panelOn]);
+  }, [panelOn, pulling]);
 
   // Phones: a pinch zooms nothing, neither the Globe nor the page (iOS
   // ignores the viewport's no-zoom, so its gestures are stopped here).
@@ -1060,6 +1063,9 @@ function Globe({
 
   const openTab = (name: PanelName) => {
     if (panel === name && panelOn) return closePanel();
+    showTab(name);
+  };
+  const showTab = (name: PanelName) => {
     setChatOn(false);
     if (name === "friends") {
       setSeenBefore(seenAt);
@@ -1397,9 +1403,25 @@ function Globe({
             ["songs", "My songs", 112],
           ] as const
         ).map(([name, label, height]) => (
-          <button
+          <PullTab
             key={name}
-            type="button"
+            pull={{
+              side: "left",
+              open: panel === name && panelOn,
+              travel: panelW + 46,
+              panel: "tt-panel",
+              onStart: () => {
+                setChatOn(false);
+                setPulling(name);
+                if (panel !== name) {
+                  setPanelOn(false);
+                  setPanel(name);
+                }
+              },
+              onOpen: () => showTab(name),
+              onClose: closePanel,
+              onEnd: () => setPulling(null),
+            }}
             onClick={() => openTab(name)}
             aria-label={label}
             aria-expanded={panel === name && panelOn}
@@ -1418,10 +1440,10 @@ function Globe({
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
               {label}
             </span>
-          </button>
+          </PullTab>
         ))}
-        <button
-          type="button"
+        <PullTab
+          pull={{ side: "left", open: false, travel: 70, onOpen: () => openCore(null) }}
           onClick={() => openCore(null)}
           aria-label="Core, open your profile"
           className="box-border flex h-[84px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
@@ -1431,11 +1453,12 @@ function Globe({
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
             Core
           </span>
-        </button>
+        </PullTab>
       </div>
 
       {panel && (
         <div
+          id="tt-panel"
           className="absolute left-[46px] z-[425] box-border flex flex-col overflow-hidden rounded-[26px] transition-[opacity,transform] duration-[260ms] ease-out"
           style={{
             top: Math.max(90, tabTop - 50),
@@ -1504,6 +1527,7 @@ function Globe({
           setChatOn(true);
         }}
         onClose={() => setChatOn(false)}
+        onPull={closePanel}
         dmWith={dmWith}
         onCore={(p) => {
           setChatOn(false);
