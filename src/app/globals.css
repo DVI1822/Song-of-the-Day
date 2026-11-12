@@ -222,6 +222,16 @@ body {
   }
 }
 
+/* the redo arrows on your own cover (Redo.tsx): chase each other round once */
+@keyframes redo-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
 /* The buttons under an opened song (Reactions.tsx). */
 /* liked: the level bars dance like an equaliser, each to its own beat */
 @keyframes eq-a {

@@ -596,19 +596,13 @@ export function FindPanel({
 export function SongsPanel({
   me,
   songs,
-  canRedo,
-  onRedo,
   width,
 }: {
   me: Profile;
   songs: Post[];
-  canRedo: boolean;
-  onRedo(post: Post): Promise<string | undefined>;
   width: number;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const today = todayIn(me.timezone);
   const big = Math.min(248, width - 48);
 
@@ -660,21 +654,6 @@ export function SongsPanel({
                 )}
                 {p.caption && <div className="text-sm leading-relaxed">“{p.caption}”</div>}
                 <SongPlayer post={p} />
-                {isToday && canRedo && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      setError(await onRedo(p) ?? null);
-                      setBusy(false);
-                    }}
-                    className="h-10 rounded-full border border-card-ink/20 text-xs font-semibold disabled:opacity-60"
-                  >
-                    Redo today&apos;s song · 1 left
-                  </button>
-                )}
-                {isToday && error && <p className="text-xs text-accent-deep">{error}</p>}
               </div>
             )}
           </div>

@@ -5,6 +5,7 @@ import { ChatIcon } from "./Chat";
 import { OpenIcon } from "./Preview";
 import { CoreIcon, LevelsIcon, NoteIcon } from "./Reactions";
 import { MoreIcon } from "./Safety";
+import { RedoArrows } from "./Redo";
 import { ShareIcon } from "./ShareStory";
 import { ShuffleIcon } from "./Shuffle";
 import { SignalCore } from "./SignalCore";
@@ -83,12 +84,6 @@ const PersonIcon = () => (
   <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <circle cx="12" cy="9" r="3.6" />
     <path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4" />
-  </svg>
-);
-const RedoIcon = () => (
-  <svg aria-hidden width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 5v5h-5" />
-    <path d="M19.5 10A8 8 0 1 0 20 15" />
   </svg>
 );
 // A tiny cover, mid-flip.
@@ -170,7 +165,7 @@ const PAGES: Page[] = [
     rows: [
       { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "Core", text: "Flies into the middle of your globe, where your profile lives." },
       { icon: <Tab><TabIcon name="songs" /></Tab>, name: "My songs", text: "Every song you've ever picked, newest first." },
-      { icon: <Round><RedoIcon /></Round>, name: "One redo a day", text: "Changed your mind? Redo today's song from My songs, once a day." },
+      { icon: <Round><RedoArrows /></Round>, name: "One redo a day", text: "Changed your mind? Open your song and tap the arrows on its cover. It gets sucked away and you pick another, once a day." },
       { icon: <Round><CalendarIcon /></Round>, name: "Your archive", text: "At midnight your song moves into your core, sorted into a playlist for each month." },
       { icon: <Half><CoreIcon on /></Half>, name: "Saved", text: "Songs you saved from friends, kept in your core." },
       { icon: <Round><PersonIcon /></Round>, name: "Your picture", text: "Tap your picture in your core to add or change it." },

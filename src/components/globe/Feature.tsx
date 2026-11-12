@@ -13,11 +13,13 @@ import type { StorySky } from "./storyVideo";
 import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon } from "./ui";
+import { RedoButton, Singularity } from "./Redo";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
 // a place to report the song or block them. Beside the title: like it, and
-// the notes people left.
+// the notes people left. On your own song today, the arrows on the cover's
+// bottom left are your one redo (Redo.tsx).
 export function Feature({
   post,
   me,
@@ -34,6 +36,8 @@ export function Feature({
   api,
   onBlocked,
   onHide,
+  onRedo,
+  onRedone,
   story,
   rootRef,
   backdropRef,
@@ -54,6 +58,9 @@ export function Feature({
   api: GlobeApi;
   onBlocked(): void;
   onHide?: () => Promise<string | null>;
+  // only on your own song, today, while you still have the redo
+  onRedo?: () => Promise<string | undefined>;
+  onRedone?: () => void;
   story: StoryOf;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
@@ -174,6 +181,28 @@ export function Feature({
     if (flagging) hint.current?.cancel();
   }, [flagging]);
 
+  // the redo: the cover's sucked away while today's song is taken back
+  const sinkRef = useRef<HTMLDivElement>(null);
+  const [sinking, setSinking] = useState(0);
+  const [redoError, setRedoError] = useState<string | null>(null);
+  const taking = useRef<Promise<string | undefined> | null>(null);
+  const redo = () => {
+    if (!onRedo || sinking) return;
+    hint.current?.cancel();
+    setRedoError(null);
+    taking.current = onRedo().catch(() => "Couldn't redo it. Try again.");
+    setSinking((n) => n + 1);
+  };
+  const sunk = async () => {
+    const err = await taking.current;
+    taking.current = null;
+    if (err) {
+      // it didn't go through: the cover comes back
+      setSinking(0);
+      setRedoError(err);
+    } else onRedone?.();
+  };
+
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
       <div ref={backdropRef} className="absolute inset-0" />
@@ -253,6 +282,7 @@ export function Feature({
             </div>
           </div>
         ) : (
+          <div ref={sinkRef} className={sinking ? "pointer-events-none" : ""}>
           <button
             type="button"
             onClick={tapCover}
@@ -313,9 +343,13 @@ export function Feature({
               </div>
             </div>
           </button>
+          </div>
           )}
+          <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {/* your one redo today, on the bottom left */}
+          {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>
         {/* "Added to core", a moment over the bottom of the cover */}
         {toast > 0 && (
