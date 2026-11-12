@@ -3,7 +3,7 @@
 import type { GlobeApi } from "@/components/globe/api";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { addDays, todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Message, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Message, Note, Picks, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 
 // The Globe with made-up friends. Works without signing in; nothing is saved.
 
@@ -183,6 +183,8 @@ const CHAT: Message[] = [
   say("d4", ME, "you have to hear the live version", 1500, FRIENDS[6]),
 ];
 
+const DEMO_PICKS: (string | null)[] = [null, null, null];
+
 const demoApi: GlobeApi = {
   // made-up facts for the made-up song
   async facts(postId) {
@@ -355,6 +357,30 @@ const demoApi: GlobeApi = {
     listen(on) {
       const t = setTimeout(() => on.add({ ...say(`live${Date.now()}`, FRIENDS[1], "ok who's listening to the same thing right now", 0) }), 6000);
       return () => clearTimeout(t);
+    },
+  },
+  // the month so far: made-up points for most of your friends, plus whatever you give
+  ranks: {
+    async mine() {
+      return [...DEMO_PICKS] as Picks;
+    },
+    async set(rank, postId) {
+      await new Promise((r) => setTimeout(r, 150));
+      for (let i = 0; i < 3; i++) if (DEMO_PICKS[i] === postId) DEMO_PICKS[i] = null;
+      DEMO_PICKS[rank - 1] = postId;
+      return {};
+    },
+    async board() {
+      await new Promise((r) => setTimeout(r, 250));
+      const given = new Map<string, number>();
+      DEMO_PICKS.forEach((id, i) => {
+        const f = id && FRIENDS.find((x) => x.post?.id === id);
+        if (f) given.set(f.id, (given.get(f.id) ?? 0) + 3 - i);
+      });
+      return FRIENDS.slice(0, 9).map((f, j) => {
+        const today = Math.floor(rnd(j + 40, 5) * 6) + (given.get(f.id) ?? 0);
+        return { who: f.id, month: 4 + Math.floor(rnd(j + 7, 2) * 38) + today, today };
+      }).concat([{ who: ME.id, month: 21, today: 4 }]);
     },
   },
   async loadCore(id) {

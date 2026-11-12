@@ -26,7 +26,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, SongFacts } from "@/lib/types";
+import type { Core, Friend, MayKnow, Message, Note, Picks, Post, Profile, Reactions, SavedSong, Score, SongFacts } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -52,6 +52,8 @@ export type GlobeApi = {
   addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }>;
   deleteNote(noteId: string): Promise<{ error?: string }>;
   chat: ChatApi;
+  // ranking today's songs, and the month's leaderboard
+  ranks?: RankApi;
   // keep this browser's push subscription for the noon and 9 PM nudges
   savePush?(sub: { endpoint: string; p256dh: string; auth: string }): Promise<void>;
   // what's new since the Globe opened; the demo has nothing new
@@ -70,6 +72,38 @@ export type ChatApi = {
   markRead(fromId: string): Promise<void>;
   people(ids: string[]): Promise<Profile[]>;
   listen(on: { add(m: Message): void; gone(id: string): void }): () => void;
+};
+
+// Your top three today and the leaderboard. Picks go through rank_song(),
+// which checks you've posted and the song is on your globe; you can read only
+// your own, and the board is totals only (20261113000000_rankings.sql).
+export type RankApi = {
+  mine(day: string): Promise<Picks>;
+  set(rank: 1 | 2 | 3, postId: string | null): Promise<{ error?: string }>;
+  board(): Promise<Score[]>;
+};
+
+const supabaseRanks: RankApi = {
+  async mine(day) {
+    const { data } = await createClient().from("votes").select("rank, post_id").eq("day", day);
+    const picks: Picks = [null, null, null];
+    for (const v of data ?? []) if (v.rank >= 1 && v.rank <= 3) picks[v.rank - 1] = v.post_id;
+    return picks;
+  },
+  async set(rank, postId) {
+    const { error } = await createClient().rpc("rank_song", { p_rank: rank, p_post: postId });
+    if (!error) return {};
+    // the database's own words are written for people (rank_song)
+    return { error: error.code === "P0001" ? error.message : "Couldn't save that. Try again." };
+  },
+  async board() {
+    const { data } = await createClient().rpc("leaderboard");
+    return ((data ?? []) as { who: string; month_points: number; today_points: number }[]).map((r) => ({
+      who: r.who,
+      month: r.month_points,
+      today: r.today_points,
+    }));
+  },
 };
 
 const MSG = "id, user_id, to_id, body, created_at, read_at";
@@ -153,6 +187,7 @@ export const serverApi: GlobeApi = {
   addNote,
   deleteNote,
   chat: supabaseChat,
+  ranks: supabaseRanks,
   // A route, not a server action: making a song's facts the first time can
   // take a few seconds, and server actions wait in line behind each other.
   async facts(postId) {

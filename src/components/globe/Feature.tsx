@@ -38,6 +38,7 @@ export function Feature({
   onHide,
   onRedo,
   onRedone,
+  ranking,
   story,
   rootRef,
   backdropRef,
@@ -61,6 +62,8 @@ export function Feature({
   // only on your own song, today, while you still have the redo
   onRedo?: () => Promise<string | undefined>;
   onRedone?: () => void;
+  // the 1st, 2nd and 3rd medals, on a friend's song once you've posted (Ranks.tsx)
+  ranking?: React.ReactNode;
   story: StoryOf;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
@@ -377,6 +380,7 @@ export function Feature({
               <div className="min-w-0 flex-1 truncate text-[15px] text-muted">
                 {[post.artist, post.album].filter(Boolean).join(" · ")}
               </div>
+              {ranking && <div className="-my-2 -mr-1.5">{ranking}</div>}
             </div>
           </div>
           <div className="-my-1.5">
