@@ -233,6 +233,7 @@ function newEls() {
     beam: null as HTMLCanvasElement | null,
     ripples: null as HTMLCanvasElement | null,
     inkGlobe: null as HTMLCanvasElement | null,
+    frost: null as HTMLDivElement | null,
     sigCore: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
@@ -1242,6 +1243,14 @@ function Globe({
         <canvas ref={(el) => void (R.current.setLive = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
+        {/* the drawn look: the ball frosts what's behind it, so the songs read
+            clearly over the scenery */}
+        <div
+          ref={(el) => void (R.current.frost = el)}
+          data-frost=""
+          className="pointer-events-none absolute rounded-full"
+          style={{ left: L.cx - L.R - 8, top: L.cy - L.R - 8, width: 2 * (L.R + 8), height: 2 * (L.R + 8), opacity: 0 }}
+        />
         <div
           ref={(el) => void (R.current.sphere = el)}
           className="pointer-events-none absolute rounded-full"
@@ -1803,6 +1812,17 @@ sim: TileSim,
     if (r.sphere) r.sphere.style.opacity = "0";
     if (r.sunShadow) r.sunShadow.style.opacity = "0";
     if (r.floor) r.floor.style.opacity = "0";
+    if (r.frost) {
+      const fs = r.frost.style;
+      fs.opacity = op.toFixed(3);
+      fs.transform = `scale(${s.zoom.toFixed(4)})`;
+      fs.background = dk > 0.5 ? "rgba(22,28,40,0.34)" : "rgba(251,248,240,0.34)";
+      const blur = "blur(7px) saturate(0.85)";
+      if (fs.backdropFilter !== blur) {
+        fs.backdropFilter = blur;
+        fs.setProperty("-webkit-backdrop-filter", blur);
+      }
+    }
     drawInkGlobe(r.inkGlobe, {
       w: L.w,
       h: L.h,
