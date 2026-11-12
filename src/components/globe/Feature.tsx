@@ -181,7 +181,7 @@ export function Feature({
     if (flagging) hint.current?.cancel();
   }, [flagging]);
 
-  // the redo: the cover sinks into a point while today's song is taken back
+  // the redo: the cover's sucked away while today's song is taken back
   const sinkRef = useRef<HTMLDivElement>(null);
   const [sinking, setSinking] = useState(0);
   const [redoError, setRedoError] = useState<string | null>(null);
@@ -282,7 +282,7 @@ export function Feature({
             </div>
           </div>
         ) : (
-          <div ref={sinkRef} className={sinking ? "pointer-events-none origin-center overflow-hidden" : ""}>
+          <div ref={sinkRef} className={sinking ? "pointer-events-none" : ""}>
           <button
             type="button"
             onClick={tapCover}
@@ -345,7 +345,7 @@ export function Feature({
           </button>
           </div>
           )}
-          <Singularity size={cover} target={sinkRef} run={sinking} onDone={sunk} />
+          <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
           {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
           {/* your one redo today, on the bottom left */}
