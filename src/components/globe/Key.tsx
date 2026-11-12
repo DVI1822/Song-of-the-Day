@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChatIcon } from "./Chat";
+import { ChatIcon, GlobeTabIcon } from "./Chat";
+import { Medal } from "./Ranks";
 import { OpenIcon } from "./Preview";
 import { CoreIcon, LevelsIcon, NoteIcon } from "./Reactions";
 import { MoreIcon } from "./Safety";
@@ -142,16 +143,19 @@ const PAGES: Page[] = [
   },
   {
     tab: "Friends",
-    title: "Friends and chat",
+    title: "Friends, leaderboard and chat",
     rows: [
-      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "My friends", text: "Who has posted today, newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
-      { icon: <Tab><TabIcon name="find" /></Tab>, name: "Find a friend", text: "Search by username. “Added you” shows who added you, “You may know” shows friends of your friends." },
+      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "Friends", text: "Search by username up top. Below: who added you, then who has posted today (tap the header to fold it up), newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
+      { icon: <Tab><TabIcon name="find" /></Tab>, name: "Find friends", text: "In Friends: “You may know” shows friends of your friends, and Share sends your link to anyone outside the app." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full bg-accent px-2 py-1 text-[10px] font-semibold text-white">Add</span></span>,
         name: "Add",
         text: "Puts their songs on your globe. When they add you back, you're mutual friends.",
       },
-      { icon: <Tab right><ChatIcon size={15} /></Tab>, name: "Globe chat", text: "The tab on the right. Talk with your mutual friends. It starts fresh every midnight, like the songs." },
+      { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Globe", text: "The tab on the right, with the Leaderboard, Chat and Messages inside." },
+      { icon: <span className="flex h-10 w-10 items-center justify-center"><Medal n={1} on size={30} /></span>, name: "Rank 1, 2, 3", text: "Once you've posted, tap 1, 2 or 3 on a friend's song to make it your 1st, 2nd or 3rd today: 3, 2 and 1 points. Change them until midnight. Never your own, and nobody sees who ranked them." },
+      { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Leaderboard", text: "Everyone on your globe by points this month. Each morning it adds the day before's votes. The top three get the podium." },
+      { icon: <Tab right><ChatIcon size={15} /></Tab>, name: "Chat", text: "Talk with your mutual friends. It starts fresh every midnight, like the songs." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full px-1.5 py-1 text-[9px] font-semibold" style={glass(false)}>Message</span></span>,
         name: "Message",
@@ -161,10 +165,9 @@ const PAGES: Page[] = [
   },
   {
     tab: "Core",
-    title: "Your core",
+    title: "My Core",
     rows: [
-      { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "Core", text: "Flies into the middle of your globe, where your profile lives." },
-      { icon: <Tab><TabIcon name="songs" /></Tab>, name: "My songs", text: "Every song you've ever picked, newest first." },
+      { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "My Core", text: "Flies into the middle of your globe, where your profile lives: every song you've ever picked, by month, and the ones you saved." },
       { icon: <Round><RedoArrows /></Round>, name: "One redo a day", text: "Changed your mind? Open your song and tap the arrows on its cover. It gets sucked away and you pick another, once a day." },
       { icon: <Round><CalendarIcon /></Round>, name: "Your archive", text: "At midnight your song moves into your core, sorted into a playlist for each month." },
       { icon: <Half><CoreIcon on /></Half>, name: "Saved", text: "Songs you saved from friends, kept in your core." },

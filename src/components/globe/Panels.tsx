@@ -15,106 +15,92 @@ const Kicker = ({ children }: { children: React.ReactNode }) => (
 );
 
 // ---------------------------------------------------------------------------
-// My friends: everyone on your globe, whoever posted most recently on top,
+// On your globe: everyone you've added, whoever posted most recently on top,
 // then the people who haven't posted yet, by name. When a new song comes in,
 // its poster rises to the top and everyone else slides down. Beside each
 // one, their streak, their song today (tap to fly to it, or an empty ring if
-// they haven't posted) and their core. Anything new since you last looked gets a dot. Above, likes and notes
-// on your song; below, whose songs you've hidden.
+// they haven't posted) and their core. Anything new since you last looked
+// gets a dot. It folds up under its header, like a drop-down.
 // ---------------------------------------------------------------------------
 
-export function FriendsPanel({
+function GlobeList({
   friends,
-  activity,
-  onMine,
   seenBefore,
-  onShow,
   onOpen,
   onCore,
-  onFind,
 }: {
   friends: Friend[];
-  activity: Activity[];
-  onMine(): void; // open your song
   seenBefore: number; // when you last looked, in ms
-  onShow(f: Friend): Promise<string | null>;
   onOpen(k: number): void;
   onCore(p: Profile): void;
-  onFind(): void;
 }) {
+  const [open, setOpen] = useState(true);
   const isNew = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenBefore;
   const byName = (a: { f: Friend }, b: { f: Friend }) => a.f.display_name.localeCompare(b.f.display_name);
   const all = friends.map((f, k) => ({ f, k }));
   const byLatest = (a: { f: Friend }, b: { f: Friend }) =>
     a.f.post && b.f.post ? b.f.post.created_at.localeCompare(a.f.post.created_at) : a.f.post ? -1 : b.f.post ? 1 : byName(a, b);
   const shown = all.filter((x) => !x.f.hidden).sort(byLatest);
-  const rows = useSlide(shown.map((x) => x.f.id).join(" "));
-  const hidden = all.filter((x) => x.f.hidden).sort(byName);
+  const rows = useSlide(open ? shown.map((x) => x.f.id).join(" ") : "");
   const posted = shown.filter((x) => x.f.post).length;
-  const mine = activity.length > 0 && <OnYourSong activity={activity} isNew={isNew} onMine={onMine} />;
-
-  if (!friends.length)
-    return (
-      <div className="flex flex-1 flex-col items-start gap-3 overflow-y-auto px-[18px] pt-2">
-        {mine && <div className="-mx-2 self-stretch">{mine}</div>}
-        <div className="text-sm text-muted">No one on your globe yet.</div>
-        <button type="button" onClick={onFind} className="h-10 rounded-full bg-accent px-4 text-[13px] font-semibold text-white">
-          Find a friend
-        </button>
-      </div>
-    );
+  if (!shown.length) return null;
 
   return (
-    <div className="flex-1 overflow-y-auto px-2.5 pb-4">
-      {mine}
-      <Kicker>
-        On your globe · {shown.length} · {posted} posted today
-      </Kicker>
-      {shown.map(({ f, k }) => {
-        const p = f.post;
-        const back = isNew(f.followed_back_at);
-        return (
-          <div key={f.id} ref={rows(f.id)} data-motion className="relative flex h-[54px] items-center gap-1 pl-2">
-            <PersonButton p={f} onCore={onCore}>
-              <Avatar p={f} />
-              <div className="flex min-w-0 flex-1 flex-col gap-px">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-semibold">{f.display_name}</span>
-                  {Boolean(f.streak) && <Streak days={f.streak!} />}
-                  {(back || isNew(p?.created_at)) && <NewDot />}
+    <div className="pb-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 px-2 pb-1.5 pt-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted"
+      >
+        Posted today · {posted} of {shown.length}
+        <Chevron open={open} />
+      </button>
+      {open &&
+        shown.map(({ f, k }) => {
+          const p = f.post;
+          const back = isNew(f.followed_back_at);
+          return (
+            <div key={f.id} ref={rows(f.id)} data-motion className="relative flex h-[54px] items-center gap-1 pl-2">
+              <PersonButton p={f} onCore={onCore}>
+                <Avatar p={f} />
+                <div className="flex min-w-0 flex-1 flex-col gap-px">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold">{f.display_name}</span>
+                    {Boolean(f.streak) && <Streak days={f.streak!} />}
+                    {(back || isNew(p?.created_at)) && <NewDot />}
+                  </div>
+                  <div className="truncate text-[11px] text-muted">
+                    {back
+                      ? `added you back · ${formatTime(f.followed_back_at!, localZone())}`
+                      : p
+                        ? `${p.title}${p.artist ? ` · ${p.artist}` : ""}`
+                        : "hasn't posted today"}
+                  </div>
                 </div>
-                <div className="truncate text-[11px] text-muted">
-                  {back
-                    ? `added you back · ${formatTime(f.followed_back_at!, localZone())}`
-                    : p
-                      ? `${p.title}${p.artist ? ` · ${p.artist}` : ""}`
-                      : "hasn't posted today"}
-                </div>
-              </div>
-            </PersonButton>
-            {p ? (
-              <button
-                type="button"
-                onClick={() => onOpen(k)}
-                aria-label={`Open ${f.display_name}'s song, ${p.title}`}
-                className="flex h-11 w-11 flex-none items-center justify-center"
-              >
-                <Cover src={p.artwork_url} seed={p.title} size={30} style={{ boxShadow: "0 3px 8px -3px rgba(13,42,63,0.5)" }} />
-              </button>
-            ) : (
-              <span
-                role="img"
-                aria-label={`${f.display_name} hasn't posted today`}
-                className="flex h-11 w-11 flex-none items-center justify-center"
-              >
-                <span className="box-border h-[30px] w-[30px] border border-dashed border-muted/70" style={{ borderRadius: coverRadius(30) }} />
-              </span>
-            )}
-            <CoreButton name={f.display_name} onClick={() => onCore(f)} />
-          </div>
-        );
-      })}
-      {hidden.length > 0 && <Hidden people={hidden.map((x) => x.f)} onShow={onShow} onCore={onCore} />}
+              </PersonButton>
+              {p ? (
+                <button
+                  type="button"
+                  onClick={() => onOpen(k)}
+                  aria-label={`Open ${f.display_name}'s song, ${p.title}`}
+                  className="flex h-11 w-11 flex-none items-center justify-center"
+                >
+                  <Cover src={p.artwork_url} seed={p.title} size={30} style={{ boxShadow: "0 3px 8px -3px rgba(13,42,63,0.5)" }} />
+                </button>
+              ) : (
+                <span
+                  role="img"
+                  aria-label={`${f.display_name} hasn't posted today`}
+                  className="flex h-11 w-11 flex-none items-center justify-center"
+                >
+                  <span className="box-border h-[30px] w-[30px] border border-dashed border-muted/70" style={{ borderRadius: coverRadius(30) }} />
+                </span>
+              )}
+              <CoreButton name={f.display_name} onClick={() => onCore(f)} />
+            </div>
+          );
+        })}
     </div>
   );
 }
@@ -420,20 +406,26 @@ function PersonRow({
 }
 
 // ---------------------------------------------------------------------------
-// Find a friend. On top, "Added you": people who want to be your friend.
-// Below, "You may know": people who know someone on your globe, most shared
-// friends first; tap a name to see who you share. Then your invite link.
-// Searching by username swaps all of that for the results.
+// Friends: one tab for the people on your globe and finding more. On top, a
+// search by username. Then likes and notes on your song, "Added you" (people
+// who want to be your friend), who's posted today (folds up), "You may know"
+// (people who know someone on your globe, most shared friends first; tap a
+// name to see who you share), your invite link to send outside the app, and
+// whose songs you've hidden. Searching swaps all of that for the results.
 // ---------------------------------------------------------------------------
 
 type Found = Profile & { following: boolean };
 
-export function FindPanel({
+export function FriendsTab({
   api,
   me,
   friends,
   addedMe,
+  activity,
   seenBefore,
+  onMine,
+  onShow,
+  onOpen,
   onAddBack,
   onFollowed,
   onCore,
@@ -442,7 +434,11 @@ export function FindPanel({
   me: Profile;
   friends: Friend[];
   addedMe: AddedMe[];
+  activity: Activity[];
   seenBefore: number;
+  onMine(): void; // open your song
+  onShow(f: Friend): Promise<string | null>;
+  onOpen(k: number): void; // fly to a friend's song
   onAddBack(p: AddedMe): Promise<string | null>;
   onFollowed(f: Friend): void;
   onCore(p: Profile): void;
@@ -476,6 +472,7 @@ export function FindPanel({
   }, [q, searching, api]);
 
   const onGlobe = new Set(friends.map((f) => f.id));
+  const hidden = friends.filter((f) => f.hidden).sort((a, b) => a.display_name.localeCompare(b.display_name));
   const asked = new Map(addedMe.map((p) => [p.id, p]));
   const shared = new Map((known ?? []).map((p) => [p.id, p.mutuals]));
   // people who added you are listed above, so "You may know" skips them
@@ -549,6 +546,7 @@ export function FindPanel({
           </>
         ) : (
           <>
+            {activity.length > 0 && <OnYourSong activity={activity} isNew={isNew} onMine={onMine} />}
             {addedMe.length > 0 && (
               <div className="pb-2.5">
                 <Kicker>Added you · {addedMe.length}</Kicker>
@@ -558,6 +556,11 @@ export function FindPanel({
                   return row(p, n ? mutualText(n) : `added you ${formatDay(p.added_at.slice(0, 10))}`);
                 })}
               </div>
+            )}
+            {friends.length ? (
+              <GlobeList friends={friends} seenBefore={seenBefore} onOpen={onOpen} onCore={onCore} />
+            ) : (
+              <div className="px-2 pb-2 pt-1 text-[13px] text-muted">No one on your globe yet. Search above, or send your link.</div>
             )}
             <div className="pb-2.5">
               <Kicker>You may know{mayKnow.length ? ` · ${mayKnow.length}` : ""}</Kicker>
@@ -582,6 +585,7 @@ export function FindPanel({
                 onFollowed={onFollowed}
               />
             </div>
+            {hidden.length > 0 && <Hidden people={hidden} onShow={onShow} onCore={onCore} />}
           </>
         )}
       </div>

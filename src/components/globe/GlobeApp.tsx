@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Post, Profile, SavedSong } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Picks, Post, Profile, SavedSong } from "@/lib/types";
 import { serverApi, shrinkPhoto, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -32,7 +32,8 @@ import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
-import { FindPanel, FriendsPanel, SongsPanel } from "./Panels";
+import { FriendsTab } from "./Panels";
+import { Leaderboard, RankMedals } from "./Ranks";
 import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -76,7 +77,7 @@ export function GlobeApp(props: Props) {
 }
 
 const ME = 99; // your own tile's slot; friends take 0..89
-type PanelName = "friends" | "find" | "songs";
+type PanelName = "friends";
 type TileInfo = { k: number; wait: boolean; art: string; label: string };
 type TileEls = {
   box: HTMLDivElement | null;
@@ -283,6 +284,9 @@ function Globe({
   // a left tab being dragged out right now (pull.tsx), which keeps its panel mounted
   const [pulling, setPulling] = useState<PanelName | null>(null);
   const [chatOn, setChatOn] = useState(false);
+  // your 1st, 2nd and 3rd today (Ranks.tsx); rankTick fetches the board again
+  const [picks, setPicks] = useState<Picks>([null, null, null]);
+  const [rankTick, setRankTick] = useState(0);
   const welcomeSeen = useWelcomeSeen();
   const [help, setHelp] = useState(false);
   const [keyOn, setKeyOn] = useState(false); // the key: what every button does
@@ -443,6 +447,39 @@ function Globe({
   // -------------------------------------------------------------------------
 
   const closePanel = useCallback(() => setPanelOn(false), []);
+
+  // -------------------------------------------------------------------------
+  // Ranking today's songs
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    let on = true;
+    api.ranks?.mine(todayIn(me.timezone)).then((p) => on && setPicks(p)).catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [api, me.timezone]);
+
+  // Give a song a place (or take it back with null, or by tapping the place it
+  // already has). Shows at once; goes back if the server says no.
+  const rank = useCallback(
+    async (n: 1 | 2 | 3, postId: string | null) => {
+      if (!api.ranks) return null;
+      const before = picks;
+      const off = postId !== null && before[n - 1] === postId;
+      const next = before.map((p) => (p === postId ? null : p)) as Picks;
+      next[n - 1] = off ? null : postId;
+      setPicks(next);
+      const res = await api.ranks.set(n, off ? null : postId);
+      if (res.error) {
+        setPicks(before);
+        return res.error;
+      }
+      setRankTick((t) => t + 1);
+      return null;
+    },
+    [api, picks],
+  );
 
   const spinTo = useCallback(
     (k: number) => {
@@ -1398,9 +1435,7 @@ function Globe({
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
         {(
           [
-            ["friends", "My friends", 116],
-            ["find", "Find a friend", 130],
-            ["songs", "My songs", 112],
+            ["friends", "Friends", 104],
           ] as const
         ).map(([name, label, height]) => (
           <PullTab
@@ -1429,12 +1464,12 @@ function Globe({
             style={{ height, ...glass(darkOn), ...activeTab(name) }}
           >
             <TabIcon name={name} />
-            {(name === "friends" ? newCount : name === "find" ? addedMe.length : 0) > 0 && (
+            {(name === "friends" ? newCount + addedMe.length : 0) > 0 && (
               <span
-                aria-label={name === "friends" ? `${newCount} new` : `${addedMe.length} added you`}
+                aria-label={`${newCount + addedMe.length} new`}
                 className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
               >
-                {name === "friends" ? newCount : addedMe.length}
+                {newCount + addedMe.length}
               </span>
             )}
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
@@ -1445,13 +1480,13 @@ function Globe({
         <PullTab
           pull={{ side: "left", open: false, travel: 70, onOpen: () => openCore(null) }}
           onClick={() => openCore(null)}
-          aria-label="Core, open your profile"
-          className="box-border flex h-[84px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
+          aria-label="My Core: your songs and profile"
+          className="box-border flex h-[104px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
           style={glass(darkOn)}
         >
           <SignalCore className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
-            Core
+            My Core
           </span>
         </PullTab>
       </div>
@@ -1474,41 +1509,26 @@ function Globe({
         >
           <div className="flex items-center py-1.5 pl-[18px] pr-1.5 pt-3">
             <h2 className="display text-lg">
-              {panel === "friends" ? "My friends" : panel === "find" ? "Find a friend" : "My songs"}
+              Friends
             </h2>
             <button type="button" onClick={closePanel} aria-label="Close" className="ml-auto flex h-11 w-11 items-center justify-center">
               <BackIcon />
             </button>
           </div>
           {panel === "friends" && (
-            <FriendsPanel
+            <FriendsTab
+              api={api}
+              me={me}
               friends={friends}
+              addedMe={addedMe}
               activity={activity}
               onMine={() => myPost && landed && fly(ME)}
               seenBefore={seenBefore}
               onShow={(f) => setHidden(f, false)}
               onOpen={fly}
-              onCore={(p) => openCore(null, p)}
-              onFind={() => setPanel("find")}
-            />
-          )}
-          {panel === "find" && (
-            <FindPanel
-              api={api}
-              me={me}
-              friends={friends}
-              addedMe={addedMe}
-              seenBefore={seenBefore}
               onAddBack={onAddBack}
               onFollowed={onFollowed}
               onCore={(p) => openCore(null, p)}
-            />
-          )}
-          {panel === "songs" && (
-            <SongsPanel
-              me={me}
-              songs={mySongs}
-              width={panelW}
             />
           )}
         </div>
@@ -1538,6 +1558,26 @@ function Globe({
         width={Math.min(320, L.w - 96)}
         height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}
         tabRef={(el) => void (R.current.chrome[3] = el)}
+        board={
+          <Leaderboard
+            api={api}
+            me={me}
+            friends={friends}
+            myPost={myPost && landed ? myPost : null}
+            picks={picks}
+            open={chatOn}
+            tick={rankTick}
+            onRank={rank}
+            onOpen={(k) => {
+              setChatOn(false);
+              fly(k);
+            }}
+            onCore={(p) => {
+              setChatOn(false);
+              openCore(null, p);
+            }}
+          />
+        }
       />
 
       {feat !== null && featPost && (
@@ -1560,6 +1600,11 @@ function Globe({
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
+          ranking={
+            feat !== ME && myPost && landed && api.ranks ? (
+              <RankMedals postId={featPost.id} picks={picks} onRank={(n, id) => rank(n, id)} />
+            ) : undefined
+          }
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
           rootRef={(el) => void (R.current.feat = el)}
           backdropRef={(el) => void (R.current.featBack = el)}
