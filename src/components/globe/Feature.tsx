@@ -13,11 +13,13 @@ import type { StorySky } from "./storyVideo";
 import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon } from "./ui";
+import { Eraser, RedoButton } from "./Redo";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
 // a place to report the song or block them. Beside the title: like it, and
-// the notes people left.
+// the notes people left. On your own song today, the arrows on the cover's
+// bottom left are your one redo (Redo.tsx).
 export function Feature({
   post,
   me,
@@ -34,6 +36,8 @@ export function Feature({
   api,
   onBlocked,
   onHide,
+  onRedo,
+  onRedone,
   story,
   rootRef,
   backdropRef,
@@ -54,6 +58,9 @@ export function Feature({
   api: GlobeApi;
   onBlocked(): void;
   onHide?: () => Promise<string | null>;
+  // only on your own song, today, while you still have the redo
+  onRedo?: () => Promise<string | undefined>;
+  onRedone?: () => void;
   story: StoryOf;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
@@ -174,6 +181,30 @@ export function Feature({
     if (flagging) hint.current?.cancel();
   }, [flagging]);
 
+  // the redo: the pencil rubs the cover out while today's song is taken back
+  const eraseClip = useRef<HTMLDivElement>(null);
+  const eraseGhost = useRef<HTMLDivElement>(null);
+  const [erasing, setErasing] = useState(0);
+  const [redoError, setRedoError] = useState<string | null>(null);
+  const taking = useRef<Promise<string | undefined> | null>(null);
+  const redo = () => {
+    if (!onRedo || erasing) return;
+    hint.current?.cancel();
+    setRedoError(null);
+    taking.current = onRedo().catch(() => "Couldn't redo it. Try again.");
+    setErasing((n) => n + 1);
+  };
+  const erased = async () => {
+    const err = await taking.current;
+    taking.current = null;
+    if (err) {
+      // it didn't go through: the cover comes back
+      if (eraseClip.current) eraseClip.current.style.clipPath = "";
+      setErasing(0);
+      setRedoError(err);
+    } else onRedone?.();
+  };
+
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
       <div ref={backdropRef} className="absolute inset-0" />
@@ -230,6 +261,18 @@ export function Feature({
           </div>
         </div>
         <div className="relative">
+          {/* what's left once the pencil's been over it, faintly */}
+          {erasing > 0 && (
+            <div ref={eraseGhost} aria-hidden className="pointer-events-none absolute inset-0 opacity-0">
+              <Cover
+                src={post.artwork_url}
+                seed={post.title}
+                size={cover}
+                className="blur-[3px] grayscale"
+                style={{ borderRadius: radius }}
+              />
+            </div>
+          )}
           {flagging ? (
           <div className="relative overflow-hidden" style={{ width: cover, height: cover, borderRadius: radius }}>
             <Cover
@@ -253,6 +296,7 @@ export function Feature({
             </div>
           </div>
         ) : (
+          <div ref={eraseClip} className={erasing ? "pointer-events-none" : ""}>
           <button
             type="button"
             onClick={tapCover}
@@ -313,9 +357,13 @@ export function Feature({
               </div>
             </div>
           </button>
+          </div>
           )}
+          <Eraser size={cover} clip={eraseClip} ghost={eraseGhost} run={erasing} onErased={erased} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {!flagging && !erasing && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {/* your one redo today, on the bottom left */}
+          {!flagging && !erasing && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>
         {/* "Added to core", a moment over the bottom of the cover */}
         {toast > 0 && (

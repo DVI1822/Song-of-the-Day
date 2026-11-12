@@ -964,17 +964,26 @@ function Globe({
     setLaunching(true);
   };
 
+  // Your one redo a day, from your song's card: the song's taken back while
+  // the pencil rubs its cover out, then the card goes and the paste sheet
+  // comes up for another song.
+  const canRedo = !redoUsed && !launching && !!myPost && myPost.day === todayIn(me.timezone);
   const onRedo = async (post: Post) => {
     const r = await api.deleteTodayPost(post.id);
-    if (r?.error) return r.error;
-    m.current.myLanded = false;
-    m.current.myLock = null;
-    setLanded(false);
-    setMyPost(null);
-    setMySongs((list) => list.filter((p) => p.id !== post.id));
+    return r?.error;
+  };
+  const onRedone = (post: Post) => {
     setRedoUsed(true);
-    closePanel();
-    setCompose(true);
+    afterFeat.current = () => {
+      m.current.myLanded = false;
+      m.current.myLock = null;
+      setLanded(false);
+      setMyPost(null);
+      setMySongs((list) => list.filter((p) => p.id !== post.id));
+      closePanel();
+      setCompose(true);
+    };
+    closeFeat();
   };
 
   const onFollowed = (f: Friend) => {
@@ -1467,8 +1476,6 @@ function Globe({
             <SongsPanel
               me={me}
               songs={mySongs}
-              canRedo={!redoUsed && !launching && myPost?.day === todayIn(me.timezone)}
-              onRedo={onRedo}
               width={panelW}
             />
           )}
@@ -1518,6 +1525,8 @@ function Globe({
           api={api}
           onBlocked={() => window.location.reload()}
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
+          onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
+          onRedone={() => onRedone(featPost)}
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
           rootRef={(el) => void (R.current.feat = el)}
           backdropRef={(el) => void (R.current.featBack = el)}
