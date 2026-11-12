@@ -3,7 +3,9 @@ import type { PlatformLinks } from "./songs";
 export type Profile = {
   id: string;
   username: string;
-  display_name: string;
+  display_name: string; // "First Last", shown around the app
+  first_name?: string | null; // null for people who joined before names were required
+  last_name?: string | null;
   timezone: string;
   created_at: string;
   avatar_url?: string | null; // their picture, if they've chosen one
@@ -81,3 +83,8 @@ export type SongFact = { text: string; about: "song" | "artist"; source?: { name
 // photo: a less-seen photo of the artist from Wikimedia Commons, with who took it
 export type ArtistPhoto = { url: string; width: number; height: number; page: string; credit: string; license: string };
 export type SongFacts = { facts: SongFact[]; photo?: ArtistPhoto | null };
+
+// People who joined before first and last names were required get asked once.
+export function needsFullName(p: Pick<Profile, "first_name" | "last_name">) {
+  return !p.first_name?.trim() || !p.last_name?.trim();
+}

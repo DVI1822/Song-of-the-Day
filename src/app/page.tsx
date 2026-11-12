@@ -7,6 +7,7 @@ import { LegalLinks } from "@/components/Legal";
 import { Shell, buttonClass } from "@/components/Shell";
 import { getGlobe, getSession, sweepPhotos } from "@/lib/data";
 import { isConfigured } from "@/lib/supabase/env";
+import { needsFullName } from "@/lib/types";
 
 export default async function Home() {
   await connection();
@@ -14,7 +15,7 @@ export default async function Home() {
 
   const { supabase, userId, profile } = await getSession();
   if (!userId) return <Landing />;
-  if (!profile) redirect("/welcome");
+  if (!profile || needsFullName(profile)) redirect("/welcome");
 
   const [{ friends, myPost, mySongs, redoUsed, addedMe, activity }] = await Promise.all([
     getGlobe(profile),
