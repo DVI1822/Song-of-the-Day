@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ChatIcon, GlobeTabIcon } from "./Chat";
-import { Medal } from "./Ranks";
+import { TopTrackHand } from "./Ranks";
 import { OpenIcon } from "./Preview";
 import { CoreIcon, LevelsIcon, NoteIcon } from "./Reactions";
 import { MoreIcon } from "./Safety";
@@ -153,7 +153,7 @@ const PAGES: Page[] = [
         text: "Puts their songs on your globe. When they add you back, you're mutual friends.",
       },
       { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Globe", text: "The tab on the right, with the Leaderboard, Chat and Messages inside." },
-      { icon: <span className="flex h-10 w-10 items-center justify-center"><Medal n={1} on size={30} /></span>, name: "Rank 1, 2, 3", text: "Once you've posted, tap 1, 2 or 3 on a friend's song to make it your 1st, 2nd or 3rd today: 3, 2 and 1 points. Change them until midnight. Never your own, and nobody sees who ranked them." },
+      { icon: <span className="flex h-10 w-10 items-center justify-center"><TopTrackHand on size={22} /></span>, name: "Your TopTrack", text: "Once you've posted, tap the hand on the bottom right of a friend's cover to make it your TopTrack today. It lights up coral. One pick a day, never your own, and you can change it until midnight. Each pick is a point for them, and nobody sees who picked whom." },
       { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Leaderboard", text: "Everyone on your globe by points this month. Each morning it adds the day before's votes. The top three get the podium." },
       { icon: <Tab right><ChatIcon size={15} /></Tab>, name: "Chat", text: "Talk with your mutual friends. It starts fresh every midnight, like the songs." },
       {

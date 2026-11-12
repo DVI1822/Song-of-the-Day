@@ -427,7 +427,9 @@ export function MyFacts({
 // you tap.
 // `cover`: the size of the opened song's cover the star sits on; the facts
 // then open over the top half of that cover instead of at the top of the screen
-export function FactsButton({ post, load, cover }: { post: Post; load?: Load; cover?: number }) {
+// side: which bottom corner of the cover the star sits in (left on a friend's
+// song, where the TopTrack hand takes the right)
+export function FactsButton({ post, load, cover, side = "right" }: { post: Post; load?: Load; cover?: number; side?: "left" | "right" }) {
   const [facts, setFacts] = useState<Facts | null>(null);
   const [busy, setBusy] = useState(false);
   const [none, setNone] = useState(false);
@@ -475,7 +477,7 @@ export function FactsButton({ post, load, cover }: { post: Post; load?: Load; co
           document.body,
         )
       )}
-      <div className="absolute bottom-3 right-3 z-[2] flex flex-row-reverse items-center gap-2">
+      <div className={`absolute bottom-3 z-[2] flex items-center gap-2 ${side === "left" ? "left-3 flex-row" : "right-3 flex-row-reverse"}`}>
         <StarButton
           starRef={star}
           pulling={pulling}

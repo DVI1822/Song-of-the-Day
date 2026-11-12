@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Picks, Post, Profile, SavedSong } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Post, Profile, SavedSong } from "@/lib/types";
 import { serverApi, shrinkPhoto, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -33,7 +33,7 @@ import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FriendsTab } from "./Panels";
-import { Leaderboard, RankMedals } from "./Ranks";
+import { Leaderboard, PickHand } from "./Ranks";
 import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -285,7 +285,7 @@ function Globe({
   const [pulling, setPulling] = useState<PanelName | null>(null);
   const [chatOn, setChatOn] = useState(false);
   // your 1st, 2nd and 3rd today (Ranks.tsx); rankTick fetches the board again
-  const [picks, setPicks] = useState<Picks>([null, null, null]);
+  const [myPick, setMyPick] = useState<string | null>(null);
   const [rankTick, setRankTick] = useState(0);
   const welcomeSeen = useWelcomeSeen();
   const [help, setHelp] = useState(false);
@@ -449,36 +449,33 @@ function Globe({
   const closePanel = useCallback(() => setPanelOn(false), []);
 
   // -------------------------------------------------------------------------
-  // Ranking today's songs
+  // Your TopTrack today
   // -------------------------------------------------------------------------
 
   useEffect(() => {
     let on = true;
-    api.ranks?.mine(todayIn(me.timezone)).then((p) => on && setPicks(p)).catch(() => {});
+    api.ranks?.mine(todayIn(me.timezone)).then((p) => on && setMyPick(p)).catch(() => {});
     return () => {
       on = false;
     };
   }, [api, me.timezone]);
 
-  // Give a song a place (or take it back with null, or by tapping the place it
-  // already has). Shows at once; goes back if the server says no.
-  const rank = useCallback(
-    async (n: 1 | 2 | 3, postId: string | null) => {
+  // Make a song your TopTrack (null takes it back). Shows at once; goes back
+  // if the server says no.
+  const choose = useCallback(
+    async (postId: string | null) => {
       if (!api.ranks) return null;
-      const before = picks;
-      const off = postId !== null && before[n - 1] === postId;
-      const next = before.map((p) => (p === postId ? null : p)) as Picks;
-      next[n - 1] = off ? null : postId;
-      setPicks(next);
-      const res = await api.ranks.set(n, off ? null : postId);
+      const before = myPick;
+      setMyPick(postId);
+      const res = await api.ranks.set(postId);
       if (res.error) {
-        setPicks(before);
+        setMyPick(before);
         return res.error;
       }
       setRankTick((t) => t + 1);
       return null;
     },
-    [api, picks],
+    [api, myPick],
   );
 
   const spinTo = useCallback(
@@ -1564,10 +1561,10 @@ function Globe({
             me={me}
             friends={friends}
             myPost={myPost && landed ? myPost : null}
-            picks={picks}
+            pick={myPick}
             open={chatOn}
             tick={rankTick}
-            onRank={rank}
+            onPick={choose}
             onOpen={(k) => {
               setChatOn(false);
               fly(k);
@@ -1600,9 +1597,13 @@ function Globe({
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
-          ranking={
+          pick={
             feat !== ME && myPost && landed && api.ranks ? (
-              <RankMedals postId={featPost.id} picks={picks} onRank={(n, id) => rank(n, id)} />
+              <PickHand
+                picked={myPick === featPost.id}
+                radius={Math.round(0.03 * L.cover)}
+                onPick={(on) => choose(on ? featPost.id : null)}
+              />
             ) : undefined
           }
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}

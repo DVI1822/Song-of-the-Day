@@ -89,9 +89,6 @@ export function needsFullName(p: Pick<Profile, "first_name" | "last_name">) {
   return !p.first_name?.trim() || !p.last_name?.trim();
 }
 
-// Your 1st, 2nd and 3rd today: the post ids, or null where nothing's picked.
-export type Picks = [string | null, string | null, string | null];
-
 // Someone's points on the leaderboard: this month's finished days, and what
 // yesterday's song got. Today's points arrive tomorrow.
 export type Score = { who: string; month: number; last: number };

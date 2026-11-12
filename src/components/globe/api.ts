@@ -26,7 +26,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, MayKnow, Message, Note, Picks, Post, Profile, Reactions, SavedSong, Score, SongFacts } from "@/lib/types";
+import type { Core, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, Score, SongFacts } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -52,7 +52,7 @@ export type GlobeApi = {
   addNote(postId: string, body: string): Promise<{ note?: Note; error?: string }>;
   deleteNote(noteId: string): Promise<{ error?: string }>;
   chat: ChatApi;
-  // ranking today's songs, and the month's leaderboard
+  // your TopTrack pick today, and the month's leaderboard
   ranks?: RankApi;
   // keep this browser's push subscription for the noon and 9 PM nudges
   savePush?(sub: { endpoint: string; p256dh: string; auth: string }): Promise<void>;
@@ -74,26 +74,25 @@ export type ChatApi = {
   listen(on: { add(m: Message): void; gone(id: string): void }): () => void;
 };
 
-// Your top three today and the leaderboard. Picks go through rank_song(),
-// which checks you've posted and the song is on your globe; you can read only
-// your own, and the board is totals only (20261113000000_rankings.sql).
+// Your TopTrack pick today and the leaderboard. Picks go through
+// pick_song(), which checks you've posted and the song is on your globe; you
+// can read only your own, and the board is totals only
+// (20261113000000_rankings.sql, 20261114000000_toptrack_pick.sql).
 export type RankApi = {
-  mine(day: string): Promise<Picks>;
-  set(rank: 1 | 2 | 3, postId: string | null): Promise<{ error?: string }>;
+  mine(day: string): Promise<string | null>;
+  set(postId: string | null): Promise<{ error?: string }>;
   board(): Promise<Score[]>;
 };
 
 const supabaseRanks: RankApi = {
   async mine(day) {
-    const { data } = await createClient().from("votes").select("rank, post_id").eq("day", day);
-    const picks: Picks = [null, null, null];
-    for (const v of data ?? []) if (v.rank >= 1 && v.rank <= 3) picks[v.rank - 1] = v.post_id;
-    return picks;
+    const { data } = await createClient().from("votes").select("post_id").eq("day", day).limit(1);
+    return data?.[0]?.post_id ?? null;
   },
-  async set(rank, postId) {
-    const { error } = await createClient().rpc("rank_song", { p_rank: rank, p_post: postId });
+  async set(postId) {
+    const { error } = await createClient().rpc("pick_song", { p_post: postId });
     if (!error) return {};
-    // the database's own words are written for people (rank_song)
+    // the database's own words are written for people (pick_song)
     return { error: error.code === "P0001" ? error.message : "Couldn't save that. Try again." };
   },
   async board() {

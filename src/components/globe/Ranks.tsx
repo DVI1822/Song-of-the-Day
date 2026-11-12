@@ -1,96 +1,111 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Friend, Picks, Post, Profile, Score } from "@/lib/types";
+import type { Friend, Post, Profile, Score } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { Cover, Face } from "./ui";
 
-// Ranking: once you've posted, you give three of today's songs on your globe
-// your 1st, 2nd and 3rd (never your own). They're worth 3, 2 and 1 points.
-// The medals sit on each friend's song card; the Leaderboard, inside the
-// Globe tab, shows your three picks and everyone's points this month, live.
-// Points start again on the 1st. Who gave whom points is never shown.
+// Your TopTrack: once you've posted, you pick the one song on your globe that
+// hit hardest today (never your own) with the TopTrack hand on the bottom
+// right of its cover. Each pick is a point for that friend. The Leaderboard,
+// inside the Globe tab, shows your pick and everyone's points this month,
+// adding each day's picks the next morning. Who picked whom is never shown.
 
-export const POINTS = [3, 2, 1] as const;
-const PLACE = ["1st", "2nd", "3rd"] as const;
-
-// One drawn medal: an ink ring with the place in it, coral once it's given.
-export function Medal({ n, on, size = 34 }: { n: 1 | 2 | 3; on: boolean; size?: number }) {
+// The raised hand from the TopTrack logo (Wordmark.tsx), drawn with an ink
+// outline: paper white, or coral once it's your pick.
+export function TopTrackHand({ on, size = 20 }: { on: boolean; size?: number }) {
+  const fill = on ? "#ff5e57" : "#fffdf6";
+  const p = { fill, stroke: "#0d2a3f", strokeWidth: 3.4, strokeLinejoin: "round" as const };
   return (
-    <svg aria-hidden width={size} height={size} viewBox="0 0 34 34" className="flex-none overflow-visible">
-      {on && <circle cx="18.5" cy="19" r="13.5" fill="#0d2a3f" opacity="0.9" />}
-      <path
-        d="M17 3.6c7.6-.2 13.5 5.6 13.4 13.2-.1 7.5-6 13.6-13.6 13.6C9.3 30.4 3.5 24.6 3.6 17 3.7 9.6 9.6 3.8 17 3.6Z"
-        fill={on ? "#ff5e57" : "rgba(255,255,255,0.7)"}
-        stroke="#0d2a3f"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      {on && <path d="M9.5 11.5c1.6-2.2 3.8-3.4 6.4-3.7" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity="0.8" />}
-      <text
-        x="17"
-        y="22.3"
-        textAnchor="middle"
-        fontSize="15"
-        fontWeight="700"
-        fill={on ? "#fff" : "#0d2a3f"}
-        style={{ fontFamily: "var(--font-bubble)" }}
-      >
-        {n}
-      </text>
+    <svg aria-hidden width={size} height={size * 1.18} viewBox="20 6 58 106" className="flex-none overflow-visible">
+      <rect {...p} x="35" y="78" width="27" height="30" />
+      <rect {...p} x="27" y="11" width="13.5" height="50" rx="6.75" />
+      <rect {...p} x="62" y="47" width="10.5" height="25" rx="5.25" />
+      <rect {...p} x="51.5" y="44" width="11" height="28" rx="5.5" />
+      <rect {...p} x="40.5" y="42" width="11" height="30" rx="5.5" />
+      <path {...p} d="M27 50 V72 C27 80 33 86 41 86 H60 C68 86 72.5 80 72.5 72 V64 Z" />
+      <path {...p} d="M24 66 C24 60 30 58 36 60 L58 64 C63 65 64 72 59 73 L36 74 C29 74 24 72 24 66 Z" />
+      <path d="M30.5 22 H37" stroke="#0d2a3f" strokeWidth={3.4} strokeLinecap="round" fill="none" />
     </svg>
   );
 }
 
-// The three medals on a friend's song card. Tap one to give the song that
-// place; tap the one it already has to take it back. Another song holding
-// that place steps off.
-export function RankMedals({
-  postId,
-  picks,
-  onRank,
+// The hand on the bottom right of a friend's cover. Tap it to make the song
+// your TopTrack today: the hand jumps, coral rings ripple out, the cover's
+// rim flashes coral and "My TopTrack" floats up. It stays lit after. Tap it
+// again to take it back. Picking another song moves your pick there.
+export function PickHand({
+  picked,
+  radius,
+  onPick,
 }: {
-  postId: string;
-  picks: Picks;
-  onRank(rank: 1 | 2 | 3, postId: string): Promise<string | null>;
+  picked: boolean;
+  radius: number; // the cover's corners, for the coral flash round its rim
+  onPick(on: boolean): Promise<string | null>;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [pop, setPop] = useState<number | null>(null);
-  const tap = async (n: 1 | 2 | 3) => {
+  const [burst, setBurst] = useState(0);
+  const tap = async () => {
     setError(null);
-    if (picks[n - 1] !== postId) setPop(n);
-    const e = await onRank(n, postId);
-    if (e) setError(e);
+    if (!picked) setBurst((b) => b + 1);
+    const e = await onPick(!picked);
+    if (e) {
+      setError(e);
+      setTimeout(() => setError(null), 3200);
+    }
   };
-  const mine = picks.indexOf(postId);
   return (
-    <div className="relative flex flex-none flex-col items-end">
-      <div className="flex items-center gap-0.5" role="group" aria-label="Rank this song">
-        {([1, 2, 3] as const).map((n) => {
-          const on = mine === n - 1;
-          return (
-            <button
-              key={n}
-              type="button"
-              onClick={() => tap(n)}
-              aria-pressed={on}
-              aria-label={on ? `Your ${PLACE[n - 1]} today. Tap to take it back` : `Rank it ${PLACE[n - 1]}, ${POINTS[n - 1]} points`}
-              className="flex h-11 w-[38px] items-center justify-center"
+    <>
+      {/* the cover's rim flashing coral */}
+      {burst > 0 && picked && (
+        <span
+          key={`rim${burst}`}
+          aria-hidden
+          data-motion
+          className="pointer-events-none absolute inset-0 z-[2]"
+          style={{ borderRadius: radius, animation: "pick-rim 1.4s ease-out both" }}
+        />
+      )}
+      <div className="absolute bottom-3 right-3 z-[3]">
+        {burst > 0 && picked && (
+          <span key={`fx${burst}`} aria-hidden data-motion className="pointer-events-none absolute inset-0">
+            <span className="absolute -inset-1 rounded-full border-[2.5px] border-coral" style={{ animation: "pick-ring .9s ease-out .15s both" }} />
+            <span className="absolute -inset-1 rounded-full border-[2px] border-card-ink" style={{ animation: "pick-ring .9s ease-out .3s both" }} />
+            <span
+              className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-full border-[1.8px] border-card-ink bg-coral px-2.5 py-0.5 font-bubble text-[13px] font-bold text-white shadow-[2px_2px_0_#0d2a3f]"
+              style={{ animation: "pick-label 1.9s ease-out .25s both" }}
             >
-              <span
-                key={on && pop === n ? "pop" : "still"}
-                data-motion
-                className="block"
-                style={on && pop === n ? { animation: "medal-pop .5s cubic-bezier(.2,.9,.3,1.4)" } : undefined}
-              >
-                <Medal n={n} on={on} size={32} />
-              </span>
-            </button>
-          );
-        })}
+              My TopTrack!
+            </span>
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={tap}
+          aria-pressed={picked}
+          aria-label={picked ? "Your TopTrack today. Tap to take it back" : "Make this your TopTrack today"}
+          className="relative flex h-11 w-11 items-center justify-center rounded-full border-[1.8px] border-card-ink transition-colors duration-300"
+          style={{
+            background: picked ? "#ff5e57" : "rgba(255,253,246,0.94)",
+            boxShadow: picked ? "0 0 0 4px rgba(255,94,87,0.35), 2px 3px 0 #0d2a3f" : "0 4px 14px -6px rgba(13,42,63,0.5)",
+          }}
+        >
+          <span
+            key={`hand${burst}`}
+            data-motion
+            className="block"
+            style={burst > 0 && picked ? { animation: "pick-hand .8s cubic-bezier(.2,.9,.3,1.3) both" } : undefined}
+          >
+            <TopTrackHand on={false} size={23} />
+          </span>
+        </button>
+        {error && (
+          <div className="absolute bottom-full right-0 mb-2 w-[200px] rounded-xl bg-white/95 px-2.5 py-1.5 text-right text-[11px] leading-snug text-accent-deep shadow">
+            {error}
+          </div>
+        )}
       </div>
-      {error && <div className="absolute right-1 top-full z-10 w-[200px] text-right text-[11px] leading-snug text-accent-deep">{error}</div>}
-    </div>
+    </>
   );
 }
 
@@ -105,10 +120,10 @@ export function Leaderboard({
   me,
   friends,
   myPost,
-  picks,
+  pick,
   open,
   tick,
-  onRank,
+  onPick,
   onOpen,
   onCore,
 }: {
@@ -116,14 +131,16 @@ export function Leaderboard({
   me: Profile;
   friends: Friend[];
   myPost: Post | null; // you rank once you've posted
-  picks: Picks;
+  pick: string | null; // the post you made your TopTrack today
   open: boolean;
-  tick: number; // goes up when your own picks change, to fetch again
-  onRank(rank: 1 | 2 | 3, postId: string | null): Promise<string | null>;
+  tick: number; // goes up when your pick changes, to fetch again
+  onPick(postId: string | null): Promise<string | null>;
   onOpen(k: number): void; // fly to a friend's song
   onCore(p: Profile): void;
 }) {
   const [scores, setScores] = useState<Score[] | null>(api.ranks ? null : []);
+  // the board covers finished days, so on the 1st it still shows last month
+  const [month] = useState(() => new Date(Date.now() - 86_400_000).toLocaleString(undefined, { month: "long" }));
 
   // live: fetched on open, after your own picks, and every 20s while open
   useEffect(() => {
@@ -154,54 +171,43 @@ export function Leaderboard({
   const podium = anyPoints ? rows.slice(0, 3).filter((r) => r.month > 0) : [];
 
   const posts = new Map(friends.flatMap((f, k) => (f.post ? [[f.post.id, { f, k, post: f.post }] as const] : [])));
-  // the board covers finished days, so on the 1st it still shows last month
-  const month = new Date(Date.now() - 86_400_000).toLocaleString(undefined, { month: "long" });
+  const got = pick ? posts.get(pick) : null;
 
   return (
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
-      <Kicker>Your top three today</Kicker>
+      <Kicker>Your TopTrack today</Kicker>
       {!myPost ? (
-        <div className="px-2 pb-2 text-[13px] leading-snug text-muted">Post your song, then rank three of today&apos;s from your globe.</div>
+        <div className="px-2 pb-2 text-[13px] leading-snug text-muted">Post your song, then pick the one on your globe that hit hardest.</div>
+      ) : got ? (
+        <div className="flex h-[52px] items-center gap-2.5 pb-1 pl-1">
+          <TopTrackHand on size={22} />
+          <button
+            type="button"
+            onClick={() => onOpen(got.k)}
+            aria-label={`Open ${got.f.display_name}'s song, ${got.post.title}`}
+            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          >
+            <Cover src={got.post.artwork_url} seed={got.post.title} size={32} />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[13px] font-semibold">{got.post.title}</span>
+              <span className="truncate text-[11px] text-muted">{got.f.display_name}</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onPick(null)}
+            aria-label="Take back your TopTrack"
+            className="flex h-11 w-9 flex-none items-center justify-center text-muted"
+          >
+            <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
       ) : (
-        <div className="flex flex-col gap-0.5 pb-1">
-          {([1, 2, 3] as const).map((n) => {
-            const got = picks[n - 1] ? posts.get(picks[n - 1]!) : null;
-            return (
-              <div key={n} className="flex h-[48px] items-center gap-2.5 pl-1">
-                <Medal n={n} on={Boolean(got)} size={30} />
-                {got ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onOpen(got.k)}
-                      aria-label={`Open ${got.f.display_name}'s song, ${got.post.title}`}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                    >
-                      <Cover src={got.post.artwork_url} seed={got.post.title} size={30} />
-                      <span className="flex min-w-0 flex-col">
-                        <span className="truncate text-[13px] font-semibold">{got.post.title}</span>
-                        <span className="truncate text-[11px] text-muted">{got.f.display_name}</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRank(n, null)}
-                      aria-label={`Take back your ${PLACE[n - 1]}`}
-                      className="flex h-11 w-9 flex-none items-center justify-center text-muted"
-                    >
-                      <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-                        <path d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-[12px] text-muted">
-                    {POINTS[n - 1]} {POINTS[n - 1] === 1 ? "point" : "points"} · tap {n} on a friend&apos;s song
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-2.5 px-1 pb-2 text-[12px] leading-snug text-muted">
+          <TopTrackHand on={false} size={18} />
+          Tap the hand on a friend&apos;s song to make it your TopTrack.
         </div>
       )}
 
@@ -232,7 +238,7 @@ export function Leaderboard({
             </button>
           ))}
           <p className="px-2 pt-2 text-[11px] leading-snug text-muted">
-            1st is 3 points, 2nd is 2, 3rd is 1. Points land each morning for the day before. Nobody sees who ranked them.
+            Each time someone makes your song their TopTrack, you get a point. Points land each morning for the day before. Nobody sees who picked whom.
           </p>
         </>
       )}
@@ -254,7 +260,7 @@ function Podium({ rows, meId, onCore }: { rows: Row[]; meId: string; onCore(p: P
             key={r.p.id}
             type="button"
             onClick={() => onCore(r.p)}
-            aria-label={`${PLACE[n - 1]}: ${r.p.id === meId ? "You" : r.p.display_name}, ${r.month} points`}
+            aria-label={`${["1st", "2nd", "3rd"][n - 1]}: ${r.p.id === meId ? "You" : r.p.display_name}, ${r.month} points`}
             className="flex w-[72px] flex-col items-center gap-1"
           >
             {n === 1 && <Crown />}

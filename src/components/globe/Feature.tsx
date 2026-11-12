@@ -38,7 +38,7 @@ export function Feature({
   onHide,
   onRedo,
   onRedone,
-  ranking,
+  pick,
   story,
   rootRef,
   backdropRef,
@@ -62,8 +62,9 @@ export function Feature({
   // only on your own song, today, while you still have the redo
   onRedo?: () => Promise<string | undefined>;
   onRedone?: () => void;
-  // the 1st, 2nd and 3rd medals, on a friend's song once you've posted (Ranks.tsx)
-  ranking?: React.ReactNode;
+  // the TopTrack hand, on a friend's song once you've posted (Ranks.tsx); it
+  // takes the cover's bottom right, and the facts star moves to the left
+  pick?: React.ReactNode;
   story: StoryOf;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
@@ -350,7 +351,9 @@ export function Feature({
           )}
           <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} side={pick ? "left" : "right"} />}
+          {/* your TopTrack pick, on the bottom right of a friend's cover */}
+          {!flagging && !sinking && pick}
           {/* your one redo today, on the bottom left */}
           {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>
@@ -380,7 +383,6 @@ export function Feature({
               <div className="min-w-0 flex-1 truncate text-[15px] text-muted">
                 {[post.artist, post.album].filter(Boolean).join(" · ")}
               </div>
-              {ranking && <div className="-my-2 -mr-1.5">{ranking}</div>}
             </div>
           </div>
           <div className="-my-1.5">
