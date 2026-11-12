@@ -98,7 +98,7 @@ export function RankMedals({
 // The Leaderboard, the first of the Globe tab's two sides.
 // ---------------------------------------------------------------------------
 
-type Row = { p: Profile; month: number; today: number; k: number | null };
+type Row = { p: Profile; month: number; last: number; k: number | null };
 
 export function Leaderboard({
   api,
@@ -140,10 +140,10 @@ export function Leaderboard({
 
   const byId = new Map((scores ?? []).map((s) => [s.who, s]));
   const people: Row[] = [
-    { p: me, k: null, month: 0, today: 0 },
-    ...friends.map((f, k) => ({ p: f as Profile, k, month: 0, today: 0, hidden: f.hidden })).filter((r) => !r.hidden),
-  ].map((r) => ({ ...r, month: byId.get(r.p.id)?.month ?? 0, today: byId.get(r.p.id)?.today ?? 0 }));
-  const rows = people.sort((a, b) => b.month - a.month || b.today - a.today || a.p.display_name.localeCompare(b.p.display_name));
+    { p: me, k: null, month: 0, last: 0 },
+    ...friends.map((f, k) => ({ p: f as Profile, k, month: 0, last: 0, hidden: f.hidden })).filter((r) => !r.hidden),
+  ].map((r) => ({ ...r, month: byId.get(r.p.id)?.month ?? 0, last: byId.get(r.p.id)?.last ?? 0 }));
+  const rows = people.sort((a, b) => b.month - a.month || b.last - a.last || a.p.display_name.localeCompare(b.p.display_name));
   // shared places for equal points: 1, 2, 2, 4
   const place = (i: number) => {
     let j = i;
@@ -154,8 +154,8 @@ export function Leaderboard({
   const podium = anyPoints ? rows.slice(0, 3).filter((r) => r.month > 0) : [];
 
   const posts = new Map(friends.flatMap((f, k) => (f.post ? [[f.post.id, { f, k, post: f.post }] as const] : [])));
-  const now = new Date();
-  const month = now.toLocaleString(undefined, { month: "long" });
+  // the board covers finished days, so on the 1st it still shows last month
+  const month = new Date(Date.now() - 86_400_000).toLocaleString(undefined, { month: "long" });
 
   return (
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
@@ -212,7 +212,7 @@ export function Leaderboard({
         <>
           {podium.length > 0 && <Podium rows={podium} meId={me.id} onCore={onCore} />}
           {!anyPoints && (
-            <div className="px-2 pb-2 text-[13px] leading-snug text-muted">No points yet this month. Rank today&apos;s songs to get it going.</div>
+            <div className="px-2 pb-2 text-[13px] leading-snug text-muted">No points yet this month. Today&apos;s picks count tomorrow morning.</div>
           )}
           {rows.map((r, i) => (
             <button
@@ -227,12 +227,12 @@ export function Leaderboard({
               </span>
               <Face p={r.p} size={32} />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">{r.p.id === me.id ? "You" : r.p.display_name}</span>
-              {r.today > 0 && <span className="flex-none text-[11px] font-semibold tabular-nums text-accent">+{r.today} today</span>}
+              {r.last > 0 && <span className="flex-none text-[11px] font-semibold tabular-nums text-accent">+{r.last} yesterday</span>}
               <span className="w-9 flex-none text-right font-bubble text-[17px] font-semibold tabular-nums">{r.month}</span>
             </button>
           ))}
           <p className="px-2 pt-2 text-[11px] leading-snug text-muted">
-            1st is 3 points, 2nd is 2, 3rd is 1. Nobody sees who ranked them.
+            1st is 3 points, 2nd is 2, 3rd is 1. Points land each morning for the day before. Nobody sees who ranked them.
           </p>
         </>
       )}

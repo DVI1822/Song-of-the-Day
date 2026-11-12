@@ -372,15 +372,10 @@ const demoApi: GlobeApi = {
     },
     async board() {
       await new Promise((r) => setTimeout(r, 250));
-      const given = new Map<string, number>();
-      DEMO_PICKS.forEach((id, i) => {
-        const f = id && FRIENDS.find((x) => x.post?.id === id);
-        if (f) given.set(f.id, (given.get(f.id) ?? 0) + 3 - i);
-      });
       return FRIENDS.slice(0, 9).map((f, j) => {
-        const today = Math.floor(rnd(j + 40, 5) * 6) + (given.get(f.id) ?? 0);
-        return { who: f.id, month: 4 + Math.floor(rnd(j + 7, 2) * 38) + today, today };
-      }).concat([{ who: ME.id, month: 21, today: 4 }]);
+        const last = Math.floor(rnd(j + 40, 5) * 6);
+        return { who: f.id, month: 4 + Math.floor(rnd(j + 7, 2) * 38) + last, last };
+      }).concat([{ who: ME.id, month: 21, last: 4 }]);
     },
   },
   async loadCore(id) {

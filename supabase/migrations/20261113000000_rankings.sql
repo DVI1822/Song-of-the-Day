@@ -7,7 +7,7 @@
 --
 -- Votes are anonymous: you can read only your own picks. Everyone's totals
 -- come from leaderboard(), which adds the points up without saying who gave
--- them. Points count for the calendar month and start again on the 1st.
+-- them, once each day is over. Points count for the calendar month and start again on the 1st.
 -- If someone redoes their song, the votes on the old one go with it.
 --
 -- Run this once in the Supabase SQL Editor. It's safe to run again.
@@ -87,10 +87,13 @@ $$;
 revoke all on function public.rank_song(int, uuid) from public, anon;
 grant execute on function public.rank_song(int, uuid) to authenticated;
 
--- Points this month (from the 1st of your own month) and today, for you
--- and the people on your globe. Only totals; never who gave them.
+-- Points this month (from the 1st of the month your yesterday was in) for you and the
+-- people on your globe, counting finished days only: today's votes land the
+-- next morning, when the poster's day is over. last_points is what they got
+-- for yesterday's song. Only totals; never who gave them.
+drop function if exists public.leaderboard();
 create or replace function public.leaderboard()
-returns table (who uuid, month_points int, today_points int)
+returns table (who uuid, month_points int, last_points int)
 language sql stable security definer set search_path = '' as $$
   with people as (
     select auth.uid() as id
@@ -99,15 +102,18 @@ language sql stable security definer set search_path = '' as $$
   ), shown as (
     select id from people where id not in (select public.hidden_people())
   ), since as (
-    select date_trunc('month', public.current_day(auth.uid()))::date as d
+    -- the month of your yesterday, so on the 1st the board still shows how
+    -- last month ended until the first new day is in
+    select date_trunc('month', public.current_day(auth.uid()) - 1)::date as d
   )
   select v.poster_id,
          sum(4 - v.rank)::int,
-         coalesce(sum(4 - v.rank) filter (where p.day = public.current_day(v.poster_id)), 0)::int
+         coalesce(sum(4 - v.rank) filter (where p.day = public.current_day(v.poster_id) - 1), 0)::int
   from public.votes v
   join public.posts p on p.id = v.post_id
   where v.poster_id in (select id from shown)
-    and v.day >= (select d from since)
+    and p.day >= (select d from since)
+    and p.day < public.current_day(v.poster_id)
   group by v.poster_id;
 $$;
 

@@ -98,10 +98,10 @@ const supabaseRanks: RankApi = {
   },
   async board() {
     const { data } = await createClient().rpc("leaderboard");
-    return ((data ?? []) as { who: string; month_points: number; today_points: number }[]).map((r) => ({
+    return ((data ?? []) as { who: string; month_points: number; last_points: number }[]).map((r) => ({
       who: r.who,
       month: r.month_points,
-      today: r.today_points,
+      last: r.last_points,
     }));
   },
 };

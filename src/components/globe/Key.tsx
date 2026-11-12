@@ -154,7 +154,7 @@ const PAGES: Page[] = [
       },
       { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Globe", text: "The tab on the right, with the Leaderboard, Chat and Messages inside." },
       { icon: <span className="flex h-10 w-10 items-center justify-center"><Medal n={1} on size={30} /></span>, name: "Rank 1, 2, 3", text: "Once you've posted, tap 1, 2 or 3 on a friend's song to make it your 1st, 2nd or 3rd today: 3, 2 and 1 points. Change them until midnight. Never your own, and nobody sees who ranked them." },
-      { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Leaderboard", text: "Everyone on your globe by points this month, live. The top three get the podium. It starts over on the 1st." },
+      { icon: <Tab right><GlobeTabIcon /></Tab>, name: "Leaderboard", text: "Everyone on your globe by points this month. Each morning it adds the day before's votes. The top three get the podium." },
       { icon: <Tab right><ChatIcon size={15} /></Tab>, name: "Chat", text: "Talk with your mutual friends. It starts fresh every midnight, like the songs." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full px-1.5 py-1 text-[9px] font-semibold" style={glass(false)}>Message</span></span>,
