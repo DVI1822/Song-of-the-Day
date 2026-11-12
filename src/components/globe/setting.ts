@@ -1023,7 +1023,9 @@ export class SettingScene {
       }
       this.lay = this.kind === "city" ? cityLayout(f.w, f.h, 7) : mountainLayout(f.w, f.h, 11);
       this.pix =
-        this.kind === "mountain" ? pixComps().map((c, i) => pixLayout(f.w, f.h, 11 + i * 7, pixStyle(), c)) : null;
+        this.kind === "mountain" && this.art === "pixel"
+          ? pixComps().map((c, i) => pixLayout(f.w, f.h, 11 + i * 7, pixStyle(), c))
+          : null;
       this.key = "";
     }
     // repaint the still layer only when the light has really changed
@@ -1051,8 +1053,12 @@ export class SettingScene {
       else if (this.pix && this.art === "line")
         this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
       else if (this.pix) this.pano = paintPano(this.pix, this.L, f.season);
-      if (process.env.NODE_ENV !== "production")
+      if (process.env.NODE_ENV !== "production") {
         (window as unknown as { __pano?: LinePano | null }).__pano = this.lpano;
+        // dev only: the whole loop laid flat, moving things drawn at time t
+        (window as unknown as { __panoLive?: (t: number) => HTMLCanvasElement | null }).__panoLive = (t) =>
+          this.flat(t);
+      }
       if (!this.pix && !wk) this.aura(g, f);
       this.panoKey = "";
     }
@@ -1082,9 +1088,25 @@ export class SettingScene {
     this.frame(dt, f);
   }
 
+  private flat(t: number): HTMLCanvasElement | null {
+    const lp = this.lpano;
+    if (!lp || !this.L) return null;
+    const cv = document.createElement("canvas");
+    cv.width = Math.ceil(lp.W * lp.scale);
+    cv.height = Math.ceil(lp.H * lp.scale);
+    const g = cv.getContext("2d")!;
+    for (const l of lp.layers) g.drawImage(l, 0, lp.top * lp.scale, lp.W * lp.scale, (lp.H - lp.top) * lp.scale);
+    g.setTransform(lp.scale, 0, 0, lp.scale, 0, 0);
+    if (this.wpano) liveWorld(g, this.wpano, [0, 0, 0], t);
+    else if (this.pix)
+      this.pix.forEach((lay, i) => liveLines(g, lay, lp.I, this.L!, t + i * 23, i * lay.W * PIX, lp.W, i === 0));
+    return cv;
+  }
+
   // the line-drawn worlds beyond Montana
   private world(): WorldKind | null {
     if (this.kind === "country") return "farm";
+    if (this.kind === "mountain") return this.art === "pixel" ? null : "mountain";
     if (
       this.kind === "coast" ||
       this.kind === "city" ||

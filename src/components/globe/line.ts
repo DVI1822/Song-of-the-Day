@@ -1,6 +1,6 @@
 import type { Season } from "./scene";
 import type { C, Light } from "./setting";
-import { PARALLAX, PIX, SLOPE, hash, noise1, type PixLayout } from "./pixel";
+import { PIX, SLOPE, hash, noise1, type PixLayout } from "./pixel";
 
 // Where you are, as a simple ink drawing: thin hand-drawn black lines over
 // flat fills, so the real sky and weather do the colour and the mood. The
@@ -646,8 +646,13 @@ export function paintLinePano(lays: PixLayout[], L: Light, season: Season, style
   return { W: PW, H, top, scale, layers, lays, I };
 }
 
+// how far each layer slides as the globe turns (far, middle, near): well
+// under the globe's own surface speed, so the world drifts by slowly behind
+// it while still following every turn and drag
+export const LINE_PARALLAX = [0.1, 0.2, 0.36];
+
 export function lineOffset(pano: LinePano, yaw: number, R: number, k: number) {
-  const px = -yaw * R * PARALLAX[k];
+  const px = -yaw * R * LINE_PARALLAX[k];
   return ((px % pano.W) + pano.W) % pano.W;
 }
 
