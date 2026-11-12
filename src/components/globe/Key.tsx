@@ -165,10 +165,9 @@ const PAGES: Page[] = [
   },
   {
     tab: "Core",
-    title: "Your core",
+    title: "My Core",
     rows: [
-      { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "Core", text: "Flies into the middle of your globe, where your profile lives." },
-      { icon: <Tab><TabIcon name="songs" /></Tab>, name: "My songs", text: "Every song you've ever picked, newest first." },
+      { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "My Core", text: "Flies into the middle of your globe, where your profile lives: every song you've ever picked, by month, and the ones you saved." },
       { icon: <Round><RedoArrows /></Round>, name: "One redo a day", text: "Changed your mind? Open your song and tap the arrows on its cover. It gets sucked away and you pick another, once a day." },
       { icon: <Round><CalendarIcon /></Round>, name: "Your archive", text: "At midnight your song moves into your core, sorted into a playlist for each month." },
       { icon: <Half><CoreIcon on /></Half>, name: "Saved", text: "Songs you saved from friends, kept in your core." },

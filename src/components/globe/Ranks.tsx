@@ -156,7 +156,6 @@ export function Leaderboard({
   const posts = new Map(friends.flatMap((f, k) => (f.post ? [[f.post.id, { f, k, post: f.post }] as const] : [])));
   const now = new Date();
   const month = now.toLocaleString(undefined, { month: "long" });
-  const resets = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleString(undefined, { month: "short", day: "numeric" });
 
   return (
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
@@ -206,9 +205,7 @@ export function Leaderboard({
         </div>
       )}
 
-      <Kicker>
-        {month} · resets {resets}
-      </Kicker>
+      <Kicker>{month}</Kicker>
       {scores === null ? (
         <div className="px-2 py-3 text-[13px] text-muted">Counting…</div>
       ) : (

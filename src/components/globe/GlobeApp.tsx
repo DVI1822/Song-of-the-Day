@@ -32,7 +32,7 @@ import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
-import { FriendsTab, SongsPanel } from "./Panels";
+import { FriendsTab } from "./Panels";
 import { Leaderboard, RankMedals } from "./Ranks";
 import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
@@ -77,7 +77,7 @@ export function GlobeApp(props: Props) {
 }
 
 const ME = 99; // your own tile's slot; friends take 0..89
-type PanelName = "friends" | "songs";
+type PanelName = "friends";
 type TileInfo = { k: number; wait: boolean; art: string; label: string };
 type TileEls = {
   box: HTMLDivElement | null;
@@ -1436,7 +1436,6 @@ function Globe({
         {(
           [
             ["friends", "Friends", 104],
-            ["songs", "My songs", 112],
           ] as const
         ).map(([name, label, height]) => (
           <PullTab
@@ -1481,13 +1480,13 @@ function Globe({
         <PullTab
           pull={{ side: "left", open: false, travel: 70, onOpen: () => openCore(null) }}
           onClick={() => openCore(null)}
-          aria-label="Core, open your profile"
-          className="box-border flex h-[84px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
+          aria-label="My Core: your songs and profile"
+          className="box-border flex h-[104px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
           style={glass(darkOn)}
         >
           <SignalCore className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
-            Core
+            My Core
           </span>
         </PullTab>
       </div>
@@ -1510,7 +1509,7 @@ function Globe({
         >
           <div className="flex items-center py-1.5 pl-[18px] pr-1.5 pt-3">
             <h2 className="display text-lg">
-              {panel === "friends" ? "Friends" : "My songs"}
+              Friends
             </h2>
             <button type="button" onClick={closePanel} aria-label="Close" className="ml-auto flex h-11 w-11 items-center justify-center">
               <BackIcon />
@@ -1530,13 +1529,6 @@ function Globe({
               onAddBack={onAddBack}
               onFollowed={onFollowed}
               onCore={(p) => openCore(null, p)}
-            />
-          )}
-          {panel === "songs" && (
-            <SongsPanel
-              me={me}
-              songs={mySongs}
-              width={panelW}
             />
           )}
         </div>

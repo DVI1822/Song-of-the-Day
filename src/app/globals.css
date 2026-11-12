@@ -334,8 +334,7 @@ body {
   box-shadow: 4px 6px 0 rgba(29, 36, 51, 0.22) !important;
 }
 [data-ink] button[aria-label="Friends"]::after,
-[data-ink] button[aria-label="My songs"]::after,
-[data-ink] button[aria-label^="Core"]::after { border-left: 0; }
+[data-ink] button[aria-label^="My Core"]::after { border-left: 0; }
 [data-ink] button[aria-label="Globe"]::after { border-right: 0; }
 /* the add button: coral with a fat ink line and a hard drawn shadow */
 [data-ink] button[aria-label="Add today's song"] {
