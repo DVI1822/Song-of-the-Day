@@ -64,6 +64,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <meta name="apple-mobile-web-app-title" content="TopTrack" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* most album covers come from Spotify: start the handshake before the page asks */}
+        <link rel="preconnect" href="https://i.scdn.co" />
       </head>
       <body className="min-h-full">
         {/* what's playing carries on from page to page */}

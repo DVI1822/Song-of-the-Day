@@ -17,7 +17,7 @@ export function TodayCard({ post, who, timezone }: { post: Post; who: string; ti
         onClick={() => setOpen(true)}
         className="flex items-center gap-3 rounded-[20px] border border-line p-2.5 text-left"
       >
-        <Artwork src={post.artwork_url} alt="" className="h-[52px] w-[52px] flex-none rounded-[14px]" />
+        <Artwork src={post.artwork_url} alt="" size={52} className="h-[52px] w-[52px] flex-none rounded-[14px]" />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-[11px] text-card-muted">Today · {time}</span>
           <span className="truncate text-[15px] font-semibold">{post.title}</span>
