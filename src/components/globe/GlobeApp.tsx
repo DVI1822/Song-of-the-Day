@@ -34,6 +34,7 @@ import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FriendsTab } from "./Panels";
 import { BoardTab, Leaderboard } from "./Ranks";
+import { NewsCard } from "./News";
 import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -1419,6 +1420,7 @@ function Globe({
       {welcomeSeen && !help && !tour && !keyOn && <InstallCard />}
       {welcomeSeen && !help && !tour && !keyOn && <LocateCard />}
       {welcomeSeen && !help && !tour && !keyOn && <NotifyCard api={api} />}
+      {welcomeSeen && !help && !tour && !keyOn && <NewsCard />}
 
       {/* the drawn look's wobbly ink edge (globals.css, [data-ink]) */}
       <svg aria-hidden width="0" height="0" className="absolute">

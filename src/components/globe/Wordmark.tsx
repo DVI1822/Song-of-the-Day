@@ -31,7 +31,9 @@ export function Wordmark({ size = 31 }: { size?: number }) {
   const id = "wm" + useId().replace(/[^a-zA-Z0-9]/g, "");
   return (
     <svg
-      viewBox="0 -6 460 126"
+      // the drawing runs from x 12 to 382, so the box is shifted to put its
+      // middle (197) dead centre and the name sits centred under the date
+      viewBox="-33 -6 460 126"
       width={size * 6.6}
       height={size * 6.6 * (126 / 460)}
       aria-label="TopTrack"
