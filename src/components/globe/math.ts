@@ -1,3 +1,4 @@
+import { coverAt } from "@/lib/cover";
 // The Globe's geometry, light and physics. Plain functions so the render
 // loop can call them every frame without React in the way.
 
@@ -446,6 +447,23 @@ export function paintedCover(seed: string) {
   return `radial-gradient(circle at 62% 30%, ${sun} 11%, rgba(255,255,255,0) 12%), radial-gradient(ellipse 60% 45% at 25% 104%, ${hill} 99%, rgba(0,0,0,0) 100%), linear-gradient(165deg, ${a}, ${b})`;
 }
 
-export function coverBackground(artworkUrl: string | null | undefined, seed: string) {
-  return artworkUrl ? `url("${artworkUrl.replace(/"/g, "%22")}")` : paintedCover(seed);
+// (globe tiles: 600 pixels is plenty, even zoomed in on one)
+export function coverBackground(artworkUrl: string | null | undefined, seed: string, px = 200) {
+  const url = coverAt(artworkUrl, px);
+  return url ? `url("${url.replace(/"/g, "%22")}")` : paintedCover(seed);
+}
+
+// A full-screen layer with nothing on it (no rain, no ripples): clear it once
+// and then leave it alone. Clearing an empty canvas every frame still hands
+// the phone a fresh picture to blend over the whole screen, sixty times a
+// second, for nothing. True means: it's already blank, skip drawing.
+const blankLayers = new WeakSet<HTMLCanvasElement>();
+export function stayBlank(cv: HTMLCanvasElement, empty: boolean) {
+  if (!empty) {
+    blankLayers.delete(cv);
+    return false;
+  }
+  if (blankLayers.has(cv)) return true;
+  blankLayers.add(cv); // the caller clears it this one time
+  return false;
 }

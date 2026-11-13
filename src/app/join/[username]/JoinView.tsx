@@ -64,6 +64,7 @@ export function JoinView({
                       {typeof t === "object" ? (
                         <Artwork
                           src={t.artwork_url}
+                          size={72}
                           alt={`${t.title} by ${t.artist}`}
                           className="h-full w-full rounded-[19px] shadow-[0_10px_24px_-12px_rgba(13,42,63,0.5)]"
                         />
@@ -93,7 +94,7 @@ export function JoinView({
 
         {today && !mine && (
           <div className="mt-5 flex w-full max-w-[300px] items-center gap-3 rounded-[22px] border border-line bg-white/70 p-2.5 text-left backdrop-blur">
-            <Artwork src={today.artwork_url} alt="" className="h-12 w-12 flex-none rounded-[13px]" />
+            <Artwork src={today.artwork_url} alt="" size={48} className="h-12 w-12 flex-none rounded-[13px]" />
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                 {first}&apos;s song today

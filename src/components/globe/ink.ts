@@ -10,7 +10,7 @@
 // [data-ink]). The lines "boil" a few times a second, the way hand-drawn
 // animation does.
 
-import { camV, PERSPECTIVE, type Camera, type V3 } from "./math";
+import { camV, PERSPECTIVE, stayBlank, type Camera, type V3 } from "./math";
 
 const KEY = "tt-ink";
 let on: boolean | null = null;
@@ -104,7 +104,7 @@ export function drawInkGlobe(cv: HTMLCanvasElement | null, f: InkGlobeFrame) {
   fit(cv, f.w, f.h, dpr);
   cv.style.opacity = f.op.toFixed(3);
   const g = cv.getContext("2d");
-  if (!g) return;
+  if (!g || stayBlank(cv, f.op <= 0.01)) return;
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, cv.width, cv.height);
   if (f.op <= 0.01) return;

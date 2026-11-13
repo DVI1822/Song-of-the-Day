@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { paintedCover } from "./math";
 import { initials } from "@/lib/day";
+import { coverAt } from "@/lib/cover";
 
 // Album covers everywhere share the tiles' rounded-square shape.
 export const coverRadius = (px: number) => Math.max(2, Math.round(0.26 * px));
@@ -27,7 +28,7 @@ export function Cover({
     >
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" draggable={false} />
+        <img src={coverAt(src, size)} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" draggable={false} />
       )}
     </div>
   );
