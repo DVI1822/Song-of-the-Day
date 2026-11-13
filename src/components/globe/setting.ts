@@ -2,7 +2,8 @@ import type { Weather } from "@/lib/weather";
 import type { SettingKind } from "@/lib/setting";
 import type { Season } from "./scene";
 import { skyBands } from "./sky";
-import { drawLinePano, lineOffset, liveLines, paintLinePano, type LinePano } from "./line";
+import { drawLinePano, inksFor, lineOffset, liveLines, paintLinePano, type LinePano } from "./line";
+import { blenderOn, blenderSet, paintBlenderPano } from "./blender";
 import { Moments } from "./events";
 import { liveWorld, paintWorldPano, type WorldKind, type WorldPano } from "./world";
 import {
@@ -950,6 +951,9 @@ export class SettingScene {
   private live: CanvasRenderingContext2D;
   private kind: "city" | "mountain" | "coast" | "suburb" | "desert" | "woods" | "country" | null = null;
   private wpano: WorldPano | null = null;
+  // the Blender renders, when they have loaded for this place and season
+  private bpano: LinePano | null = null;
+  private blender = blenderOn();
   private moments = new Moments();
   private wxKind = "clear";
   private lay: CityLayout | MtnLayout | null = null;
@@ -994,6 +998,7 @@ export class SettingScene {
     this.lay = null;
     this.lpano = null;
     this.wpano = null;
+    this.bpano = null;
     this.key = "";
     if (!k) {
       this.still.setTransform(1, 0, 0, 1, 0, 0);
@@ -1050,7 +1055,19 @@ export class SettingScene {
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       g.clearRect(0, 0, f.w, f.h);
       const wk = this.world();
-      if (wk) this.lpano = this.wpano = paintWorldPano(wk, f.w, f.h, this.L, f.season, lineStyle(), this.dpr);
+      const set = wk && this.blender ? blenderSet(wk, f.season, () => (this.key = "")) : null;
+      this.bpano = null;
+      if (wk && set) {
+        this.wpano = null;
+        this.lpano = this.bpano = paintBlenderPano(
+          set,
+          f.w,
+          f.h,
+          this.L,
+          inksFor(this.L, f.season, lineStyle()),
+          this.dpr,
+        );
+      } else if (wk) this.lpano = this.wpano = paintWorldPano(wk, f.w, f.h, this.L, f.season, lineStyle(), this.dpr);
       else if (this.lay.kind === "city") paintCity(g, this.lay, f.w, f.h, this.L);
       else if (this.pix && this.art === "line")
         this.lpano = paintLinePano(this.pix, this.L, f.season, lineStyle(), this.dpr);
@@ -1072,7 +1089,7 @@ export class SettingScene {
       : this.pano
         ? [0, 1, 2].map((k) => panoOffset(this.pano!, f.yaw ?? 0, f.R, k)).join(",") + `|${f.cx},${f.cy},${f.R}`
         : "";
-    if (lp && (this.pix || this.wpano) && pk !== this.panoKey) {
+    if (lp && (this.pix || this.wpano || this.bpano) && pk !== this.panoKey) {
       this.panoKey = pk;
       const g = this.still;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
