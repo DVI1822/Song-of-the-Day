@@ -239,8 +239,10 @@ export function Feature({
             boxShadow: `0 30px 80px -30px rgba(13,42,63,0.45)${hw ? `, 0 0 0 1.5px rgba(${hw.accentRgb},0.55), 0 0 60px -8px rgba(${hw.accentRgb},0.7)` : ""}`,
           }}
         />
+        {/* your TopTrack: a gold crown floats above the card, off it */}
+        {crown?.on && !flagging && <CoverCrown burst={crownBurst} fall={cover + 330} top={-14} />}
         <div className="relative flex h-7 items-center justify-between">
-          <div className="min-w-0 truncate text-xs text-muted" style={crown?.on ? { maxWidth: cover / 2 - 34 } : undefined}>
+          <div className="min-w-0 truncate text-xs text-muted">
             {time} · {who}
             {post.place && ` · ${post.place}`}
           </div>
@@ -366,8 +368,6 @@ export function Feature({
           <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
           {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
-          {/* your TopTrack: the crown sits on top of the cover */}
-          {!flagging && !sinking && crown?.on && <CoverCrown burst={crownBurst} fall={cover + 230} />}
           {/* your one redo today, on the bottom left */}
           {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>

@@ -8,8 +8,8 @@ import { CloseIcon, Face, glass } from "./ui";
 
 // Your TopTrack: once you've posted, you crown the one song on your globe
 // that hit hardest today (never your own) with the crown button in the row
-// under a friend's song. The crown then sits, coloured in, on top of their
-// cover, shakes, and confetti rains down the card. Each crown is a point for
+// under a friend's song. A gold crown then lands above the card, off it,
+// shakes, and confetti rains down over the song. Each crown is a point for
 // that friend. The Leaderboard tab on the right adds them up for the month,
 // taking in each day's crowns the next morning. Who crowned whom is never shown.
 
@@ -31,10 +31,10 @@ export function CrownIcon({ on, size = 46, stroke = 1.4 }: { on: boolean; size?:
   const w = (stroke * 24) / size;
   return (
     <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinejoin="round">
-      <path d={CROWN} fill={on ? CORAL : "none"} className="transition-[fill] duration-300" />
+      <path d={CROWN} fill={on ? GOLD : "none"} className="transition-[fill] duration-300" />
       <path d="M5.2 16h13.6" strokeLinecap="round" />
       {TIPS.map(([x, y]) => (
-        <circle key={x} cx={x} cy={y} r={1.05} fill={on ? GOLD : "none"} />
+        <circle key={x} cx={x} cy={y} r={1.05} fill={on ? CORAL : "none"} />
       ))}
     </svg>
   );
@@ -64,25 +64,26 @@ export function CrownButton({ on, onTap }: { on: boolean; onTap(): void }) {
 // The big coloured crown on top of a crowned cover, in the drawn style. It
 // lands with a shake and a burst of ink lines, and confetti rains down the
 // card. `burst` goes up on each new crowning, so it plays again.
-export function CoverCrown({ burst, fall }: { burst: number; fall: number }) {
+export function CoverCrown({ burst, fall, top }: { burst: number; fall: number; top: number }) {
   return (
     <div
       aria-hidden
       data-motion
-      className="pointer-events-none absolute left-1/2 top-0 z-[4] -translate-x-1/2"
-      style={{ width: 0, height: 0 }}
+      className="pointer-events-none absolute left-1/2 z-[4] -translate-x-1/2"
+      style={{ width: 0, height: 0, top }}
     >
-      <span key={`c${burst}`} className="absolute -left-[27px] -top-[30px] block" style={{ animation: burst ? "crown-land .9s cubic-bezier(.36,.07,.19,.97) both" : undefined }}>
-        <svg width="54" height="40" viewBox="2 3.4 20 16" className="block overflow-visible drop-shadow-[2px_3px_0_rgba(13,42,63,0.25)]">
-          <path d={CROWN} fill={CORAL} stroke={INK} strokeWidth={1.1} strokeLinejoin="round" />
-          <path d="M5.2 16h13.6" stroke={INK} strokeWidth={0.9} strokeLinecap="round" />
+      <span key={`c${burst}`} className="absolute -left-[32px] -top-[46px] block" style={{ animation: burst ? "crown-land .9s cubic-bezier(.36,.07,.19,.97) both" : undefined }}>
+        <svg width="64" height="48" viewBox="2 3.4 20 16" className="block overflow-visible drop-shadow-[2px_3px_0_rgba(13,42,63,0.3)]">
+          <path d={CROWN} fill={GOLD} stroke={INK} strokeWidth={1} strokeLinejoin="round" />
+          <path d="M6.4 9.6 7 15M12 8.2v6.6M17.6 9.6 17 15" stroke="#fff3c4" strokeWidth={0.7} strokeLinecap="round" />
+          <path d="M5.2 16h13.6" stroke={INK} strokeWidth={0.85} strokeLinecap="round" />
           {TIPS.map(([x, y]) => (
-            <circle key={x} cx={x} cy={y} r={1.25} fill={GOLD} stroke={INK} strokeWidth={0.85} />
+            <circle key={x} cx={x} cy={y} r={1.25} fill={CORAL} stroke={INK} strokeWidth={0.8} />
           ))}
-          <circle cx="12" cy="13" r="1.1" fill="#b9e4c9" stroke={INK} strokeWidth={0.8} />
+          <circle cx="12" cy="13" r="1.1" fill={CORAL} stroke={INK} strokeWidth={0.75} />
         </svg>
         {burst > 0 && (
-          <svg width="90" height="70" viewBox="0 0 90 70" className="absolute -left-[18px] -top-[20px] overflow-visible" style={{ animation: "crown-lines .6s .12s ease-out both" }}>
+          <svg width="90" height="70" viewBox="0 0 90 70" className="absolute -left-[13px] -top-[16px] overflow-visible" style={{ animation: "crown-lines .6s .12s ease-out both" }}>
             <g stroke={INK} strokeWidth="2.2" strokeLinecap="round" fill="none">
               <path d="M45 2v8M12 14l7 5M78 14l-7 5M3 38h8M79 38h8" />
             </g>
@@ -104,16 +105,16 @@ function Confetti({ seed, fall }: { seed: number; fall: number }) {
   };
   return (
     <>
-      {Array.from({ length: 34 }, (_, i) => {
+      {Array.from({ length: 90 }, (_, i) => {
         const c = BITS[i % BITS.length];
         const shape = i % 4;
-        const dx = (rnd(i, 1) - 0.5) * 300;
+        const dx = (rnd(i, 1) - 0.5) * 380;
         const style = {
           "--dx": `${dx}px`,
           "--up": `${-20 - rnd(i, 2) * 50}px`,
-          "--dy": `${fall * (0.55 + rnd(i, 3) * 0.6)}px`,
+          "--dy": `${fall * (0.45 + rnd(i, 3) * 0.75)}px`,
           "--r": `${(rnd(i, 4) - 0.5) * 900}deg`,
-          animation: `confetti-fall ${1.5 + rnd(i, 5) * 1.1}s cubic-bezier(.25,.6,.4,1) ${0.2 + rnd(i, 6) * 0.18}s both`,
+          animation: `confetti-fall ${1.6 + rnd(i, 5) * 1.4}s cubic-bezier(.25,.6,.4,1) ${0.2 + rnd(i, 6) * 0.6}s both`,
         } as React.CSSProperties;
         return (
           <svg key={i} width="14" height="12" viewBox="0 0 14 12" className="absolute -left-[7px] -top-[6px] overflow-visible" style={style}>
@@ -216,8 +217,8 @@ export function BoardTab({
 }
 
 // ---------------------------------------------------------------------------
-// The Leaderboard itself: a plain list, most points first. The leader wears
-// a little crown.
+// The Leaderboard itself: a plain list, most points first. Only the one at
+// the very top wears the little crown.
 // ---------------------------------------------------------------------------
 
 type Row = { p: Profile; month: number; last: number };
@@ -293,7 +294,7 @@ export function Leaderboard({
               </span>
               <span className="relative flex-none">
                 <Face p={r.p} size={32} />
-                {r.month > 0 && r.month === top && (
+                {i === 0 && r.month > 0 && (
                   <svg aria-hidden width="20" height="15" viewBox="2 3.4 20 16" className="absolute -top-[11px] left-1/2 -translate-x-1/2 -rotate-[8deg] overflow-visible">
                     <path d={CROWN} fill={GOLD} stroke={INK} strokeWidth={1.5} strokeLinejoin="round" />
                   </svg>
