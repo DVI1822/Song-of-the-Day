@@ -89,7 +89,7 @@ body {
 /* "Added to core": a little pill that rises, holds, then fades */
 /* crowning a song your TopTrack (Ranks.tsx): the row button pops, the big
    crown lands on the cover with a shake and ink lines, confetti rains down
-   the card; the Leaderboard tab's little crown bobs and now and then shakes */
+   the card; the Leaderboard tab's crown now and then shakes */
 @keyframes crown-pop {
   0% { transform: none; }
   25% { transform: scale(0.82); }
@@ -116,9 +116,6 @@ body {
   25% { transform: translate(calc(var(--dx) * 0.6), var(--up)) rotate(calc(var(--r) * 0.3)); }
   85% { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); }
-}
-@keyframes crown-bob {
-  50% { transform: translateY(-4px); }
 }
 @keyframes crown-nudge {
   0%, 78%, 100% { transform: none; }

@@ -153,7 +153,7 @@ const PAGES: Page[] = [
         text: "Puts their songs on your globe. When they add you back, you're mutual friends.",
       },
       { icon: <span className="flex h-10 w-10 items-center justify-center text-card-ink"><CrownIcon on size={34} stroke={1.4} /></span>, name: "Your TopTrack", text: "Once you've posted, tap the crown, the fourth button under a friend's song, to crown it your TopTrack today. The crown lands on their cover with confetti. One crown a day, never your own, and you can move it until midnight. Each crown is a point for them, and nobody sees who crowned whom." },
-      { icon: <Tab right><CrownIcon on={false} size={15} stroke={1.8} /></Tab>, name: "Leaderboard", text: "The tab on the right, with the little crown over it. Everyone on your globe by points this month, most first; the leader wears the crown. Each morning it adds the day before's crowns." },
+      { icon: <Tab right><CrownIcon on={false} size={15} stroke={1.8} /></Tab>, name: "Leaderboard", text: "The tab on the right with the crown. Everyone on your globe by points this month, most first; the leader wears the crown. Each morning it adds the day before's crowns." },
       { icon: <Tab><ChatIcon size={15} /></Tab>, name: "Chat", text: "On the left under My Core. Globe chat is with your mutual friends and starts fresh every midnight, like the songs. Messages are one to one." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full px-1.5 py-1 text-[9px] font-semibold" style={glass(false)}>Message</span></span>,

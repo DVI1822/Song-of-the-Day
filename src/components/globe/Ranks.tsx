@@ -130,8 +130,8 @@ function Confetti({ seed, fall }: { seed: number; fall: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// The Leaderboard tab, alone on the right edge, with a little crown floating
-// over it that gives a shake every few seconds to get you to open it.
+// The Leaderboard tab, alone on the right edge. Its crown gives a shake every
+// few seconds to get you to open it.
 // ---------------------------------------------------------------------------
 
 export function BoardTab({
@@ -174,17 +174,10 @@ export function BoardTab({
           ...(open ? { background: "#FFFFFF", boxShadow: "inset -3px 0 0 #D7262B, 0 8px 30px -14px rgba(13,42,63,0.3)" } : {}),
         }}
       >
-        {!open && (
-          <span aria-hidden data-motion className="pointer-events-none absolute -top-[24px] left-[6px]" style={{ animation: "crown-bob 2.6s ease-in-out infinite" }}>
-            <svg width="26" height="20" viewBox="2 3.4 20 16" className="block overflow-visible" style={{ transformOrigin: "50% 90%", animation: "crown-nudge 5.5s ease-in-out 1.5s infinite" }}>
-              <path d={CROWN} fill={GOLD} stroke={INK} strokeWidth={1.3} strokeLinejoin="round" />
-              {TIPS.map(([x, y]) => (
-                <circle key={x} cx={x} cy={y} r={1.25} fill={CORAL} stroke={INK} strokeWidth={0.9} />
-              ))}
-            </svg>
-          </span>
-        )}
-        <CrownIcon on={false} size={18} stroke={1.8} />
+        {/* the tab's own crown gives a little shake now and then, to get you to open it */}
+        <span data-motion className="flex" style={open ? undefined : { transformOrigin: "50% 85%", animation: "crown-nudge 5.5s ease-in-out 1.5s infinite" }}>
+          <CrownIcon on={false} size={18} stroke={1.8} />
+        </span>
         <span className="whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">Leaderboard</span>
       </PullTab>
       <div
