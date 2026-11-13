@@ -8,7 +8,7 @@ import { CoreIcon, LevelsIcon, NoteIcon } from "./Reactions";
 import { MoreIcon } from "./Safety";
 import { RedoArrows } from "./Redo";
 import { ShareIcon } from "./ShareStory";
-import { ShuffleIcon } from "./Shuffle";
+import { PlayAllIcon } from "./Shuffle";
 import { SignalCore } from "./SignalCore";
 import { CompassStar } from "./SongFacts";
 import { CloseIcon, glass, RecenterIcon, TabIcon } from "./ui";
@@ -117,7 +117,7 @@ const PAGES: Page[] = [
       { icon: <Tile />, name: "Songs", text: "Each square is a friend's song today. Tap one to open it. Drag anywhere to spin the globe." },
       { icon: <Round><RecenterIcon /></Round>, name: "Bring songs to the front", text: "Turns every song round to face you for a few seconds." },
       { icon: <Round><CompassStar /></Round>, name: "Your song's facts", text: "Once you post, a few facts about your song land here, each from a real source." },
-      { icon: <Round><ShuffleIcon /></Round>, name: "Shuffle all", text: "Plays every song on your globe in a row. The little pill shows what's playing and who picked it. Tap it to fly there." },
+      { icon: <Round><PlayAllIcon /></Round>, name: "Play", text: "Plays every song on your globe, one after another. The player shows the cover, the song and who picked it, with back, play/pause and next. Tap the cover or the song to open its card." },
       { icon: <Words top="12" bottom="SONGS" size={17} />, name: "Songs today", text: "How many songs are on your globe right now." },
       { icon: <Words top="4:12" bottom="NEXT SONG" size={14} />, name: "Countdown", text: "Time until midnight. Then everyone picks a new song, and today's goes into your core." },
       { icon: <Round>{SCENES[1].icon}</Round>, name: "Backdrop wheel", text: "The see-through dial low on the right-hand side picks the scene behind your Globe. Tap it for the next one, or spin it. The pin means where you really are." },

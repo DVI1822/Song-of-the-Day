@@ -1338,7 +1338,7 @@ function Globe({
       {/* lightning lights up everything */}
       <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
-      {/* facts about your song once you've posted, the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
+      {/* facts about your song once you've posted, the songs on your globe and the Play button (or the player), with + below until you've posted */}
       <div
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex flex-col items-center justify-end gap-2"
