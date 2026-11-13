@@ -6,6 +6,7 @@ import { installPending } from "./Install";
 import { LATER_KEY, enablePush, notifyLater } from "./Welcome";
 import { ASKED_KEY } from "./Locate";
 import { scenePick } from "@/lib/setting";
+import { appPushState, isApp } from "@/lib/native";
 
 // Asks again for notifications, for anyone who hasn't turned them on: a
 // friend posting their song, likes and notes on yours, and the nudges. If
@@ -16,18 +17,29 @@ import { scenePick } from "@/lib/setting";
 
 type Ask = "ask" | "off";
 
-function askNow(api: GlobeApi): Ask | null {
+// In the iPhone app the phone itself answers (lib/native).
+async function askNow(api: GlobeApi): Promise<Ask | null> {
+  if (isApp()) {
+    if (!api.savePush || !waited()) return null;
+    const state = await appPushState().catch(() => null);
+    return state === "ask" ? "ask" : state === "denied" ? "off" : null;
+  }
   if (!api.savePush || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return null;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return null;
   if (Notification.permission === "granted" || installPending()) return null;
-  try {
-    if (Date.now() < Number(localStorage.getItem(LATER_KEY) || 0)) return null;
-    // the location card goes first; this one waits for the next visit
-    if (localStorage.getItem(ASKED_KEY) === null && scenePick() === "auto" && "geolocation" in navigator) return null;
-  } catch {
-    return null;
-  }
+  if (!waited()) return null;
   return Notification.permission === "denied" ? "off" : "ask";
+}
+
+function waited() {
+  try {
+    if (Date.now() < Number(localStorage.getItem(LATER_KEY) || 0)) return false;
+    // the location card goes first; this one waits for the next visit
+    if (localStorage.getItem(ASKED_KEY) === null && scenePick() === "auto" && "geolocation" in navigator) return false;
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 export function NotifyCard({ api }: { api: GlobeApi }) {
@@ -35,8 +47,12 @@ export function NotifyCard({ api }: { api: GlobeApi }) {
   const [busy, setBusy] = useState(false);
   // not the moment the globe opens: let it settle first
   useEffect(() => {
-    const t = setTimeout(() => setAsk(askNow(api)), 2500);
-    return () => clearTimeout(t);
+    let live = true;
+    const t = setTimeout(() => void askNow(api).then((a) => live && setAsk(a)), 2500);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
   }, [api]);
   if (!ask) return null;
 
@@ -49,7 +65,8 @@ export function NotifyCard({ api }: { api: GlobeApi }) {
     await enablePush(api, true);
     setBusy(false);
     // said no to the browser's own question: leave it a while
-    close(Notification.permission === "granted" ? 0 : 7);
+    const granted = isApp() ? (await appPushState().catch(() => null)) === "granted" : Notification.permission === "granted";
+    close(granted ? 0 : 7);
   };
   const ua = navigator.userAgent;
   const iphone = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
