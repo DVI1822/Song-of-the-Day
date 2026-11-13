@@ -33,7 +33,7 @@ import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FriendsTab } from "./Panels";
-import { Leaderboard, PickHand } from "./Ranks";
+import { BoardTab, Leaderboard } from "./Ranks";
 import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -284,7 +284,8 @@ function Globe({
   // a left tab being dragged out right now (pull.tsx), which keeps its panel mounted
   const [pulling, setPulling] = useState<PanelName | null>(null);
   const [chatOn, setChatOn] = useState(false);
-  // your 1st, 2nd and 3rd today (Ranks.tsx); rankTick fetches the board again
+  const [boardOn, setBoardOn] = useState(false);
+  // the song you crowned your TopTrack today (Ranks.tsx); rankTick fetches the board again
   const [myPick, setMyPick] = useState<string | null>(null);
   const [rankTick, setRankTick] = useState(0);
   const welcomeSeen = useWelcomeSeen();
@@ -692,6 +693,7 @@ function Globe({
       else {
         closePanel();
         setChatOn(false);
+        setBoardOn(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1101,6 +1103,7 @@ function Globe({
   };
   const showTab = (name: PanelName) => {
     setChatOn(false);
+    setBoardOn(false);
     if (name === "friends") {
       setSeenBefore(seenAt);
       seenStore.set(new Date().toISOString());
@@ -1444,6 +1447,7 @@ function Globe({
               panel: "tt-panel",
               onStart: () => {
                 setChatOn(false);
+                setBoardOn(false);
                 setPulling(name);
                 if (panel !== name) {
                   setPanelOn(false);
@@ -1531,7 +1535,7 @@ function Globe({
         </div>
       )}
 
-      {/* the globe chat, pulled out from the right */}
+      {/* the chat, pulled out from the left under My Core */}
       <Chat
         api={api}
         me={me}
@@ -1541,41 +1545,58 @@ function Globe({
         open={chatOn}
         onOpen={() => {
           closePanel();
+          setBoardOn(false);
           setChatOn(true);
         }}
         onClose={() => setChatOn(false)}
-        onPull={closePanel}
+        onPull={() => {
+          closePanel();
+          setBoardOn(false);
+        }}
         dmWith={dmWith}
         onCore={(p) => {
           setChatOn(false);
           openCore(null, p);
         }}
-        tabTop={tabTop}
+        tabTop={tabTop + 224}
         top={Math.max(90, tabTop - 50)}
         width={Math.min(320, L.w - 96)}
         height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}
         tabRef={(el) => void (R.current.chrome[3] = el)}
-        board={
-          <Leaderboard
-            api={api}
-            me={me}
-            friends={friends}
-            myPost={myPost && landed ? myPost : null}
-            pick={myPick}
-            open={chatOn}
-            tick={rankTick}
-            onPick={choose}
-            onOpen={(k) => {
-              setChatOn(false);
-              fly(k);
-            }}
-            onCore={(p) => {
-              setChatOn(false);
-              openCore(null, p);
-            }}
-          />
-        }
       />
+
+      {/* the leaderboard, alone on the right */}
+      <BoardTab
+        open={boardOn}
+        dark={darkOn}
+        onOpen={() => {
+          closePanel();
+          setChatOn(false);
+          setBoardOn(true);
+        }}
+        onClose={() => setBoardOn(false)}
+        onPull={() => {
+          closePanel();
+          setChatOn(false);
+        }}
+        tabTop={tabTop}
+        top={Math.max(90, tabTop - 50)}
+        width={Math.min(320, L.w - 96)}
+        height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}
+        tabRef={(el) => void (R.current.chrome[9] = el)}
+      >
+        <Leaderboard
+          api={api}
+          me={me}
+          friends={friends}
+          open={boardOn}
+          tick={rankTick}
+          onCore={(p) => {
+            setBoardOn(false);
+            openCore(null, p);
+          }}
+        />
+      </BoardTab>
 
       {feat !== null && featPost && (
         <Feature
@@ -1597,14 +1618,10 @@ function Globe({
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
-          pick={
-            feat !== ME && myPost && landed && api.ranks ? (
-              <PickHand
-                picked={myPick === featPost.id}
-                radius={Math.round(0.03 * L.cover)}
-                onPick={(on) => choose(on ? featPost.id : null)}
-              />
-            ) : undefined
+          crown={
+            feat !== ME && myPost && landed && api.ranks
+              ? { on: myPick === featPost.id, set: (on: boolean) => choose(on ? featPost.id : null) }
+              : undefined
           }
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
           rootRef={(el) => void (R.current.feat = el)}

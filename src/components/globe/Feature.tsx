@@ -8,6 +8,7 @@ import { halloween } from "./halloween";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
 import { FactsButton } from "./SongFacts";
+import { CoverCrown, CrownButton } from "./Ranks";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
 import type { StorySky } from "./storyVideo";
 import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactions";
@@ -38,7 +39,7 @@ export function Feature({
   onHide,
   onRedo,
   onRedone,
-  pick,
+  crown,
   story,
   rootRef,
   backdropRef,
@@ -62,15 +63,28 @@ export function Feature({
   // only on your own song, today, while you still have the redo
   onRedo?: () => Promise<string | undefined>;
   onRedone?: () => void;
-  // the TopTrack hand, on a friend's song once you've posted (Ranks.tsx); it
-  // takes the cover's bottom right, and the facts star moves to the left
-  pick?: React.ReactNode;
+  // the TopTrack crown, on a friend's song once you've posted (Ranks.tsx): a
+  // fourth button in the row, and the coloured crown on top of the cover
+  crown?: { on: boolean; set(on: boolean): Promise<string | null> };
   story: StoryOf;
   rootRef: Ref<HTMLDivElement>;
   backdropRef: Ref<HTMLDivElement>;
   cardRef: Ref<HTMLDivElement>;
 }) {
   const time = formatTime(post.created_at, timeZone);
+  const [crownBurst, setCrownBurst] = useState(0);
+  const [crownError, setCrownError] = useState<string | null>(null);
+  const crownTap = async () => {
+    if (!crown) return;
+    const on = !crown.on;
+    setCrownError(null);
+    if (on) setCrownBurst((b) => b + 1);
+    const e = await crown.set(on);
+    if (e) {
+      setCrownError(e);
+      setTimeout(() => setCrownError(null), 3200);
+    }
+  };
   const hw = halloween(); // only ever shown after a tap, so always in the browser
   // big enough to see the whole cover: only a slight rounding, so no corner
   // of the artwork is cut off
@@ -226,7 +240,7 @@ export function Feature({
           }}
         />
         <div className="relative flex h-7 items-center justify-between">
-          <div className="min-w-0 truncate text-xs text-muted">
+          <div className="min-w-0 truncate text-xs text-muted" style={crown?.on ? { maxWidth: cover / 2 - 34 } : undefined}>
             {time} · {who}
             {post.place && ` · ${post.place}`}
           </div>
@@ -351,9 +365,9 @@ export function Feature({
           )}
           <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
           {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} side={pick ? "left" : "right"} />}
-          {/* your TopTrack pick, on the bottom right of a friend's cover */}
-          {!flagging && !sinking && pick}
+          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
+          {/* your TopTrack: the crown sits on top of the cover */}
+          {!flagging && !sinking && crown?.on && <CoverCrown burst={crownBurst} fall={cover + 230} />}
           {/* your one redo today, on the bottom left */}
           {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>
@@ -385,7 +399,7 @@ export function Feature({
               </div>
             </div>
           </div>
-          <div className="-my-1.5">
+          <div className="relative -my-1.5">
             <ReactionButtons
               r={r}
               mine={mine}
@@ -394,7 +408,13 @@ export function Feature({
               onLikes={() => setLikesOpen(true)}
               onNotes={() => setNotesOpen(true)}
               onSave={save}
+              crown={crown && <CrownButton on={crown.on} onTap={crownTap} />}
             />
+            {crownError && (
+              <div role="status" className="absolute right-0 z-10 -mt-1 w-[220px] rounded-xl bg-white/95 px-2.5 py-1.5 text-right text-[12px] leading-snug text-accent-deep shadow">
+                {crownError}
+              </div>
+            )}
           </div>
           <div className="relative">
             <SongPlayer
