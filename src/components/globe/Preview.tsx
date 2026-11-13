@@ -24,6 +24,8 @@ type PreviewState = {
   shuffle: ShuffleState | null;
   startShuffle(posts: Post[]): Promise<string | null>;
   shuffleNext(): void;
+  // back to the start of this song, or, right at its start, the one before
+  shufflePrev(): void;
   shuffleToggle(): void;
   // the Globe shows its own player bar, so the mini player steps aside
   docked: boolean;
@@ -139,6 +141,15 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     clip(shuffle.list, i + 1);
   }, [shuffle, clip]);
 
+  const shufflePrev = useCallback(() => {
+    const a = audio.current;
+    const i = shuffle ? shuffle.list.findIndex((p) => p.id === shuffle.now.id) : -1;
+    if (shuffle && i > 0 && (a?.currentTime ?? 0) < 3) return clip(shuffle.list, i - 1);
+    if (!a?.src) return;
+    a.currentTime = 0;
+    setAt(0);
+  }, [shuffle, clip]);
+
   const shuffleToggle = useCallback(() => {
     if (!shuffle) return;
     const paused = !shuffle.paused;
@@ -164,6 +175,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
         shuffle,
         startShuffle,
         shuffleNext,
+        shufflePrev,
         shuffleToggle,
         docked,
         setDocked,
@@ -222,11 +234,13 @@ export function SongPlayer({
 }) {
   const pv = usePreview();
   const key = `song-${post.id}`;
-  const mine = pv.key === key;
+  // the song Play is on counts as this card's own, so pause here pauses it
+  const inShuffle = pv.shuffle?.now.id === post.id;
+  const mine = pv.key === key || inShuffle;
   const [embedOpen, setEmbedOpen] = useState(false);
   const links = post.platform_links ?? {};
   const embed = embedFor(links, post.song_url);
-  const paused = mine && pv.track?.paused;
+  const paused = mine && (inShuffle ? pv.shuffle?.paused : pv.track?.paused);
   const canPlay = Boolean(post.preview_url || embed);
   const size = big ? 54 : 44;
   const playing = embedOpen || (mine && !paused);
@@ -234,6 +248,7 @@ export function SongPlayer({
   const toggle = () => {
     if (embedOpen) return setEmbedOpen(false);
     // pause, or carry on, without losing your place
+    if (inShuffle) return pv.shuffleToggle();
     if (mine && pv.track) return pv.toggle();
     if (post.preview_url) pv.play(key, post.preview_url, undefined, post);
     else if (embed) {
