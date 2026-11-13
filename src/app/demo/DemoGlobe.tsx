@@ -3,7 +3,7 @@
 import type { GlobeApi } from "@/components/globe/api";
 import { GlobeApp } from "@/components/globe/GlobeApp";
 import { addDays, todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Message, Note, Picks, Post, Profile, Reactions, SavedSong } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Message, Note, Post, Profile, Reactions, SavedSong } from "@/lib/types";
 
 // The Globe with made-up friends. Works without signing in; nothing is saved.
 
@@ -183,7 +183,7 @@ const CHAT: Message[] = [
   say("d4", ME, "you have to hear the live version", 1500, FRIENDS[6]),
 ];
 
-const DEMO_PICKS: (string | null)[] = [null, null, null];
+let demoPick: string | null = null;
 
 const demoApi: GlobeApi = {
   // made-up facts for the made-up song
@@ -362,20 +362,19 @@ const demoApi: GlobeApi = {
   // the month so far: made-up points for most of your friends, plus whatever you give
   ranks: {
     async mine() {
-      return [...DEMO_PICKS] as Picks;
+      return demoPick;
     },
-    async set(rank, postId) {
+    async set(postId) {
       await new Promise((r) => setTimeout(r, 150));
-      for (let i = 0; i < 3; i++) if (DEMO_PICKS[i] === postId) DEMO_PICKS[i] = null;
-      DEMO_PICKS[rank - 1] = postId;
+      demoPick = postId;
       return {};
     },
     async board() {
       await new Promise((r) => setTimeout(r, 250));
       return FRIENDS.slice(0, 9).map((f, j) => {
-        const last = Math.floor(rnd(j + 40, 5) * 6);
-        return { who: f.id, month: 4 + Math.floor(rnd(j + 7, 2) * 38) + last, last };
-      }).concat([{ who: ME.id, month: 21, last: 4 }]);
+        const last = Math.floor(rnd(j + 40, 5) * 3);
+        return { who: f.id, month: 1 + Math.floor(rnd(j + 7, 2) * 11) + last, last };
+      }).concat([{ who: ME.id, month: 7, last: 1 }]);
     },
   },
   async loadCore(id) {

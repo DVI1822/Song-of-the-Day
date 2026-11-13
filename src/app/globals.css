@@ -87,11 +87,42 @@ body {
 }
 
 /* "Added to core": a little pill that rises, holds, then fades */
-/* a medal given on a song card (Ranks.tsx): stamped down with a little bounce */
-@keyframes medal-pop {
-  0% { transform: scale(0.4) rotate(-25deg); }
-  60% { transform: scale(1.25) rotate(6deg); }
+/* crowning a song your TopTrack (Ranks.tsx): the row button pops, the big
+   crown lands on the cover with a shake and ink lines, confetti rains down
+   the card; the Leaderboard tab's crown now and then shakes */
+@keyframes crown-pop {
+  0% { transform: none; }
+  25% { transform: scale(0.82); }
+  60% { transform: scale(1.3) rotate(-10deg); }
   100% { transform: none; }
+}
+@keyframes crown-land {
+  0% { opacity: 0; transform: translateY(-26px) scale(0.5); }
+  22% { opacity: 1; transform: translateY(3px) scale(1.1); }
+  38% { transform: rotate(-16deg) scale(1.22); }
+  54% { transform: rotate(13deg) scale(1.18); }
+  70% { transform: rotate(-8deg) scale(1.08); }
+  85% { transform: rotate(4deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes crown-lines {
+  0% { opacity: 0; transform: scale(0.6); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+@keyframes confetti-fall {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0); }
+  6% { opacity: 1; }
+  25% { transform: translate(calc(var(--dx) * 0.6), var(--up)) rotate(calc(var(--r) * 0.3)); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)); }
+}
+@keyframes crown-nudge {
+  0%, 78%, 100% { transform: none; }
+  82% { transform: rotate(-18deg); }
+  86% { transform: rotate(15deg); }
+  90% { transform: rotate(-10deg); }
+  94% { transform: rotate(6deg); }
 }
 @keyframes toast-blip {
   0% {

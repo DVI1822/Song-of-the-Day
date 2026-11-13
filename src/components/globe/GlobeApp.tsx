@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { todayIn } from "@/lib/day";
-import type { Activity, AddedMe, Friend, Picks, Post, Profile, SavedSong } from "@/lib/types";
+import type { Activity, AddedMe, Friend, Post, Profile, SavedSong } from "@/lib/types";
 import { serverApi, shrinkPhoto, type GlobeApi } from "./api";
 import { Ambient } from "./Ambient";
 import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weatherOverride, useWeather } from "./Weather";
@@ -33,7 +33,7 @@ import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FriendsTab } from "./Panels";
-import { Leaderboard, RankMedals } from "./Ranks";
+import { BoardTab, Leaderboard } from "./Ranks";
 import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
@@ -284,8 +284,9 @@ function Globe({
   // a left tab being dragged out right now (pull.tsx), which keeps its panel mounted
   const [pulling, setPulling] = useState<PanelName | null>(null);
   const [chatOn, setChatOn] = useState(false);
-  // your 1st, 2nd and 3rd today (Ranks.tsx); rankTick fetches the board again
-  const [picks, setPicks] = useState<Picks>([null, null, null]);
+  const [boardOn, setBoardOn] = useState(false);
+  // the song you crowned your TopTrack today (Ranks.tsx); rankTick fetches the board again
+  const [myPick, setMyPick] = useState<string | null>(null);
   const [rankTick, setRankTick] = useState(0);
   const welcomeSeen = useWelcomeSeen();
   const [help, setHelp] = useState(false);
@@ -449,36 +450,33 @@ function Globe({
   const closePanel = useCallback(() => setPanelOn(false), []);
 
   // -------------------------------------------------------------------------
-  // Ranking today's songs
+  // Your TopTrack today
   // -------------------------------------------------------------------------
 
   useEffect(() => {
     let on = true;
-    api.ranks?.mine(todayIn(me.timezone)).then((p) => on && setPicks(p)).catch(() => {});
+    api.ranks?.mine(todayIn(me.timezone)).then((p) => on && setMyPick(p)).catch(() => {});
     return () => {
       on = false;
     };
   }, [api, me.timezone]);
 
-  // Give a song a place (or take it back with null, or by tapping the place it
-  // already has). Shows at once; goes back if the server says no.
-  const rank = useCallback(
-    async (n: 1 | 2 | 3, postId: string | null) => {
+  // Make a song your TopTrack (null takes it back). Shows at once; goes back
+  // if the server says no.
+  const choose = useCallback(
+    async (postId: string | null) => {
       if (!api.ranks) return null;
-      const before = picks;
-      const off = postId !== null && before[n - 1] === postId;
-      const next = before.map((p) => (p === postId ? null : p)) as Picks;
-      next[n - 1] = off ? null : postId;
-      setPicks(next);
-      const res = await api.ranks.set(n, off ? null : postId);
+      const before = myPick;
+      setMyPick(postId);
+      const res = await api.ranks.set(postId);
       if (res.error) {
-        setPicks(before);
+        setMyPick(before);
         return res.error;
       }
       setRankTick((t) => t + 1);
       return null;
     },
-    [api, picks],
+    [api, myPick],
   );
 
   const spinTo = useCallback(
@@ -695,6 +693,7 @@ function Globe({
       else {
         closePanel();
         setChatOn(false);
+        setBoardOn(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1104,6 +1103,7 @@ function Globe({
   };
   const showTab = (name: PanelName) => {
     setChatOn(false);
+    setBoardOn(false);
     if (name === "friends") {
       setSeenBefore(seenAt);
       seenStore.set(new Date().toISOString());
@@ -1443,6 +1443,7 @@ function Globe({
               panel: "tt-panel",
               onStart: () => {
                 setChatOn(false);
+                setBoardOn(false);
                 setPulling(name);
                 if (panel !== name) {
                   setPanelOn(false);
@@ -1530,7 +1531,7 @@ function Globe({
         </div>
       )}
 
-      {/* the globe chat, pulled out from the right */}
+      {/* the chat, pulled out from the left under My Core */}
       <Chat
         api={api}
         me={me}
@@ -1540,41 +1541,58 @@ function Globe({
         open={chatOn}
         onOpen={() => {
           closePanel();
+          setBoardOn(false);
           setChatOn(true);
         }}
         onClose={() => setChatOn(false)}
-        onPull={closePanel}
+        onPull={() => {
+          closePanel();
+          setBoardOn(false);
+        }}
         dmWith={dmWith}
         onCore={(p) => {
           setChatOn(false);
           openCore(null, p);
         }}
-        tabTop={tabTop}
+        tabTop={tabTop + 224}
         top={Math.max(90, tabTop - 50)}
         width={Math.min(320, L.w - 96)}
         height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}
         tabRef={(el) => void (R.current.chrome[3] = el)}
-        board={
-          <Leaderboard
-            api={api}
-            me={me}
-            friends={friends}
-            myPost={myPost && landed ? myPost : null}
-            picks={picks}
-            open={chatOn}
-            tick={rankTick}
-            onRank={rank}
-            onOpen={(k) => {
-              setChatOn(false);
-              fly(k);
-            }}
-            onCore={(p) => {
-              setChatOn(false);
-              openCore(null, p);
-            }}
-          />
-        }
       />
+
+      {/* the leaderboard, alone on the right */}
+      <BoardTab
+        open={boardOn}
+        dark={darkOn}
+        onOpen={() => {
+          closePanel();
+          setChatOn(false);
+          setBoardOn(true);
+        }}
+        onClose={() => setBoardOn(false)}
+        onPull={() => {
+          closePanel();
+          setChatOn(false);
+        }}
+        tabTop={tabTop}
+        top={Math.max(90, tabTop - 50)}
+        width={Math.min(320, L.w - 96)}
+        height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}
+        tabRef={(el) => void (R.current.chrome[9] = el)}
+      >
+        <Leaderboard
+          api={api}
+          me={me}
+          friends={friends}
+          open={boardOn}
+          tick={rankTick}
+          onCore={(p) => {
+            setBoardOn(false);
+            openCore(null, p);
+          }}
+        />
+      </BoardTab>
 
       {feat !== null && featPost && (
         <Feature
@@ -1596,10 +1614,10 @@ function Globe({
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
-          ranking={
-            feat !== ME && myPost && landed && api.ranks ? (
-              <RankMedals postId={featPost.id} picks={picks} onRank={(n, id) => rank(n, id)} />
-            ) : undefined
+          crown={
+            feat !== ME && myPost && landed && api.ranks
+              ? { on: myPick === featPost.id, set: (on: boolean) => choose(on ? featPost.id : null) }
+              : undefined
           }
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
           rootRef={(el) => void (R.current.feat = el)}

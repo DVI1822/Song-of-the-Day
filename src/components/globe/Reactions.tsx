@@ -144,6 +144,7 @@ export function ReactionButtons({
   onNotes,
   onSave,
   saveRef,
+  crown,
 }: {
   r: Reactions | null;
   mine: boolean;
@@ -153,6 +154,7 @@ export function ReactionButtons({
   onNotes(): void;
   onSave(): void;
   saveRef?: Ref<HTMLButtonElement>;
+  crown?: React.ReactNode; // a fourth button: crown it your TopTrack (Ranks.tsx)
 }) {
   const liked = Boolean(r?.feels.some((f) => f.user.id === meId));
   const saved = Boolean(r?.saved);
@@ -167,7 +169,7 @@ export function ReactionButtons({
   const btn = "relative flex h-14 w-14 items-center justify-center rounded-full text-card-ink";
   const badge = `pointer-events-none absolute left-[52px] top-1/2 -translate-y-1/2 ${count}`;
   return (
-    <div data-motion className={`grid ${mine ? "grid-cols-2" : "grid-cols-3"} justify-items-center`}>
+    <div data-motion className={`grid ${mine ? "grid-cols-2" : crown ? "grid-cols-4" : "grid-cols-3"} justify-items-center`}>
       {!mine && (
         <button
           ref={saveRef}
@@ -225,6 +227,7 @@ export function ReactionButtons({
         <NoteIcon on={noted} ring={ring} />
         {notes > 0 && <span className={badge}>{notes}</span>}
       </button>
+      {crown}
     </div>
   );
 }

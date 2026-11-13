@@ -7,15 +7,15 @@ import type { GlobeApi } from "./api";
 import { PullTab } from "./pull";
 import { BackIcon, CloseIcon, Face, glass } from "./ui";
 
-// The Globe tab on the right edge. Inside, three sides: the Leaderboard
-// (Ranks.tsx), the globe chat and Messages. The globe chat is a live chat with
+// The Chat tab on the left edge, under My Core. Inside, two sides: the globe
+// chat and Messages. The globe chat is a live chat with
 // your mutual friends: people you've added who have added you back. Only they
 // see what you say, and you see only what they say. Messages to one person
 // start from their core (mutual friends only) and live here too, under Messages.
 // The globe chat starts fresh every midnight, like the songs; messages to one
 // person stay.
 
-type View = { kind: "board" } | { kind: "globe" } | { kind: "inbox" } | { kind: "dm"; with: Profile };
+type View = { kind: "globe" } | { kind: "inbox" } | { kind: "dm"; with: Profile };
 
 // When you last read the globe chat, kept on this device.
 const SEEN_KEY = "sotd-chat-seen";
@@ -60,7 +60,6 @@ export function Chat({
   width,
   height,
   tabRef,
-  board,
 }: {
   api: GlobeApi;
   me: Profile;
@@ -79,12 +78,11 @@ export function Chat({
   width: number;
   height: number;
   tabRef: Ref<HTMLButtonElement>;
-  board: React.ReactNode; // the Leaderboard
 }) {
   const [msgs, setMsgs] = useState<Message[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [extra, setExtra] = useState<Profile[]>([]);
-  const [view, setView] = useState<View>({ kind: "board" });
+  const [view, setView] = useState<View>({ kind: "globe" });
   const seen = useSyncExternalStore(seenStore.sub, seenStore.get, () => "");
 
   const people = useMemo(() => {
@@ -176,43 +174,43 @@ export function Chat({
     <>
       <PullTab
         buttonRef={tabRef}
-        pull={{ side: "right", open, travel: width + 46, panel: "tt-chat", onStart: onPull, onOpen, onClose }}
+        pull={{ side: "left", open, travel: width + 46, panel: "tt-chat", onStart: onPull, onOpen, onClose }}
         onClick={open ? onClose : onOpen}
-        aria-label="Globe"
+        aria-label="Chat"
         aria-expanded={open}
-        className="absolute right-0 z-[430] box-border flex h-[124px] w-[38px] flex-col items-center justify-center gap-2 rounded-l-[18px] !border-r-0 transition-shadow"
+        className="absolute left-0 z-[430] box-border flex h-[96px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0 transition-shadow"
         style={{
           top: tabTop,
           ...glass(dark),
-          ...(open ? { background: "#FFFFFF", boxShadow: "inset -3px 0 0 #D7262B, 0 8px 30px -14px rgba(13,42,63,0.3)" } : {}),
+          ...(open ? { background: "#FFFFFF", boxShadow: "inset 3px 0 0 #D7262B, 0 8px 30px -14px rgba(13,42,63,0.3)" } : {}),
         }}
       >
-        <GlobeTabIcon />
+        <ChatIcon size={16} />
         {count > 0 && (
           <span
             aria-label={`${count} new`}
-            className="absolute left-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
+            className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
           >
             {count > 99 ? "99+" : count}
           </span>
         )}
-        <span className="whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">Globe</span>
+        <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">Chat</span>
       </PullTab>
 
       <div
         id="tt-chat"
         role="dialog"
-        aria-label="Globe"
+        aria-label="Chat"
         inert={!open}
-        className="absolute right-[46px] z-[425] box-border flex flex-col overflow-hidden rounded-[26px] transition-[opacity,transform] duration-[260ms] ease-out"
+        className="absolute left-[46px] z-[425] box-border flex flex-col overflow-hidden rounded-[26px] transition-[opacity,transform] duration-[260ms] ease-out"
         style={{
           top,
           width,
           height,
           ...glass(dark),
-          boxShadow: "-18px 0 50px -28px rgba(0,0,0,0.7)",
+          boxShadow: "18px 0 50px -28px rgba(0,0,0,0.7)",
           opacity: open ? 1 : 0,
-          transform: `translateX(${open ? 0 : 60}px)`,
+          transform: `translateX(${open ? 0 : -60}px)`,
           pointerEvents: open ? undefined : "none",
         }}
       >
@@ -242,7 +240,7 @@ export function Chat({
         ) : (
           <div className="flex flex-col gap-2 pb-2 pl-[18px] pr-1.5 pt-3">
             <div className="flex items-center">
-              <h2 className="display text-lg">Globe</h2>
+              <h2 className="display text-lg">Chat</h2>
               <button type="button" onClick={onClose} aria-label="Close" className="ml-auto flex h-11 w-11 items-center justify-center">
                 <CloseIcon />
               </button>
@@ -250,8 +248,7 @@ export function Chat({
             <div className="mr-3 flex rounded-full bg-card-ink/[0.06] p-[3px] text-xs font-semibold">
               {(
                 [
-                  ["board", "Leaderboard", 0],
-                  ["globe", "Chat", globeNew],
+                  ["globe", "Globe chat", globeNew],
                   ["inbox", "Messages", dmNew],
                 ] as const
               ).map(([kind, label, n]) => (
@@ -279,9 +276,7 @@ export function Chat({
           </div>
         )}
 
-        {view.kind === "board" ? (
-          board
-        ) : view.kind === "inbox" ? (
+        {view.kind === "inbox" ? (
           <Inbox msgs={msgs} me={me} people={people} onOpen={(p) => setView({ kind: "dm", with: p })} />
         ) : (
           <>
@@ -532,15 +527,6 @@ function Inbox({
 
 const Avatar = ({ p, small = false }: { p: Profile | null | undefined; small?: boolean }) => (
   <Face p={p} size={small ? 20 : 34} />
-);
-
-// The Globe tab's icon: a little globe with a crown on top, for the board.
-export const GlobeTabIcon = () => (
-  <svg aria-hidden width="18" height="19" viewBox="0 0 24 25" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-    <circle cx="12" cy="15" r="8" />
-    <path d="M4 15h16M12 7c-2.6 2.3-3.6 5-3.6 8s1 5.7 3.6 8c2.6-2.3 3.6-5 3.6-8s-1-5.7-3.6-8" />
-    <path d="M8.2 5.4 7.6 1.6l2.4 1.7L12 .9l2 2.4 2.4-1.7-.6 3.8" strokeWidth="1.5" />
-  </svg>
 );
 
 export const ChatIcon = ({ size = 18 }: { size?: number }) => (
