@@ -58,7 +58,7 @@ export function NewsCard() {
         </p>
         <p className="text-[15px] leading-relaxed">
           Every crown is a point. The <b>Leaderboard</b> on the right keeps score for the month, and everyone starts at
-          zero today. Chat moved to the left, under My Core.
+          zero today. Chat moved to the left, between Friends and My Core.
         </p>
         <button type="button" onClick={close} className="mt-2 h-12 rounded-full bg-accent text-[15px] font-semibold text-white">
           Let&apos;s go

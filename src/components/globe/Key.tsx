@@ -154,7 +154,7 @@ const PAGES: Page[] = [
       },
       { icon: <span className="flex h-10 w-10 items-center justify-center text-card-ink"><CrownIcon on size={34} stroke={1.4} /></span>, name: "Your TopTrack", text: "Once you've posted, tap the crown, the fourth button under a friend's song, to crown it your TopTrack today. The crown lands on their cover with confetti. One crown a day, never your own, and you can move it until midnight. Each crown is a point for them, and nobody sees who crowned whom." },
       { icon: <Tab right><CrownIcon on={false} size={15} stroke={1.8} /></Tab>, name: "Leaderboard", text: "The tab on the right with the crown. Everyone on your globe by points this month, most first; the leader wears the crown. Each morning it adds the day before's crowns." },
-      { icon: <Tab><ChatIcon size={15} /></Tab>, name: "Chat", text: "On the left under My Core. Globe chat is with your mutual friends and starts fresh every midnight, like the songs. Messages are one to one." },
+      { icon: <Tab><ChatIcon size={15} /></Tab>, name: "Chat", text: "On the left, between Friends and My Core. Globe chat is with your mutual friends and starts fresh every midnight, like the songs. Messages are one to one." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full px-1.5 py-1 text-[9px] font-semibold" style={glass(false)}>Message</span></span>,
         name: "Message",
@@ -166,7 +166,7 @@ const PAGES: Page[] = [
     tab: "Core",
     title: "My Core",
     rows: [
-      { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "My Core", text: "Flies into the middle of your globe, where your profile lives: every song you've ever picked, by month, and the ones you saved." },
+      { icon: <Tab><SignalCore className="h-3.5 w-3.5" /></Tab>, name: "My Core", text: "Flies into the middle of your globe, where your profile lives. Taste is your Taste Overview and what you spin, Songs is every song you've picked as a calendar and playlists, and People is your friends, who you follow and your globes. Tap anyone to fly into their core." },
       { icon: <Round><RedoArrows /></Round>, name: "One redo a day", text: "Changed your mind? Open your song and tap the arrows on its cover. It gets sucked away and you pick another, once a day." },
       { icon: <Round><CalendarIcon /></Round>, name: "Your archive", text: "At midnight your song moves into your core, sorted into a playlist for each month." },
       { icon: <Half><CoreIcon on /></Half>, name: "Saved", text: "Songs you saved from friends, kept in your core." },
