@@ -1653,6 +1653,7 @@ function Globe({
           cy={coreCenter ?? Math.round(L.h * 0.2)}
           coreR={50 * L.s}
           zoom={coreZoom}
+          night={darkOn}
         />
       )}
       {coreOpen && coreData && (
@@ -1661,7 +1662,7 @@ function Globe({
           posts={coreData.posts}
           saved={saved}
           mine={coreData.profile.id === me.id}
-          dark
+          dark={!inkMode() || darkOn}
           sheetTop={coreSheetTop}
           onClose={closeCore}
           onOpenToday={!coreWho ? () => fly(ME) : coreFor?.k != null ? () => fly(coreFor.k!) : undefined}
