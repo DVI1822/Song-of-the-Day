@@ -54,7 +54,7 @@ export function InviteCard({
   const [error, setError] = useState<string | null>(null);
 
   const link = inviteUrl(origin, username);
-  const message = `Share your Song of the Day with the world: ${link}`;
+  const message = `Come put your top track on my globe: ${link}`;
 
   const share = async () => {
     if (navigator.share) {

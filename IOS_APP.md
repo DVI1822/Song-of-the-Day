@@ -16,7 +16,8 @@ What the app adds over the website:
   (`src/components/AppBoot.tsx`). If iOS ever drops the web view's cookies, it
   signs straight back in.
 - **Opens fresh.** Coming back on a new day, or after 3 hours, reloads today's globe.
-- The crowned Globe icon and a coral splash screen, an offline screen, and no
+- The crowned Globe icon and a paper splash screen (the opening animation's
+  first frame, so it hands over to the site seamlessly), an offline screen, and no
   "add to your home screen" help.
 
 ## Files
@@ -26,7 +27,7 @@ What the app adds over the website:
 | `capacitor.config.ts` | app id `io.mytoptrack.app`, the site URL, splash |
 | `ios/` | the Xcode project (Swift Package Manager, no CocoaPods) |
 | `app-shell/` | the offline screen |
-| `assets/` | icon and splash sources. Regenerate with `npx @capacitor/assets generate --ios --iconBackgroundColor '#FF5E57' --splashBackgroundColor '#FF5E57'` |
+| `assets/` | icon source. Regenerate the icon with `npx @capacitor/assets generate --ios --iconBackgroundColor '#FF5E57'`, then put back `ios/App/App/Assets.xcassets/Splash.imageset` and `LaunchScreen.storyboard` from git: the splash is a 500 pt image drawn centred (not stretched) so its Globe lands exactly where the web animation's does (src/components/Launch.tsx) |
 | `codemagic.yaml` | cloud build that sends the app to TestFlight |
 | `src/lib/native.ts`, `src/components/AppBoot.tsx` | what the site does differently inside the app |
 

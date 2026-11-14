@@ -16,8 +16,8 @@ type Sub = { endpoint: string; p256dh: string; auth: string } & (
 );
 
 const NUDGE = {
-  noon: { title: "What's your song today?", body: "Pick the one that hit hardest and put it on your globe." },
-  night: { title: "Still time for today's song", body: "Your globe closes at midnight." },
+  noon: { title: "What's your top track today?", body: "Pick the song that ran your day and put it on your globe." },
+  night: { title: "Still time for your top track", body: "Your globe closes at midnight." },
 };
 
 export async function POST(req: Request) {

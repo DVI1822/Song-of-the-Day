@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "TopTrack",
     short_name: "TopTrack",
-    description: "One song a day. The one that hit hardest.",
+    description: "Pick your top track of the day, crown the best one on your globe, and find music through everyone else's.",
     start_url: "/",
     display: "standalone",
     background_color: "#FFFFFF",

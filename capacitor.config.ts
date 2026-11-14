@@ -17,18 +17,23 @@ const config: CapacitorConfig = {
   },
   // lets the site tell it's inside the app (src/lib/native.ts)
   appendUserAgent: "TopTrackApp",
-  backgroundColor: "#FF5E57",
+  // paper, the colour behind the opening animation (components/Launch.tsx)
+  backgroundColor: "#FFFDF6",
   ios: {
     contentInset: "never",
     scrollEnabled: false,
     limitsNavigationsToAppBoundDomains: false,
   },
   plugins: {
+    // The splash is the opening animation's first frame (the still Globe on
+    // paper, centred), and the site hides it the moment the animation can
+    // start (components/Launch.tsx), so the two join up seamlessly. The 6 s
+    // is only a fallback in case the site never loads.
     SplashScreen: {
-      launchShowDuration: 1200,
+      launchShowDuration: 6000,
       launchAutoHide: true,
-      launchFadeOutDuration: 300,
-      backgroundColor: "#FF5E57",
+      launchFadeOutDuration: 200,
+      backgroundColor: "#FFFDF6",
       showSpinner: false,
     },
     PushNotifications: {

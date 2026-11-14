@@ -4,6 +4,7 @@ import { PreviewProvider } from "@/components/globe/Preview";
 import { HandoffWaiter } from "@/components/HandoffWaiter";
 import { SessionFromLink } from "@/components/SessionFromLink";
 import { AppBoot } from "@/components/AppBoot";
+import { LAUNCH_SCRIPT, Launch } from "@/components/Launch";
 import { MiniPlayer } from "@/components/globe/Shuffle";
 import "./globals.css";
 
@@ -35,7 +36,7 @@ const nosifer = Nosifer({ variable: "--font-nosifer", subsets: ["latin"], weight
 
 export const metadata: Metadata = {
   title: "TopTrack",
-  description: "One song a day. The one that hit hardest.",
+  description: "Pick your top track of the day, crown the best one on your globe, and find music through everyone else's.",
   // The icons and home screen name are written straight into <head> below,
   // not here (see the note there).
 };
@@ -52,7 +53,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${outfit.variable} ${fredoka.variable} ${londrina.variable} ${creepster.variable} ${gothic.variable} ${nosifer.variable} ${gaegu.variable} h-full antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${outfit.variable} ${fredoka.variable} ${londrina.variable} ${creepster.variable} ${gothic.variable} ${nosifer.variable} ${gaegu.variable} h-full antialiased`}>
       {/* The home screen icon and name, always in <head>. Pages that look
           something up for their title (invite links, profiles) make Next send
           its metadata late, inside <body>, and Safari's Add to Home Screen
@@ -67,6 +68,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <meta name="mobile-web-app-capable" content="yes" />
         {/* most album covers come from Spotify: start the handshake before the page asks */}
         <link rel="preconnect" href="https://i.scdn.co" />
+        {/* the opening animation plays once a visit (components/Launch.tsx) */}
+        <script dangerouslySetInnerHTML={{ __html: LAUNCH_SCRIPT }} />
       </head>
       <body className="min-h-full">
         {/* what's playing carries on from page to page */}
@@ -77,6 +80,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <HandoffWaiter />
           <AppBoot />
         </PreviewProvider>
+        <Launch />
       </body>
     </html>
   );
