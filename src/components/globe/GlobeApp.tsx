@@ -56,6 +56,7 @@ import {
   type Camera,
   type Sun,
   type V3,
+  stayBlank,
 } from "./math";
 
 // Halloween's look never changes while the page is open
@@ -1337,7 +1338,7 @@ function Globe({
       {/* lightning lights up everything */}
       <div ref={(el) => void (R.current.wxFlash = el)} className="pointer-events-none absolute inset-0 z-[5] bg-white opacity-0" />
 
-      {/* facts about your song once you've posted, the songs on your globe and shuffle all (or what's playing), with + below until you've posted */}
+      {/* facts about your song once you've posted, the songs on your globe and the Play button (or the player), with + below until you've posted */}
       <div
         ref={(el) => void (R.current.chrome[1] = el)}
         className="absolute inset-x-0 bottom-[calc(46px+env(safe-area-inset-bottom))] z-[6] flex flex-col items-center justify-end gap-2"
@@ -1636,7 +1637,7 @@ function Globe({
           height: 220 * L.s,
           opacity: 0,
           borderRadius: coverRadius(220 * L.s),
-          background: myPost ? coverBackground(myPost.artwork_url, myPost.title) : undefined,
+          backgroundImage: myPost ? coverBackground(myPost.artwork_url, myPost.title) : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -2036,10 +2037,11 @@ function drawRipples(s: Motion, cv: HTMLCanvasElement | null, sim: TileSim, { Rb
     cv.height = H;
   }
   const ctx = cv.getContext("2d");
-  if (!ctx) return;
+  const empty = !sim.ripples.length || !s.cam || s.lens !== null || s.coreOn;
+  if (!ctx || stayBlank(cv, empty)) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  if (!sim.ripples.length || !s.cam || s.lens !== null || s.coreOn) return;
+  if (empty) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.lineCap = "butt";
   const night = s.dk > 0.5;

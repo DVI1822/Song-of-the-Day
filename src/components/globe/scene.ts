@@ -1,5 +1,5 @@
 import type { Weather } from "@/lib/weather";
-import { PERSPECTIVE, camInv, camV, type Camera, type V3 } from "./math";
+import { PERSPECTIVE, camInv, camV, stayBlank, type Camera, type V3 } from "./math";
 import { CELLS, TEX, atlas } from "./textures";
 
 // The weather and the season, in the Globe's own 3D space, drawn on the GPU.
@@ -360,6 +360,7 @@ class Particles {
     const gl = this.gl;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const [W, H] = fit(this.cv, f.w, f.h, dpr);
+    if (stayBlank(this.cv, !this.n)) return;
     gl.viewport(0, 0, W, H);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -412,10 +413,12 @@ class Sky {
     const gl = this.gl;
     // the drawn edge needs a sharper canvas than soft clouds do
     const [W, H] = fit(this.cv, w, h, this.ink ? 0.75 : 0.4);
+    const empty = c.cover <= 0.01 || c.alpha <= 0.01;
+    if (stayBlank(this.cv, empty)) return;
     gl.viewport(0, 0, W, H);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    if (c.cover <= 0.01 || c.alpha <= 0.01) return;
+    if (empty) return;
     gl.useProgram(this.prog);
     gl.uniform2f(this.u.res, W, H);
     gl.uniform1f(this.u.time, t);

@@ -100,7 +100,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[username]">
               {[...months.entries()].map(([key, list]) => (
                 <a key={key} href={`#m-${key}`} className="flex flex-col gap-1.5">
                   <div className="relative aspect-square overflow-hidden rounded-[26%]">
-                    <Artwork src={list[0].artwork_url} alt="" className="h-full w-full" />
+                    <Artwork src={list[0].artwork_url} alt="" size={110} className="h-full w-full" />
                     <span className="absolute bottom-1.5 right-1.5 rounded-full bg-card px-2 text-[10px] font-semibold leading-5">
                       {list.length}
                     </span>

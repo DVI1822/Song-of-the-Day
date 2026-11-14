@@ -5,8 +5,8 @@ import type { Post } from "@/lib/types";
 import { usePreview } from "./Preview";
 import { Cover, glass } from "./ui";
 
-// Shuffle all: every song on the Globe, in a random order, as 30-second
-// samples back to back.
+// Play: every song on the Globe, in a random order, as 30-second samples
+// back to back.
 // Whatever's playing (a shuffle or one song) lives in PreviewProvider, in the
 // root layout, so it keeps going on every page: the Globe shows it in this
 // bar, everywhere else in the mini player.
@@ -25,7 +25,7 @@ export function Shuffle({ songs, who }: { songs: Post[]; who?: Who }) {
     return () => setDocked(false);
   }, [setDocked]);
 
-  if (pv.shuffle || pv.track) return <Controls who={who} />;
+  if (pv.shuffle || pv.track) return <Controls who={who} songs={songs} />;
   if (!songs.length) return null;
 
   const start = async () => {
@@ -41,12 +41,14 @@ export function Shuffle({ songs, who }: { songs: Post[]; who?: Who }) {
         type="button"
         onClick={start}
         disabled={busy}
-        aria-label="Shuffle all songs"
-        className="flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-semibold"
+        aria-label="Play every song on your globe"
+        className="flex h-11 items-center gap-2 rounded-full pl-1.5 pr-5 text-[14px] font-semibold"
         style={glass(false)}
       >
-        <ShuffleIcon />
-        {busy ? "Starting…" : "Shuffle all"}
+        <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ border: "1.6px solid currentColor" }}>
+          <PlayIcon size={14} />
+        </span>
+        {busy ? "Starting…" : "Play"}
       </button>
       {note && (
         <p className="max-w-[260px] text-center text-[11px]" style={{ color: "#0D2A3F", opacity: 0.7 }}>
@@ -70,76 +72,93 @@ export function MiniPlayer() {
   );
 }
 
-// The tiny now-playing pill: cover, song, album when it fits, who played it.
-function Controls({ who }: { who?: Who }) {
+// The now-playing player: the cover, the song and who put it on your globe on
+// the left (tap either to open the song's card from its spot on the Globe),
+// back, play/pause and next on the right.
+function Controls({ who, songs }: { who?: Who; songs?: Post[] }) {
   const pv = usePreview();
   const sh = pv.shuffle;
   const now = sh?.now ?? pv.track?.post;
   if (!now) return null;
   const paused = sh ? sh.paused : Boolean(pv.track?.paused);
   const by = who?.name(now) ?? null;
-  const btn = "flex h-7 w-7 flex-none items-center justify-center rounded-full";
+  const rest = songs?.filter((p) => p.id !== now.id && p.preview_url) ?? [];
+  const last = sh ? sh.list[sh.list.length - 1]?.id === now.id : !rest.length;
+  // one song playing on its own: next carries on through the rest of the globe
+  const next = sh ? pv.shuffleNext : () => void pv.startShuffle(rest);
+  const btn = "flex h-10 w-10 flex-none items-center justify-center rounded-full disabled:opacity-30";
   const info = (
     <>
-      <Cover src={now.artwork_url} seed={now.title} size={28} style={{ borderRadius: 999 }} />
-      <span className="flex min-w-0 flex-1 flex-col pl-2 pr-1 text-left leading-[1.15]">
-        <span className="truncate text-[12px] font-semibold">{now.title}</span>
-        <span className="truncate text-[10.5px]">
-          {by && <span className="font-semibold text-accent">{by}</span>}
-          {by && now.album && <span className="opacity-40"> · </span>}
-          {now.album && <span className="opacity-60">{now.album}</span>}
-          {!by && !now.album && <span className="opacity-60">{now.artist}</span>}
+      <Cover src={now.artwork_url} seed={now.title} size={46} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 pl-3 pr-1 text-left leading-[1.2]">
+        <span className="truncate text-[14px] font-semibold">{now.title}</span>
+        <span className="truncate text-[12px]">
+          {by ? <span className="font-semibold text-accent">{by}</span> : <span className="opacity-60">{now.artist}</span>}
         </span>
       </span>
     </>
   );
   return (
-    <div className="flex h-10 w-[min(272px,calc(100vw-40px))] items-center rounded-full py-1 pl-1 pr-1" style={glass(false)}>
+    <div
+      className="flex h-[62px] w-[min(360px,calc(100vw-32px))] items-center rounded-[22px] py-2 pl-2 pr-1.5"
+      style={glass(false)}
+    >
       {who ? (
         <button
           type="button"
           onClick={() => who.open(now)}
-          aria-label={`${now.title}${by ? `, played by ${by}` : ""}. Show it on the globe`}
-          className="flex min-w-0 flex-1 items-center rounded-full"
+          aria-label={`${now.title}${by ? `, picked by ${by}` : ""}. Open the song`}
+          className="flex min-w-0 flex-1 items-center rounded-[14px]"
         >
           {info}
         </button>
       ) : (
         <div className="flex min-w-0 flex-1 items-center">{info}</div>
       )}
-      <button type="button" onClick={sh ? pv.shuffleToggle : pv.toggle} aria-label={paused ? "Play" : "Pause"} className={btn}>
-        {paused ? <PlayIcon /> : <PauseIcon />}
+      <button type="button" onClick={pv.shufflePrev} aria-label="Back" className={btn}>
+        <PrevIcon />
       </button>
-      {sh && (
-        <button type="button" onClick={pv.shuffleNext} aria-label="Next song" className={btn}>
-          <NextIcon />
+      <button
+        type="button"
+        onClick={sh ? pv.shuffleToggle : pv.toggle}
+        aria-label={paused ? "Play" : "Pause"}
+        className={`${btn} h-11 w-11`}
+        style={{ border: "1.8px solid currentColor" }}
+      >
+        {paused ? <PlayIcon size={16} /> : <PauseIcon />}
+      </button>
+      <button type="button" onClick={next} disabled={last} aria-label="Next song" className={btn}>
+        <NextIcon />
+      </button>
+      {!who && (
+        <button type="button" onClick={pv.stop} aria-label="Stop" className={`${btn} w-8 opacity-50`}>
+          <CloseIcon />
         </button>
       )}
-      <button type="button" onClick={pv.stop} aria-label="Stop" className={`${btn} opacity-50`}>
-        <CloseIcon />
-      </button>
     </div>
   );
 }
 
-export const ShuffleIcon = () => (
-  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-  </svg>
-);
-const PlayIcon = () => (
-  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M7 4.5v15l13-7.5z" />
+// navy line icons, like the song card's buttons
+const line = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+const PlayIcon = ({ size = 14 }: { size?: number }) => (
+  <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" {...line} style={{ marginLeft: size / 8 }}>
+    <path d="M7 4.8v14.4a.6.6 0 0 0 .9.5l11.6-7.2a.6.6 0 0 0 0-1L7.9 4.3a.6.6 0 0 0-.9.5z" />
   </svg>
 );
 const PauseIcon = () => (
-  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+  <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" {...line} strokeWidth={2.4}>
+    <path d="M8.5 5v14M15.5 5v14" />
   </svg>
 );
 const NextIcon = () => (
-  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M5 4.5v15l11-7.5zM17 4h3v16h-3z" />
+  <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" {...line}>
+    <path d="M5 6.2v11.6a.5.5 0 0 0 .8.4l8.4-5.8a.5.5 0 0 0 0-.8L5.8 5.8a.5.5 0 0 0-.8.4zM18.5 5.5v13" />
+  </svg>
+);
+const PrevIcon = () => (
+  <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" {...line}>
+    <path d="M19 6.2v11.6a.5.5 0 0 1-.8.4l-8.4-5.8a.5.5 0 0 1 0-.8l8.4-5.8a.5.5 0 0 1 .8.4zM5.5 5.5v13" />
   </svg>
 );
 const CloseIcon = () => (
@@ -147,3 +166,5 @@ const CloseIcon = () => (
     <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 );
+
+export const PlayAllIcon = () => <PlayIcon size={15} />;

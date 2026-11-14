@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Post } from "@/lib/types";
 import { alpha, drift, useCoreLook } from "./coreLook";
+import { coverAt } from "@/lib/cover";
 
 // Inside someone's core. It's the core itself: as the camera dives in, the
 // core's rings grow out of it until they fill the screen and you're in a slow
@@ -65,7 +66,7 @@ export function CoreInside({
     live.current.covers = coverKey.split("|").filter(Boolean).map((src) => {
       const im = new Image();
       im.decoding = "async";
-      im.src = src;
+      im.src = coverAt(src, 60);
       return im;
     });
   }, [coverKey]);

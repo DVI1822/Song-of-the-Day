@@ -16,7 +16,7 @@ export function ArchiveRow({ post, date, time, divider }: { post: Post; date: st
         className="flex h-[58px] w-full items-center gap-3 text-left"
       >
         <span className="w-12 flex-none text-[11px] font-semibold">{date}</span>
-        <Artwork src={post.artwork_url} alt="" className="h-[38px] w-[38px] flex-none rounded-[10px]" />
+        <Artwork src={post.artwork_url} alt="" size={38} className="h-[38px] w-[38px] flex-none rounded-[10px]" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13px] font-semibold">{post.title}</span>
           <span className="truncate text-[11px] text-card-muted">{post.artist}</span>
