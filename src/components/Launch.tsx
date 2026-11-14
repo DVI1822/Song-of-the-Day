@@ -64,8 +64,9 @@ const HIT3 = HIT2 + B2;
 const RISE = 0.6; // floats up to its spot
 const FLOATED = HIT3 + RISE;
 const FADE = 3.4; // then it shrinks into the O of the TopTrack logo on the page (or fades)
-const FADE_FOR = 0.85;
-const DONE = FADE + FADE_FOR;
+const FADE_FOR = 1.25;
+const SETTLE = 0.4; // once in the O, the rest of the logo fades in round it
+const DONE = FADE + FADE_FOR + SETTLE;
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const smooth = (x: number) => {
@@ -376,7 +377,7 @@ export function Launch() {
     let raf = 0;
     let t0 = 0;
     let fadeAt = FADE;
-    let target: { x: number; y: number; r: number } | null | undefined;
+    let target: { x: number; y: number; r: number; logo: SVGSVGElement } | null | undefined;
     const svg = el.querySelector("svg") as SVGSVGElement;
     // off the screen, up the axis
     const far = (Math.max(window.innerHeight, window.innerWidth) / 2 + 110) / Math.cos(TAU_TILT);
@@ -388,7 +389,11 @@ export function Launch() {
       // the end: the paper fades away while the globe and crown shrink into
       // the logo's O on the page underneath, where the real one takes over
       const k = clamp((t - fadeAt) / FADE_FOR);
-      if (k > 0 && target === undefined) target = findO();
+      if (k > 0 && target === undefined) {
+        target = findO();
+        // the page's logo waits until the globe is in its O
+        if (target) target.logo.style.opacity = "0";
+      }
       const m = k * k * (3 - 2 * k);
       el.style.background = `rgba(255,253,246,${1 - smooth(k / 0.75)})`;
       if (target) {
@@ -397,14 +402,22 @@ export function Launch() {
           dy = target.y - (box.top + box.height / 2);
         const sc = 1 + (target.r / R - 1) * m;
         svg.style.transform = `translate(${dx * m}px, ${dy * m}px) scale(${sc})`;
-        svg.style.opacity = String(1 - smooth((k - 0.72) / 0.28));
+        const after = clamp((t - fadeAt - FADE_FOR) / SETTLE);
+        target.logo.style.opacity = String(smooth(after));
+        svg.style.opacity = String(1 - smooth((after - 0.5) / 0.5));
       } else svg.style.opacity = String(1 - k);
-      if (t < fadeAt + FADE_FOR) raf = requestAnimationFrame(frame);
-      else setGone(true);
+      if (t < fadeAt + FADE_FOR + (target ? SETTLE : 0)) raf = requestAnimationFrame(frame);
+      else {
+        if (target) target.logo.style.opacity = "";
+        setGone(true);
+      }
     };
     hideSplash();
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (target) target.logo.style.opacity = "";
+    };
   }, []);
 
   if (gone) return null;
@@ -440,7 +453,7 @@ function findO() {
     const b = w.getBoundingClientRect();
     if (b.width < 20 || b.bottom < 0 || b.top > window.innerHeight) continue;
     const s = b.width / 460;
-    return { x: b.left + (91 + 33) * s, y: b.top + (69 + 6) * s, r: 28 * s };
+    return { x: b.left + (91 + 33) * s, y: b.top + (69 + 6) * s, r: 28 * s, logo: w };
   }
   return null;
 }
