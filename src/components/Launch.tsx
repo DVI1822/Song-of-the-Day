@@ -8,7 +8,8 @@ import { isApp } from "@/lib/native";
 // and build the Globe (it's made of everyone's posts), spinning on its tilted
 // axis; then the gold crown shoots down that axis, bounces twice on the north
 // pole and floats up to its spot, where it keeps turning with the globe. Then
-// it all fades into the app.
+// the paper fades and the globe and crown shrink into the O of the TopTrack
+// logo on the page underneath.
 //
 // It plays once per visit (a tab, or a launch of the iPhone app): a script
 // in <head> (LAUNCH_SCRIPT, layout.tsx) marks the page before it's drawn so
@@ -62,8 +63,8 @@ const B2 = 0.16; // second, smaller
 const HIT3 = HIT2 + B2;
 const RISE = 0.6; // floats up to its spot
 const FLOATED = HIT3 + RISE;
-const FADE = 3.75; // the whole thing fades into the app
-const FADE_FOR = 0.45;
+const FADE = 3.4; // then it shrinks into the O of the TopTrack logo on the page (or fades)
+const FADE_FOR = 0.85;
 const DONE = FADE + FADE_FOR;
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -375,6 +376,8 @@ export function Launch() {
     let raf = 0;
     let t0 = 0;
     let fadeAt = FADE;
+    let target: { x: number; y: number; r: number } | null | undefined;
+    const svg = el.querySelector("svg") as SVGSVGElement;
     // off the screen, up the axis
     const far = (Math.max(window.innerHeight, window.innerWidth) / 2 + 110) / Math.cos(TAU_TILT);
     const frame = (now: number) => {
@@ -382,7 +385,20 @@ export function Launch() {
       const t = (now - t0) / 1000;
       if (skip.current && fadeAt > t) fadeAt = t;
       g.innerHTML = launchFrame(t, far);
-      el.style.opacity = String(1 - clamp((t - fadeAt) / FADE_FOR));
+      // the end: the paper fades away while the globe and crown shrink into
+      // the logo's O on the page underneath, where the real one takes over
+      const k = clamp((t - fadeAt) / FADE_FOR);
+      if (k > 0 && target === undefined) target = findO();
+      const m = k * k * (3 - 2 * k);
+      el.style.background = `rgba(255,253,246,${1 - smooth(k / 0.75)})`;
+      if (target) {
+        const box = el.getBoundingClientRect();
+        const dx = target.x - (box.left + box.width / 2),
+          dy = target.y - (box.top + box.height / 2);
+        const sc = 1 + (target.r / R - 1) * m;
+        svg.style.transform = `translate(${dx * m}px, ${dy * m}px) scale(${sc})`;
+        svg.style.opacity = String(1 - smooth((k - 0.72) / 0.28));
+      } else svg.style.opacity = String(1 - k);
       if (t < fadeAt + FADE_FOR) raf = requestAnimationFrame(frame);
       else setGone(true);
     };
@@ -414,6 +430,19 @@ export function Launch() {
       </svg>
     </div>
   );
+}
+
+// The Globe O of a TopTrack wordmark showing on the page (components/globe/
+// Wordmark.tsx): its centre and radius on screen. Its globe is drawn at
+// 91,69 with radius 28 in a viewBox that starts at -33,-6 and is 460 wide.
+function findO() {
+  for (const w of document.querySelectorAll<SVGSVGElement>("svg[data-wordmark]")) {
+    const b = w.getBoundingClientRect();
+    if (b.width < 20 || b.bottom < 0 || b.top > window.innerHeight) continue;
+    const s = b.width / 460;
+    return { x: b.left + (91 + 33) * s, y: b.top + (69 + 6) * s, r: 28 * s };
+  }
+  return null;
 }
 
 // how long the whole thing runs, for anyone waiting on it
