@@ -35,7 +35,7 @@ import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./i
 import { FriendsTab } from "./Panels";
 import { BoardTab, Leaderboard } from "./Ranks";
 import { NewsCard } from "./News";
-import { PullTab } from "./pull";
+import { PanelSwipe, PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass, RecenterIcon, TabIcon } from "./ui";
@@ -1498,7 +1498,8 @@ function Globe({
           onClick={() => openCore(null)}
           aria-label="My Core: your songs and profile"
           className="box-border flex h-[104px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
-          style={glass(darkOn)}
+          // under Chat, which sits between Friends and here
+          style={{ ...glass(darkOn), marginTop: 104 }}
         >
           <SignalCore className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
@@ -1508,7 +1509,9 @@ function Globe({
       </div>
 
       {panel && (
-        <div
+        <PanelSwipe
+          side="left"
+          onClose={closePanel}
           id="tt-panel"
           className="absolute left-[46px] z-[425] box-border flex flex-col overflow-hidden rounded-[26px] transition-[opacity,transform] duration-[260ms] ease-out"
           style={{
@@ -1547,10 +1550,10 @@ function Globe({
               onCore={(p) => openCore(null, p)}
             />
           )}
-        </div>
+        </PanelSwipe>
       )}
 
-      {/* the chat, pulled out from the left under My Core */}
+      {/* the chat, pulled out from the left between Friends and My Core */}
       <Chat
         api={api}
         me={me}
@@ -1573,7 +1576,7 @@ function Globe({
           setChatOn(false);
           openCore(null, p);
         }}
-        tabTop={tabTop + 224}
+        tabTop={tabTop + 112}
         top={Math.max(90, tabTop - 50)}
         width={Math.min(320, L.w - 96)}
         height={Math.min(600, L.h - Math.max(90, tabTop - 50) - 144)}

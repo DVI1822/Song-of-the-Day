@@ -3,7 +3,7 @@
 import { useEffect, useState, type Ref } from "react";
 import type { Friend, Profile, Score } from "@/lib/types";
 import type { GlobeApi } from "./api";
-import { PullTab } from "./pull";
+import { PullTab, useSwipeAway } from "./pull";
 import { CloseIcon, Face, glass } from "./ui";
 
 // Your TopTrack: once you've posted, you crown the one song on your globe
@@ -159,6 +159,7 @@ export function BoardTab({
   tabRef?: Ref<HTMLButtonElement>;
   children: React.ReactNode;
 }) {
+  const swipe = useSwipeAway({ side: "right", onClose });
   return (
     <>
       <PullTab
@@ -182,6 +183,7 @@ export function BoardTab({
       </PullTab>
       <div
         id="tt-board"
+        ref={swipe}
         role="dialog"
         aria-label="Leaderboard"
         inert={!open}

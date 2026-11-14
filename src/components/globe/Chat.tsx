@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { formatTime } from "@/lib/day";
 import type { AddedMe, Friend, Message, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
-import { PullTab } from "./pull";
+import { PullTab, useSwipeAway } from "./pull";
 import { BackIcon, CloseIcon, Face, glass } from "./ui";
 
 // The Chat tab on the left edge, under My Core. Inside, two sides: the globe
@@ -168,6 +168,7 @@ export function Chat({
     return res.error ?? null;
   };
 
+  const swipe = useSwipeAway({ side: "left", onClose });
   const shown = view.kind === "dm" ? msgs.filter((m) => m.to_id !== null && pair(m, me.id) === dmId) : globe;
 
   return (
@@ -199,6 +200,7 @@ export function Chat({
 
       <div
         id="tt-chat"
+        ref={swipe}
         role="dialog"
         aria-label="Chat"
         inert={!open}

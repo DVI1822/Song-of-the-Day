@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, type ButtonHTMLAttributes, type Ref } from "react";
+import { useEffect, useLayoutEffect, useRef, type ButtonHTMLAttributes, type Ref } from "react";
 
 // A side tab you can grab and pull, like the handle of a drawer. Drag it
 // out from the edge and its panel slides out under your finger; let go past
@@ -182,4 +182,98 @@ export function PullTab({
 }: { pull: Opts; buttonRef?: Ref<HTMLButtonElement> } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const { style: own, ...bind } = usePull(pull);
   return <button ref={buttonRef} type="button" {...rest} {...bind} style={{ ...style, ...own }} />;
+}
+
+// An open side panel you can push back in: drag it sideways toward its own
+// edge and it follows the finger; let go past a third of the way (or with a
+// flick that way) and it closes, otherwise it springs back. Up and down still
+// scroll the panel, and a drag that starts in a text box is left alone.
+// Touch events, not pointer events: once the panel's list can scroll, the
+// browser takes a pointer drag for itself (pointercancel), while a touchmove
+// can still be claimed with preventDefault once it's clearly sideways.
+export function useSwipeAway(o: { side: "left" | "right"; onClose(): void }) {
+  const opts = useRef(o);
+  useLayoutEffect(() => {
+    opts.current = o;
+  });
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const sign = () => (opts.current.side === "left" ? 1 : -1);
+    let x0 = 0,
+      y0 = 0,
+      on = false,
+      dead = true,
+      dx = 0,
+      hist: { t: number; x: number }[] = [];
+    const back = (close: boolean) => {
+      el.style.setProperty("transition", `transform ${SNAP}ms cubic-bezier(.2,.8,.3,1), opacity ${SNAP}ms ease-out`, "important");
+      el.style.transform = close ? `translateX(${-sign() * 60}px)` : "translateX(0px)";
+      el.style.opacity = close ? "0" : "1";
+      if (close) opts.current.onClose();
+      // left exactly where React's own style for it puts it (open or tucked
+      // away), so the two never disagree; clearing them would wipe React's
+      setTimeout(() => el.style.removeProperty("transition"), SNAP + 20);
+    };
+    const start = (e: TouchEvent) => {
+      const t = e.touches[0];
+      dead = e.touches.length > 1 || !!(e.target as Element).closest?.("input, textarea, select, [contenteditable]");
+      on = false;
+      dx = 0;
+      x0 = t.clientX;
+      y0 = t.clientY;
+      hist = [{ t: e.timeStamp, x: t.clientX }];
+    };
+    const move = (e: TouchEvent) => {
+      if (dead) return;
+      const t = e.touches[0];
+      const mx = t.clientX - x0,
+        my = t.clientY - y0;
+      if (!on) {
+        if (Math.abs(my) > LOCK && Math.abs(my) > Math.abs(mx)) return void (dead = true);
+        if (Math.abs(mx) < LOCK) return;
+        if (sign() * mx > 0) return void (dead = true); // only toward its own edge
+        on = true;
+      }
+      e.preventDefault();
+      hist.push({ t: e.timeStamp, x: t.clientX });
+      while (hist.length > 2 && e.timeStamp - hist[0].t > 90) hist.shift();
+      dx = Math.min(0, sign() * mx); // how far in, as a negative number
+      el.style.transition = "none";
+      el.style.transform = `translateX(${sign() * dx}px)`;
+      el.style.opacity = String(Math.max(0.2, 1 + dx / (el.offsetWidth + 46)));
+    };
+    const end = (e: TouchEvent) => {
+      if (dead || !on) return;
+      dead = true;
+      if (e.type === "touchcancel") return back(false);
+      const a = hist[0],
+        b = hist[hist.length - 1];
+      const v = a && b && b.t > a.t ? (sign() * (b.x - a.x)) / (b.t - a.t) : 0;
+      back(v < -FLICK || -dx > (el.offsetWidth + 46) / 3);
+    };
+    // capture: a list inside may keep its touches to itself
+    el.addEventListener("touchstart", start, { passive: true, capture: true });
+    el.addEventListener("touchmove", move, { passive: false, capture: true });
+    el.addEventListener("touchend", end, true);
+    el.addEventListener("touchcancel", end, true);
+    return () => {
+      el.removeEventListener("touchstart", start, true);
+      el.removeEventListener("touchmove", move, true);
+      el.removeEventListener("touchend", end, true);
+      el.removeEventListener("touchcancel", end, true);
+    };
+  }, []);
+  return ref;
+}
+
+// A panel div that can be pushed back in (useSwipeAway).
+export function PanelSwipe({
+  side,
+  onClose,
+  ...rest
+}: { side: "left" | "right"; onClose(): void } & React.HTMLAttributes<HTMLDivElement>) {
+  const ref = useSwipeAway({ side, onClose });
+  return <div ref={ref} {...rest} />;
 }
