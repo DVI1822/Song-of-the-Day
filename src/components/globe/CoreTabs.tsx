@@ -348,7 +348,7 @@ export function SongsPane({
     const crowned = posts.filter((p) => picks[p.id]);
     if (crowned.length) out.push({ key: "crowned", name: "Crowned", songs: crowned, disc: GOLD });
     const felt = posts.filter((p) => (feels[p.id] ?? 0) > 0).sort((a, b) => (feels[b.id] ?? 0) - (feels[a.id] ?? 0)).slice(0, 25);
-    if (felt.length >= 2) out.push({ key: "felt", name: "Most felt", songs: felt, disc: CORAL });
+    if (felt.length >= 2) out.push({ key: "felt", name: "Most liked", songs: felt, disc: CORAL });
     if (mine && saved?.length) out.push({ key: "saved", name: "Saved from friends", songs: saved, disc: GREEN });
     const fri = posts.filter((p) => new Date(p.day + "T12:00:00Z").getUTCDay() === 5);
     if (fri.length >= 2) out.push({ key: "friday", name: "Friday picks", songs: fri, disc: PLUM });
@@ -558,7 +558,7 @@ function SongRow({
                 <Crown size={12} />
               </span>
             )}
-            {felt > 0 && <span>{felt} felt</span>}
+            {felt > 0 && <span>{felt} {felt === 1 ? "like" : "likes"}</span>}
           </div>
         )}
       </button>
