@@ -174,11 +174,11 @@ export function CoreView({
         </div>
         <div
           className="display mt-1.5 max-w-full truncate text-[26px] leading-tight transition-colors"
-          style={{ color: ink, textShadow: "0 1px 12px rgba(4,5,12,0.85)" }}
+          style={{ color: ink, textShadow: dark ? "0 1px 12px rgba(4,5,12,0.85)" : "none" }}
         >
           {profile?.display_name}
         </div>
-        <div className="text-[13px] transition-colors" style={{ color: muted, textShadow: "0 1px 10px rgba(4,5,12,0.85)" }}>
+        <div className="text-[13px] transition-colors" style={{ color: muted, textShadow: dark ? "0 1px 10px rgba(4,5,12,0.85)" : "none" }}>
           @{profile?.username}
         </div>
       </div>

@@ -13,7 +13,7 @@
 import type { Weather } from "@/lib/weather";
 import { pulseAt } from "./beat";
 import { halloween } from "./halloween";
-import { inkMode, inkRing, boil } from "./ink";
+import { CHALK, CORAL, GREEN, INK, inkMode, inkRing, boil, css as inkCss, wobbly } from "./ink";
 import type { Live, Motion } from "./GlobeApp";
 import { PERSPECTIVE, TILT, camV, latLon, type Camera, type TileSim, type V3 } from "./math";
 
@@ -260,9 +260,21 @@ export function drawSignalStream(s: Motion, cv: HTMLCanvasElement | null, sim: T
   // out along the stream
   const ct = beam?.beat ? beam.clipTime() : null;
   const hit = beam?.beat && ct !== null ? pulseAt(beam.beat, ct) : 0;
-  if (hit > s.beamLvl + 0.25 && hit > 0.45) s.beamSwells.push({ u: 0, a: hit });
+  const swell = hit > s.beamLvl + 0.25 && hit > 0.45;
+  if (swell) s.beamSwells.push({ u: 0, a: hit });
   s.beamLvl += (hit - s.beamLvl) * Math.min(1, dt * (hit > s.beamLvl ? 40 : 9));
   for (const w of s.beamSwells) w.u += dt * 1.2;
+  // the drawn look: while it plays the core sends out rings of signal, one on
+  // each hit it can hear, or in time with the stream's own pulses when it
+  // can't hear the song
+  if (s.beamA > 0.5 && on) {
+    const beat = !!beam?.beat;
+    const n = Math.floor(s.mt * 0.55 - 0.05);
+    if ((beat ? swell : n !== lastBeatN) && (!pulses.length || s.mt - pulses[pulses.length - 1].t > 0.28))
+      pulses.push({ t: s.mt, a: beat ? Math.max(0.6, hit) : 0.8, n: pulseN++ });
+    lastBeatN = n;
+  }
+  pulses = pulses.filter((q) => s.mt - q.t < PULSE_TIME);
   s.beamSwells = s.beamSwells.filter((w) => w.u < 1.1).slice(-4);
 
   const dpr = fit(cv, L.w, L.h);
@@ -286,6 +298,10 @@ export function drawSignalStream(s: Motion, cv: HTMLCanvasElement | null, sim: T
   };
   const quiet = s.lens !== null ? 0.35 : 1;
   const R0 = Rb * s.zoom;
+  if (inkMode()) {
+    drawInkStream(ctx, s, sim, { half, Rb, L }, project, R0, quiet, night);
+    return;
+  }
   const lightC = tone(t * 0.1 + 0.5, e);
   // how far the light carries: strong at night, faint in daylight (a bit more
   // under cloud), wide and soft in fog, a little brighter off wet glass
@@ -482,4 +498,179 @@ export function drawSignalStream(s: Motion, cv: HTMLCanvasElement | null, sim: T
   }
   glowLine(ctx, mid, (w, al) => css(tone(2.5 + t * 0.05, e), 0.6, al), 0.5 * L.s, A * 0.35, night ? 1 : 0.6);
   ctx.globalCompositeOperation = "source-over";
+}
+
+// ---------------------------------------------------------------------------
+// The drawn look (ink.ts): no glow, just boiling ink lines. The stream is a
+// cable of three twisted strands (ink, coral, green) with beads of signal
+// running out along it to the song, and the core sends rings of drawn
+// waveform out to the glass while a song plays, and a bold one when a song
+// lands.
+// ---------------------------------------------------------------------------
+
+const PULSE_TIME = 1.5;
+let pulses: { t: number; a: number; n: number }[] = [];
+let pulseN = 0;
+let lastBeatN = 0;
+
+// a ring of drawn waveform round the core, broken in a couple of places the
+// way a quick pen line skips
+function inkWaveRing(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, amp: number, ph: number, seed: number, width: number, color: string) {
+  const gaps = [hash(seed) * TAU, hash(seed + 1) * TAU];
+  const gapW = 0.18 + 0.2 * hash(seed + 2);
+  const inGap = (th: number) => gaps.some((g) => Math.abs(((th - g + 3 * Math.PI) % TAU) - Math.PI) < gapW / 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  let run: [number, number][] = [];
+  const flush = () => {
+    if (run.length > 1) wobbly(ctx, run, seed, 0.9);
+    run = [];
+  };
+  const n = Math.max(90, Math.min(260, Math.round(r * 1.2)));
+  for (let i = 0; i <= n; i++) {
+    const th = (i / n) * TAU;
+    if (inGap(th)) {
+      flush();
+      continue;
+    }
+    const rr = r + amp * Math.sin(th * 18 + ph) * (0.6 + 0.4 * Math.sin(th * 3 - ph * 0.4));
+    run.push([cx + Math.cos(th) * rr, cy + Math.sin(th) * rr]);
+  }
+  flush();
+}
+
+function drawInkStream(
+  ctx: CanvasRenderingContext2D,
+  s: Motion,
+  sim: TileSim,
+  { half, Rb, L }: Pick<Live, "half" | "Rb" | "L">,
+  project: (p: V3) => [number, number, number],
+  R0: number,
+  quiet: number,
+  night: boolean,
+) {
+  const t = s.mt;
+  const b = boil(t);
+  const ink = night ? CHALK : INK;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  const r0 = 50 * L.s * s.zoom * 1.05,
+    r1 = R0 * 0.93;
+
+  // rings of signal while it plays: each one leaves the core and spreads to
+  // just inside the glass, thinning as it goes
+  for (const q of pulses) {
+    const u = (t - q.t) / PULSE_TIME;
+    if (u < 0 || u >= 1) continue;
+    const r = r0 + (r1 - r0) * easeOut(u);
+    const fade = Math.min(1, u / 0.05) * Math.pow(1 - u, 1.4) * quiet * s.beamA;
+    const c = q.n % 3 === 1 ? CORAL : q.n % 3 === 2 ? GREEN : ink;
+    inkWaveRing(ctx, L.cx, L.cy, r, (1.5 + 4 * (1 - u)) * L.s * q.a, (t - q.t) * 7, q.n * 7 + b, (0.8 + 1.6 * (1 - u)) * L.s, inkCss(c, fade * 0.9));
+  }
+
+  // a song landing: one bold ring with a coral echo behind it
+  for (const age of kickAges) {
+    const u = age / WAVE_TIME;
+    if (u >= 1) continue;
+    const rf = r0 + (r1 - r0) * easeOut(u);
+    const fade = Math.min(1, u / 0.06) * Math.pow(1 - u, 1.3) * quiet;
+    inkWaveRing(ctx, L.cx, L.cy, rf, (2.5 + 5 * (1 - u)) * L.s, age * 9, 40 + b, 2.2 * L.s, inkCss(ink, fade));
+    const re = rf - (8 + 10 * u) * L.s;
+    if (re > r0) inkWaveRing(ctx, L.cx, L.cy, re, (2 + 3 * (1 - u)) * L.s, age * 9 + 0.9, 43 + b, 1.4 * L.s, inkCss(CORAL, fade * 0.8));
+  }
+  // the songs don't take on a glow in the drawn look
+  coreLight.a = 0;
+  coreLight.play = 0;
+  coreLight.wave = 0;
+
+  if (s.beamA < 0.01 || s.beamK < 0) return;
+  const A = s.beamA * quiet;
+  const { lat, lon } = latLon(sim.pos(s.beamK));
+  const v = camV([Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)], s.cam!);
+  const a = norm(Math.abs(v[2]) < 0.95 ? cross(v, [0, 0, 1]) : cross(v, [0, 1, 0]));
+  const bb = cross(v, a);
+  const bow = Rb * 0.07 * Math.sin(t * 0.5);
+  const axis = (u: number): V3 => {
+    const r = Rb * (1 - u) + half * 0.1,
+      k = Math.sin(Math.PI * u) * bow;
+    return [v[0] * r + a[0] * k, v[1] * r + a[1] * k, v[2] * r + a[2] * k];
+  };
+  // where the pulses are along the stream (u: song 0, core 1); they leave
+  // the core and run out to the song
+  const env = (u: number) => {
+    let e = Math.pow(0.5 + 0.5 * Math.sin(TAU * (u * 2.2 + t * 0.55)), 3);
+    for (const w of s.beamSwells) e += 1.2 * w.a * Math.exp(-(((u - (1 - w.u)) / 0.08) ** 2));
+    return e;
+  };
+
+  // three strands, a third of a turn apart, wound into one cable; each split
+  // where it turns toward you or away, the far side thin and faint
+  const M = 160;
+  const strandC = [ink, CORAL, GREEN];
+  for (const front of [false, true])
+    for (let j = 0; j < 3; j++) {
+      let run: [number, number][] = [];
+      const flush = () => {
+        if (run.length > 1) {
+          ctx.strokeStyle = inkCss(strandC[j], A * (front ? 0.95 : 0.35));
+          ctx.lineWidth = (front ? (j ? 1.6 : 2) : 1) * L.s;
+          wobbly(ctx, run, j * 11 + b + (front ? 0 : 5), 0.8 * L.s);
+        }
+        run = [];
+      };
+      for (let i = 0; i <= M; i++) {
+        const u = i / M;
+        const e = env(u);
+        const amp = (2 + 10 * Math.min(1.6, e)) * L.s * Math.sqrt(Math.sin(Math.PI * u)) * (0.75 + 0.25 * Math.sin(Math.PI * u));
+        // the twist moves on twos, like a drawn cycle
+        const ph = TAU * u * 7 + (Math.floor(t * 12) / 12) * 5.5 + (j * TAU) / 3;
+        const c = Math.cos(ph),
+          sn = Math.sin(ph);
+        const d = a[2] * c + bb[2] * sn;
+        const p = axis(u);
+        const [x, y] = project([p[0] + (a[0] * c + bb[0] * sn) * amp, p[1] + (a[1] * c + bb[1] * sn) * amp, p[2] + (a[2] * c + bb[2] * sn) * amp]);
+        if (d > 0 === front) run.push([x, y]);
+        else {
+          if (run.length) run.push([x, y]);
+          flush();
+        }
+      }
+      flush();
+    }
+
+  // a bead of signal round the cable at each pulse, running out to the song
+  const beads: { u: number; k: number }[] = [];
+  for (let k = -3; k <= 3; k++) {
+    const u = (k + 0.25 - ((t * 0.55) % 1)) / 2.2;
+    if (u > 0.06 && u < 0.97) beads.push({ u, k: 0.8 });
+  }
+  for (const w of s.beamSwells) if (1 - w.u > 0.06 && 1 - w.u < 0.97) beads.push({ u: 1 - w.u, k: 0.8 + w.a });
+  beads.forEach(({ u, k }, i) => {
+    const [x, y] = project(axis(u));
+    const r = (5 + 6 * k) * L.s * (0.6 + 0.4 * Math.sin(Math.PI * u));
+    const pts: [number, number][] = [];
+    for (let q = 0; q <= 24; q++) {
+      const th = (q / 24) * TAU + 0.3;
+      pts.push([x + Math.cos(th) * r, y + Math.sin(th) * r * 0.8]);
+    }
+    ctx.strokeStyle = inkCss(i % 2 ? CORAL : ink, A * 0.9 * Math.sin(Math.PI * u) ** 0.5);
+    ctx.lineWidth = 1.5 * L.s;
+    wobbly(ctx, pts, i * 3 + b, 0.9 * L.s);
+  });
+
+  // little strokes round the song where the stream reaches it, jumping with
+  // the music
+  const [tx, ty] = project(axis(0));
+  const lvl = s.beamLvl;
+  const rr = half * (1.25 + 0.15 * lvl);
+  ctx.strokeStyle = inkCss(ink, A * 0.8);
+  ctx.lineWidth = 1.8 * L.s;
+  for (let i = 0; i < 8; i++) {
+    const f = (i / 8) * TAU + b * 0.4 + 0.2;
+    const l = (5 + 5 * lvl + 3 * hash(i + b * 9)) * L.s;
+    ctx.beginPath();
+    ctx.moveTo(tx + Math.cos(f) * rr, ty + Math.sin(f) * rr);
+    ctx.lineTo(tx + Math.cos(f) * (rr + l), ty + Math.sin(f) * (rr + l));
+    ctx.stroke();
+  }
 }

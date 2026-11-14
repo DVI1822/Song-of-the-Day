@@ -4,13 +4,16 @@ import { useEffect, useRef } from "react";
 import type { Post } from "@/lib/types";
 import { alpha, drift, useCoreLook } from "./coreLook";
 import { coverAt } from "@/lib/cover";
+import { inkMode } from "./ink";
+import { drawInkInside } from "./coreInk";
 
 // Inside someone's core. It's the core itself: as the camera dives in, the
 // core's rings grow out of it until they fill the screen and you're in a slow
 // tunnel of them, in the colours of their music, with their songs riding the
 // rings, centred on their picture. Everything follows the camera's zoom, so
 // flying in and back out is one continuous move. Drawn at the screen's own
-// resolution, so it stays sharp however big it gets.
+// resolution, so it stays sharp however big it gets. In the drawn look it's
+// paper and ink instead (coreInk.ts).
 
 const NEON = ["#5ef2ff", "#9b8cff", "#ff5fd2", "#b4ff5e"];
 const RINGS = 16;
@@ -47,6 +50,7 @@ export function CoreInside({
   cy,
   coreR,
   zoom,
+  night,
 }: {
   posts: Post[] | null;
   timeZone: string;
@@ -54,11 +58,12 @@ export function CoreInside({
   cy: number; // where the tunnel settles: around their picture
   coreR: number; // the core's radius on screen before any zoom
   zoom: () => number; // the camera's zoom: the inside shows as you reach the core
+  night: boolean; // the drawn look turns to chalk on navy after dark
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const look = useCoreLook(posts, timeZone);
   const colors = look?.colors.length ? look.colors.map(vivid) : NEON;
-  const live = useRef({ colors, cy, from, coreR, zoom, covers: [] as (HTMLImageElement | null)[] });
+  const live = useRef({ colors, cy, from, coreR, zoom, night, covers: [] as (HTMLImageElement | null)[] });
 
   // the covers that ride the rings: their newest songs
   const coverKey = (posts ?? []).slice(0, RINGS).map((p) => p.artwork_url ?? "").join("|");
@@ -76,13 +81,17 @@ export function CoreInside({
     live.current.from = from;
     live.current.coreR = coreR;
     live.current.zoom = zoom;
+    live.current.night = night;
   });
 
   useEffect(() => {
     const cv = ref.current;
     const ctx = cv?.getContext("2d");
     if (!cv || !ctx) return;
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ink = inkMode();
+    // the drawn look keeps its motion with Reduce Motion on, like the app's
+    // other drawn animations; the glowing one slows right down
+    const calm = !ink && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // the core's rings, smallest deepest
     const z = Array.from({ length: RINGS }, (_, i) => (i / RINGS) * DEEP + 1.6);
     let t0: number | null = null; // when the core started to open
@@ -97,7 +106,7 @@ export function CoreInside({
       const dz = zm - lastZm;
       lastZm = zm;
       // takes over from the core as the camera reaches it, gives it back flying out
-      cv.style.opacity = clamp01((zm - 1.3) / 0.25).toFixed(3);
+      cv.style.opacity = clamp01((zm - 1.3) / (ink ? 0.08 : 0.25)).toFixed(3);
       if (zm < 1.3) {
         t0 = null;
         raf = requestAnimationFrame(frame);
@@ -126,6 +135,24 @@ export function CoreInside({
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, w, h);
 
+      // diving in, the rings rush past you; flying out, they fall back into
+      // the core; in between they drift slowly towards you
+      const move = (calm ? 0.05 : 0.14) * dt + dz * 0.9;
+      for (let i = 0; i < RINGS; i++) {
+        z[i] -= move;
+        if (z[i] < 0.12) z[i] += DEEP;
+        if (z[i] > DEEP + 1.6) z[i] -= DEEP;
+      }
+      const order = [...z.keys()].sort((a, b) => z[b] - z[a]); // far first
+
+
+      if (ink) {
+        const rush = dt > 0 ? dz / Math.max(1, zm) / dt : 0;
+        drawInkInside(ctx, { w, h, cx, cy, p, F, R0, edge, t, rush, night: live.current.night, z, order, deep: DEEP, wave, covers });
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+
       // the dark of the inside, tinted with their colours, deepening as you go in
       const dark = clamp01(p * 1.6);
       ctx.fillStyle = alpha("#04050c", dark);
@@ -147,16 +174,6 @@ export function CoreInside({
       heart.addColorStop(1, drift(colors, t * 0.08 + 1, 0, 0));
       ctx.fillStyle = heart;
       ctx.fillRect(0, 0, w, h);
-
-      // diving in, the rings rush past you; flying out, they fall back into
-      // the core; in between they drift slowly towards you
-      const move = (calm ? 0.05 : 0.14) * dt + dz * 0.9;
-      for (let i = 0; i < RINGS; i++) {
-        z[i] -= move;
-        if (z[i] < 0.12) z[i] += DEEP;
-        if (z[i] > DEEP + 1.6) z[i] -= DEEP;
-      }
-      const order = [...z.keys()].sort((a, b) => z[b] - z[a]); // far first
 
       ctx.globalCompositeOperation = "lighter";
       ctx.lineJoin = ctx.lineCap = "round";
