@@ -202,7 +202,7 @@ const GROUND: Record<
 // ------------------------------------------------------------ the moments
 const BANNERS = [
   "play it loud",
-  "song of the day",
+  "top track of the day",
   "♪ ♪ ♪",
   "hi mom",
   "turn it up",

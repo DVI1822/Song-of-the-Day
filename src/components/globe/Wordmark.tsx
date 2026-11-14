@@ -37,6 +37,8 @@ export function Wordmark({ size = 31 }: { size?: number }) {
       width={size * 6.6}
       height={size * 6.6 * (126 / 460)}
       aria-label="TopTrack"
+      // the opening animation shrinks into its O (components/Launch.tsx)
+      data-wordmark=""
       role="img"
       overflow="visible"
       style={{ display: "block" }}

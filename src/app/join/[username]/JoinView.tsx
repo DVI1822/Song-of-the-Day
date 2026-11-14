@@ -89,7 +89,7 @@ export function JoinView({
         <p className="mt-2 max-w-[300px] text-sm text-muted">
           {mine
             ? "Send it to friends. Whoever joins through it lands on your globe, and you on theirs."
-            : "Everyone shares one song a day, the one that hit hardest. Join and you'll be on each other's globes."}
+            : "Everyone picks a top track each day, the song that ran their day. Join and you'll be on each other's globes."}
         </p>
 
         {today && !mine && (

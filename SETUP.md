@@ -1,4 +1,4 @@
-# Getting Song of the Day online
+# Getting TopTrack online
 
 This takes about 20 minutes and costs nothing. You'll make two free accounts:
 
@@ -155,7 +155,7 @@ these steps.
    `https://<your-project>.supabase.co/auth/v1/callback`. Leave the tab open.
 2. Go to <https://developer.spotify.com/dashboard>, sign in with your Spotify
    account (it must be Premium), and click **Create app**.
-   - Name: Song of the Day. Description: anything.
+   - Name: TopTrack. Description: anything.
    - Redirect URI: paste the Supabase Callback URL from step 1 and click **Add**.
    - Under "Which API/SDKs are you planning to use?", tick **Web API**.
    - Agree to the terms and **Save**.

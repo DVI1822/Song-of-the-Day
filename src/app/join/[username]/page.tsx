@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<"/join/[username]">
   const { username } = await params;
   const page = await inviter(username);
   const name = page?.profile.display_name ?? `@${username}`;
-  const title = "Share your Song of the Day with the world";
+  const title = "Pick your top track of the day";
   const description = `${name} saved you a spot on their globe.`;
   return { title, description, openGraph: { title, description }, twitter: { card: "summary_large_image" } };
 }

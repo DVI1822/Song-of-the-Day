@@ -67,7 +67,7 @@ export default async function Image({ params }: { params: Promise<{ username: st
         <div
           style={{ fontSize: 68, fontWeight: 700, lineHeight: 1.08 }}
         >{`${first} saved you a spot on their globe`}</div>
-        <div style={{ fontSize: 30, color: "#D7262B", fontWeight: 600 }}>Share your Song of the Day with the world</div>
+        <div style={{ fontSize: 30, color: "#D7262B", fontWeight: 600 }}>Pick your top track of the day</div>
       </div>
     </div>,
     size,

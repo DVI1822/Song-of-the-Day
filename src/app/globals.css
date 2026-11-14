@@ -388,3 +388,30 @@ body {
 html[data-app] .web-only {
   display: none !important;
 }
+
+/* The opening animation (components/Launch.tsx) only plays once a visit. */
+html[data-launched] #tt-launch {
+  display: none !important;
+}
+
+/* The welcome page's little drawings (app/Landing.tsx). */
+.landing .spin-slow { animation: landing-spin 5s linear infinite; }
+.landing .note-float { animation: landing-note 2.8s ease-in-out infinite; }
+.landing .note-late { animation-delay: -1.4s; }
+.landing .crown-bob { animation: landing-crown 3.2s ease-in-out infinite; }
+.landing .sparkle { animation: landing-sparkle 1.6s steps(2, jump-none) infinite; }
+.landing .draw-in { stroke-dasharray: 220; stroke-dashoffset: 220; animation: landing-draw 0.7s 0.4s ease-out forwards; }
+@keyframes landing-spin { to { transform: rotate(360deg); } }
+@keyframes landing-note {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(2px, -5px) rotate(6deg); }
+}
+@keyframes landing-crown {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-4px) rotate(4deg); }
+}
+@keyframes landing-sparkle {
+  0% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+@keyframes landing-draw { to { stroke-dashoffset: 0; } }

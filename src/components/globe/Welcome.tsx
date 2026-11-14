@@ -50,17 +50,16 @@ export function Welcome({ api, onClose, onApp, onKey }: { api: GlobeApi; onClose
       >
         <h2 className="display text-[26px] leading-tight">TopTrack</h2>
         <p className="text-[15px] leading-relaxed">
-          <b>Share and discover music.</b> Post the song that hit you hardest today, and discover the best of what your
-          friends are jamming to. Your world follows the real weather, seasons and time of day. Relax, explore,
-          and post what you really feel.
+          <b>Pick your top track.</b> Of everything you played today, post the one that ran your day. Copy its link
+          in your music app, tap + and paste. One redo a day, and it all turns over at midnight.
         </p>
         <p className="text-[15px] leading-relaxed">
-          <b>How.</b> Spotify only for now. In Spotify, copy your song&apos;s link, tap + here and paste it. You get one
-          repost a day, and it all resets at midnight (watch the countdown).
+          <b>Crown the best one.</b> Each day, hand your crown to the top pick on your globe. Crowns add up on the
+          leaderboard.
         </p>
         <p className="text-[15px] leading-relaxed">
-          <b>Grow your world.</b> Share your link with more people. The more friends you bring, the more good music
-          fills your globe.
+          <b>Find your next favorite.</b> Every song here meant something to someone today. Spin the globe, open a
+          few, and bring more friends so there&apos;s more to find.
         </p>
         <button type="button" onClick={close} className="mt-1.5 h-12 rounded-full bg-accent text-[15px] font-semibold text-white">
           Let&apos;s go
