@@ -384,6 +384,57 @@ const demoApi: GlobeApi = {
     const posts = [...(f?.post ? [f.post] : []), ...history(id, seed, 8 + Math.floor(rnd(seed, 3) * 50))];
     return { profile: p, posts, followers: 12, following: 20 };
   },
+  async coreExtras(id) {
+    await new Promise((r) => setTimeout(r, 250));
+    const seed = Number(id.slice(1)) || 0;
+    const posts = id === ME.id ? MY_SONGS : history(id, seed, 50);
+    const picks: Record<string, number> = {},
+      feels: Record<string, number> = {};
+    posts.forEach((p, i) => {
+      if (rnd(seed + i, 21) < 0.18) picks[p.id] = 1 + Math.floor(rnd(seed + i, 22) * 3);
+      feels[p.id] = Math.floor(rnd(seed + i, 23) * 9);
+    });
+    return {
+      picks,
+      feels,
+      followers: FRIENDS.filter((f) => f.follows_me),
+      following: FRIENDS,
+    };
+  },
+  async taste(id) {
+    await new Promise((r) => setTimeout(r, 900));
+    const n = id === ME.id ? MY_SONGS.length + 1 : 30;
+    return {
+      picks: n,
+      overview: {
+        name: "The Golden Hour Drifter",
+        blurb:
+          "Warm, guitar-led indie with a real pull toward 70s soul. Slow builders on weeknights, something loud by Friday. About one in three songs is older than the app itself by decades.",
+        words: ["warm guitars", "70s soul", "slow builders", "late night", "sing-alongs"],
+        month: "Twice as much electronic as last month, and fewer ballads.",
+      },
+      genres: [
+        { name: "Alternative", n: 13 },
+        { name: "R&B & soul", n: 9 },
+        { name: "Indie", n: 7 },
+        { name: "Hip-hop", n: 5 },
+        { name: "Dance & electronic", n: 4 },
+        { name: "Country", n: 2 },
+        { name: "Jazz", n: 1 },
+      ],
+      decades: [
+        { decade: 1960, n: 2 },
+        { decade: 1970, n: 9 },
+        { decade: 1980, n: 4 },
+        { decade: 1990, n: 5 },
+        { decade: 2000, n: 6 },
+        { decade: 2010, n: 7 },
+        { decade: 2020, n: 8 },
+      ],
+      artists: MY_SONGS.slice(0, 4).map((p, i) => ({ name: p.artist, n: 5 - i, artwork: p.artwork_url })),
+      pending: false,
+    };
+  },
 };
 
 // Two people from the pool who added you, so "Added you" has something in it.

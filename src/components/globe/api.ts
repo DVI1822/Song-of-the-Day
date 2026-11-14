@@ -26,7 +26,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, Score, SongFacts } from "@/lib/types";
+import type { Core, CoreExtras, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, Score, SongFacts, Taste } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -41,6 +41,10 @@ export type GlobeApi = {
   // people not on your globe who know someone on it, most shared friends first
   mayKnow?(): Promise<MayKnow[]>;
   loadCore(userId: string): Promise<Core | null>;
+  // the rest of a core: picks and feels on each song, and both sides of their globe
+  coreExtras?(userId: string): Promise<CoreExtras | null>;
+  // their taste, built from their picks (lib/taste.ts)
+  taste?(userId: string): Promise<Taste | null>;
   report(input: { reportedId: string; postId?: string | null; reason: ReportReason; note?: string }): Promise<{ error?: string }>;
   block(profileId: string): Promise<{ error?: string }>;
   hideSongs(profileId: string, hide: boolean): Promise<{ error?: string }>;
@@ -104,6 +108,42 @@ const supabaseRanks: RankApi = {
     }));
   },
 };
+
+const PERSON = "id, username, display_name, timezone, created_at, avatar_url";
+
+// Straight from the database: follows, feels and profiles are readable by
+// anyone signed in, and core_picks() gives totals only
+// (20261116000000_core_taste.sql).
+async function supabaseCoreExtras(userId: string): Promise<CoreExtras | null> {
+  const supabase = createClient();
+  const [ers, ing, feels, picks] = await Promise.all([
+    supabase.from("follows").select("follower_id").eq("following_id", userId).limit(1000),
+    supabase.from("follows").select("following_id").eq("follower_id", userId).limit(1000),
+    supabase.from("feels").select("post_id, posts!inner(user_id)").eq("posts.user_id", userId).limit(5000),
+    supabase.rpc("core_picks", { p_user: userId }),
+  ]);
+  const ids = [
+    ...new Set([...(ers.data ?? []).map((r) => r.follower_id as string), ...(ing.data ?? []).map((r) => r.following_id as string)]),
+  ];
+  const people = new Map<string, Profile>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("profiles").select(PERSON).in("id", ids.slice(i, i + 200));
+    for (const p of (data ?? []) as Profile[]) people.set(p.id, p);
+  }
+  const who = (list: string[]) => list.flatMap((id) => (people.has(id) ? [people.get(id)!] : []));
+  const count = (rows: { post_id: string }[]) => {
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.post_id] = (out[r.post_id] ?? 0) + 1;
+    return out;
+  };
+  return {
+    // before the migration is run, core_picks isn't there: no crowns yet
+    picks: Object.fromEntries(((picks.data ?? []) as { post_id: string; picks: number }[]).map((r) => [r.post_id, r.picks])),
+    feels: count((feels.data ?? []) as { post_id: string }[]),
+    followers: who((ers.data ?? []).map((r) => r.follower_id as string)),
+    following: who((ing.data ?? []).map((r) => r.following_id as string)),
+  };
+}
 
 const MSG = "id, user_id, to_id, body, created_at, read_at";
 
@@ -175,6 +215,13 @@ export const serverApi: GlobeApi = {
   matchContacts,
   mayKnow,
   loadCore,
+  coreExtras: supabaseCoreExtras,
+  // a route, like facts: looking songs up and writing the overview takes a moment
+  async taste(userId) {
+    const res = await fetch(`/api/taste?user=${encodeURIComponent(userId)}`, { cache: "no-store" }).catch(() => null);
+    if (!res?.ok) return null;
+    return res.json();
+  },
   report: reportUser,
   block: blockUser,
   hideSongs,

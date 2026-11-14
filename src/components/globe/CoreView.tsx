@@ -2,13 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
-import { formatDay, formatTime, initials, monthKey, monthName, streak, todayIn, usualHour } from "@/lib/day";
-import type { Post, Profile, SavedSong } from "@/lib/types";
+import { addDays, initials, streak, todayIn } from "@/lib/day";
+import type { CoreExtras, Post, Profile, SavedSong, Taste } from "@/lib/types";
 import type { GlobeApi } from "./api";
 import { ChatIcon } from "./Chat";
-import { SongPlayer } from "./Preview";
+import { PeoplePane, Shelf, SongsPane, Tabs, TastePane } from "./CoreTabs";
 import { Safety } from "./Safety";
-import { Cover, CloseIcon, glass, glassThin } from "./ui";
+import { CloseIcon, glass, glassThin } from "./ui";
+
+type Tab = "taste" | "songs" | "people";
+const TABS: [Tab, string][] = [
+  ["taste", "Taste"],
+  ["songs", "Songs"],
+  ["people", "People"],
+];
 
 const FULL_TOP = "max(10px, env(safe-area-inset-top))";
 
@@ -30,6 +37,8 @@ export function CoreView({
   sheetRef,
   onAvatar,
   onCenter,
+  onPerson,
+  globe,
 }: {
   profile: Profile | null;
   posts: Post[] | null; // null while loading
@@ -47,10 +56,54 @@ export function CoreView({
   sheetRef: Ref<HTMLDivElement>;
   onAvatar?: (file: File) => Promise<string | { error: string }>; // your own core: change your picture
   onCenter?: (y: number) => void; // where the picture sits, for the core's rings to circle
+  onPerson?: (p: Profile) => void; // fly into someone else's core
+  globe?: { people: number; posted: number }; // your own globe, as it is right now
 }) {
-  const [month, setMonth] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
   const [flagging, setFlagging] = useState(false);
+  const [tab, setTab] = useState<Tab>("taste");
+  // the rest of the core, fetched as you arrive: picks, feels, people, taste
+  const id = profile?.id ?? null;
+  const [shown, setShown] = useState(id);
+  const [extras, setExtras] = useState<CoreExtras | null>(null);
+  const [taste, setTaste] = useState<Taste | null>(null);
+  const [tasteFailed, setTasteFailed] = useState(false);
+  const [rank, setRank] = useState<number | null>(null);
+  if (shown !== id) {
+    // a different core: start again on its Taste
+    setShown(id);
+    setExtras(null);
+    setTaste(null);
+    setTasteFailed(false);
+    setRank(null);
+    setTab("taste");
+  }
+  useEffect(() => {
+    if (!id) return;
+    let on = true;
+    api.coreExtras?.(id).then((x) => on && setExtras(x));
+    api.ranks?.board().then((b) => {
+      if (!on) return;
+      const sorted = [...b].sort((x, y) => y.month - x.month);
+      const i = sorted.findIndex((x) => x.who === id);
+      if (i >= 0 && sorted[i].month > 0) setRank(sorted.filter((x) => x.month > sorted[i].month).length + 1);
+    });
+    // the taste: songs are looked up a few at a time, so ask again while
+    // some are still waiting
+    let tries = 0,
+      timer: ReturnType<typeof setTimeout> | undefined;
+    const ask = () =>
+      (api.taste ? api.taste(id) : Promise.resolve(null)).then((t) => {
+        if (!on) return;
+        if (!t) return setTasteFailed(true);
+        setTaste(t);
+        if ((t.pending || !t.overview) && t.picks >= 3 && ++tries < 8) timer = setTimeout(ask, 6000 + tries * 2000);
+      });
+    ask();
+    return () => {
+      on = false;
+      clearTimeout(timer);
+    };
+  }, [id, api]);
   // the sheet slides up to fill the screen: drag its handle, tap it, or scroll.
   // Dragged down far enough, from the handle or from anywhere while it's
   // scrolled to the top, it lets go of the core and you're back on the globe.
@@ -125,19 +178,18 @@ export function CoreView({
   const tz = profile?.timezone ?? "UTC";
   const today = todayIn(tz);
   const list = posts ?? [];
-  const todayPost = list.find((p) => p.day === today) ?? null;
-  const past = list.filter((p) => p.day !== today);
-  const months = [...new Set(list.map((p) => monthKey(p.day)))];
-  const thisYear = today.slice(0, 4);
-  const archive = month ? list.filter((p) => monthKey(p.day) === month) : past;
   const first = profile?.display_name.split(" ")[0];
   const ink = dark ? "#EEF3F8" : "#0D2A3F";
   const muted = dark ? "#93A6B8" : "#6A818C";
 
-  const stats = [
-    [posts ? String(streak(list.map((p) => p.day), today)) : "–", "day streak"],
-    [posts ? String(list.length) : "–", "songs shared"],
-    [(posts && usualHour(list.map((p) => p.created_at), tz)) || "–", "usual post time"],
+  const days = list.map((p) => p.day);
+  const crowns = Object.values(extras?.picks ?? {}).reduce((a, n) => a + n, 0);
+  const shelf: { n: string; label: string; icon?: "flame" | "crown" }[] = [
+    { n: posts ? String(streak(days, today)) : "–", label: "day streak", icon: "flame" },
+    { n: extras ? String(crowns) : "–", label: crowns === 1 ? "crown" : "crowns", icon: "crown" },
+    ...(rank ? [{ n: `#${rank}`, label: "this month" }] : []),
+    { n: posts ? String(list.length) : "–", label: list.length === 1 ? "song" : "songs" },
+    { n: posts ? String(bestStreak(days)) : "–", label: "best streak" },
   ];
 
 
@@ -189,7 +241,7 @@ export function CoreView({
         <div
           ref={sheet}
           onScroll={(e) => !full && e.currentTarget.scrollTop > 40 && setFull(true)}
-          className="pointer-events-auto absolute inset-x-0 bottom-0 mx-auto flex max-w-[560px] flex-col gap-5 overflow-y-auto rounded-t-[28px] px-4 pb-[22px] transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
+          className="pointer-events-auto absolute inset-x-0 bottom-0 mx-auto flex max-w-[560px] flex-col gap-5 overflow-y-auto [&>*]:flex-none rounded-t-[28px] px-4 pb-[22px] transition-transform duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
           style={{ top: FULL_TOP, transform: full ? "none" : low, ...glassThin(dark) }}
         >
           <div
@@ -251,131 +303,36 @@ export function CoreView({
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {stats.map(([n, label]) => (
-              <div key={label} className="flex flex-col gap-0.5 rounded-[18px] bg-card-ink/5 p-3">
-                <div className="display text-2xl">{n}</div>
-                <div className="text-[11px] text-muted">{label}</div>
-              </div>
+          <Shelf items={shelf} />
+          <Tabs<Tab>
+            tabs={TABS}
+            on={tab}
+            set={setTab}
+          />
+          {tab === "taste" && <TastePane taste={taste} failed={tasteFailed} first={first ?? ""} />}
+          {tab === "songs" &&
+            (posts ? (
+              <SongsPane
+                posts={list}
+                today={today}
+                picks={extras?.picks ?? {}}
+                feels={extras?.feels ?? {}}
+                saved={saved}
+                first={first ?? ""}
+                mine={mine}
+                onToday={onOpenToday}
+              />
+            ) : (
+              <p className="text-sm text-muted">Loading…</p>
             ))}
-          </div>
-
-          {todayPost && (
-            <div className="flex flex-col gap-2.5 rounded-[20px] bg-card-ink/5 p-2.5">
-              <button
-                type="button"
-                onClick={onOpenToday ?? (() => setOpen(open === todayPost.id ? null : todayPost.id))}
-                aria-expanded={onOpenToday ? undefined : open === todayPost.id}
-                className="flex items-center gap-3 text-left"
-              >
-                <Cover src={todayPost.artwork_url} seed={todayPost.title} size={52} />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div className="text-[11px] text-muted">Today · {formatTime(todayPost.created_at, tz)}</div>
-                  <div className="truncate text-[15px] font-semibold">{todayPost.title}</div>
-                  <div className="truncate text-xs text-muted">{todayPost.artist}</div>
-                </div>
-              </button>
-              {!onOpenToday && open === todayPost.id && (
-                <div className="rise-in flex flex-col gap-2.5 px-1 pb-1">
-                  {todayPost.caption && <div className="text-sm leading-relaxed">“{todayPost.caption}”</div>}
-                  <SongPlayer post={todayPost} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {mine && saved && saved.length > 0 && (
-            <div className="flex flex-col">
-              <div className="display pb-1.5 text-[17px]">Saved</div>
-              {saved.map((p, j) => (
-                <div key={p.id} className={j ? "border-t border-card-ink/[0.08]" : ""}>
-                  <button
-                    type="button"
-                    onClick={() => setOpen(open === p.id ? null : p.id)}
-                    aria-expanded={open === p.id}
-                    className="flex h-[54px] w-full items-center gap-3 text-left"
-                  >
-                    <Cover src={p.artwork_url} seed={p.title} size={38} />
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <div className="truncate text-[13px] font-semibold">{p.title}</div>
-                      <div className="truncate text-[11px] text-muted">
-                        {p.artist} · {p.by.display_name.split(" ")[0]}&apos;s song, {formatDay(p.day)}
-                      </div>
-                    </div>
-                  </button>
-                  {open === p.id && (
-                    <div className="rise-in flex flex-col gap-2.5 pb-3">
-                      {p.caption && <div className="text-sm leading-relaxed">“{p.caption}”</div>}
-                      <SongPlayer post={p} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {months.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <div className="display text-[17px]">Playlists</div>
-              <div className="grid grid-cols-3 gap-2.5">
-                {months.map((key) => {
-                  const songs = list.filter((p) => monthKey(p.day) === key);
-                  const on = month === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setMonth(on ? null : key)}
-                      aria-pressed={on}
-                      className="flex flex-col gap-1.5 text-left"
-                    >
-                      <div className="relative aspect-square w-full">
-                        <Cover
-                          src={songs[0].artwork_url}
-                          seed={songs[0].title}
-                          size={120}
-                          className="!h-full !w-full"
-                          style={on ? { boxShadow: "0 0 0 3px #D7262B" } : undefined}
-                        />
-                        <div className="absolute bottom-1.5 right-1.5 flex h-5 items-center rounded-[10px] bg-white/[0.88] px-[7px] text-[10px] font-semibold">
-                          {songs.length}
-                        </div>
-                      </div>
-                      <div className="text-xs font-semibold">{monthName(key, key.slice(0, 4) !== thisYear)}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {archive.length > 0 && (
-            <div className="flex flex-col">
-              <div className="display pb-1.5 text-[17px]">{month ? monthName(month, month.slice(0, 4) !== thisYear) : "Archive"}</div>
-              {archive.map((p, j) => (
-                <div key={p.id} className={j ? "border-t border-card-ink/[0.08]" : ""}>
-                  <button
-                    type="button"
-                    onClick={() => setOpen(open === p.id ? null : p.id)}
-                    aria-expanded={open === p.id}
-                    className="flex h-[54px] w-full items-center gap-3 text-left"
-                  >
-                    <div className="w-11 flex-none text-[11px] font-semibold">{formatDay(p.day)}</div>
-                    <Cover src={p.artwork_url} seed={p.title} size={38} />
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <div className="truncate text-[13px] font-semibold">{p.title}</div>
-                      <div className="truncate text-[11px] text-muted">{p.artist}</div>
-                    </div>
-                  </button>
-                  {open === p.id && (
-                    <div className="rise-in flex flex-col gap-2.5 pb-3">
-                      {p.caption && <div className="text-sm leading-relaxed">“{p.caption}”</div>}
-                      <SongPlayer post={p} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+          {tab === "people" && (
+            <PeoplePane
+              extras={extras}
+              mine={mine}
+              first={first ?? ""}
+              globe={globe ?? { people: extras?.following.length ?? 0 }}
+              onPerson={onPerson}
+            />
           )}
 
           {!mine && profile && !flagging && (
@@ -519,4 +476,21 @@ function Avatar({
       {error && <p className="text-xs text-red-300">{error}</p>}
     </>
   );
+}
+
+// The longest run of days in a row with a song.
+function bestStreak(days: string[]) {
+  const set = new Set(days);
+  let best = 0;
+  for (const d of set) {
+    if (set.has(addDays(d, -1))) continue; // not the start of a run
+    let n = 0,
+      c = d;
+    while (set.has(c)) {
+      n++;
+      c = addDays(c, 1);
+    }
+    best = Math.max(best, n);
+  }
+  return best;
 }

@@ -22,7 +22,8 @@ type PreviewState = {
   toggle(): void;
   // Shuffle all
   shuffle: ShuffleState | null;
-  startShuffle(posts: Post[]): Promise<string | null>;
+  // inOrder: a playlist, played as listed
+  startShuffle(posts: Post[], inOrder?: boolean): Promise<string | null>;
   shuffleNext(): void;
   // back to the start of this song, or, right at its start, the one before
   shufflePrev(): void;
@@ -126,8 +127,8 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   );
 
   const startShuffle = useCallback(
-    async (posts: Post[]) => {
-      const list = shuffled(posts).filter((p) => p.preview_url);
+    async (posts: Post[], inOrder = false) => {
+      const list = (inOrder ? posts : shuffled(posts)).filter((p) => p.preview_url);
       if (!list.length) return "None of these songs has a sample to play.";
       clip(list, 0);
       return null;
