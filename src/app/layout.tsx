@@ -3,6 +3,7 @@ import { Creepster, Fredoka, Gaegu, Londrina_Solid, Nosifer, Outfit, UnifrakturM
 import { PreviewProvider } from "@/components/globe/Preview";
 import { HandoffWaiter } from "@/components/HandoffWaiter";
 import { SessionFromLink } from "@/components/SessionFromLink";
+import { AppBoot } from "@/components/AppBoot";
 import { MiniPlayer } from "@/components/globe/Shuffle";
 import "./globals.css";
 
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <MiniPlayer />
           <SessionFromLink />
           <HandoffWaiter />
+          <AppBoot />
         </PreviewProvider>
       </body>
     </html>

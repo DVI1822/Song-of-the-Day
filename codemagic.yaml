@@ -1,0 +1,45 @@
+# Builds the TopTrack iPhone app in the cloud and sends it to TestFlight,
+# so no Mac is needed. Start a build from codemagic.io (Start new build →
+# ios-testflight). Setup is in IOS_APP.md.
+#
+# The app itself is a shell around www.mytoptrack.io (capacitor.config.ts),
+# so site changes reach it on merge; a new build is only needed when the
+# shell changes (icon, splash, plugins, iOS settings).
+workflows:
+  ios-testflight:
+    name: TopTrack iOS to TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    integrations:
+      # the App Store Connect API key's name in Codemagic
+      app_store_connect: TopTrack
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: io.mytoptrack.app
+      node: 22
+      xcode: latest
+    triggering:
+      events: []
+    scripts:
+      - name: Install
+        script: npm ci
+      - name: Copy the app shell into the iOS project
+        script: npx cap sync ios
+      - name: Use the signing profile
+        script: xcode-project use-profiles
+      - name: Number this build
+        script: |
+          cd ios/App
+          agvtool new-version -all $((BUILD_NUMBER + 1))
+      - name: Build
+        script: |
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

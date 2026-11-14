@@ -15,13 +15,20 @@ import { createClient, createLinkClient } from "@/lib/supabase/client";
 // screen app. NEXT_PUBLIC_EMAIL_CODE=off hides the code box.
 const withCode = process.env.NEXT_PUBLIC_EMAIL_CODE !== "off";
 
+// Apple's App Review can't receive an email code, so one review account
+// (NEXT_PUBLIC_REVIEW_EMAIL, made in Supabase with a password) signs in with
+// its password instead. Every other email works as before.
+const reviewEmail = process.env.NEXT_PUBLIC_REVIEW_EMAIL?.trim().toLowerCase();
+
 export function LoginForm({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState(initialError);
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
+  const [password, setPassword] = useState("");
   const router = useRouter();
+  const review = !!reviewEmail && email.trim().toLowerCase() === reviewEmail;
 
   // The same email carries a code, for when the link would open in another
   // browser (like a home-screen app on a phone): type it here instead.
@@ -43,6 +50,17 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     e.preventDefault();
     setState("sending");
     setError(undefined);
+    if (review) {
+      const { error } = await createClient().auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        setError("That password didn't work.");
+        setState("idle");
+        return;
+      }
+      router.replace("/");
+      router.refresh();
+      return;
+    }
     const { error } = await createLinkClient().auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback?h=${newHandoff()}` },
@@ -110,9 +128,21 @@ export function LoginForm({ initialError }: { initialError?: string }) {
             className={inputClass}
           />
         </label>
+        {review && (
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Password"
+            aria-label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={inputClass}
+          />
+        )}
         {error && <p className="text-sm text-accent-deep">{error}</p>}
         <button className={buttonClass} disabled={state === "sending"}>
-          {state === "sending" ? "Sending…" : "Email me a sign-in code"}
+          {review ? (state === "sending" ? "Signing in…" : "Sign in") : state === "sending" ? "Sending…" : "Email me a sign-in code"}
         </button>
         <p className="text-xs text-card-muted">No password needed. New here? The same code creates your account.</p>
       </form>

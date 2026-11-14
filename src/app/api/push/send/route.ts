@@ -1,11 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/env";
+import { sendApns, type ApnsMessage } from "@/lib/apns";
 
 // The database calls this every hour with the people to nudge, and whenever
 // someone likes a song or leaves a note on it, and when someone posts their
 // song for the friends who have them on their globe (see the push migrations). It's
-// signed with PUSH_SECRET, so nobody else can send anything.
+// signed with PUSH_SECRET, so nobody else can send anything. Browsers get web
+// push; the iPhone app saves its Apple device token as "apns:<token>" and
+// goes through Apple instead (lib/apns.ts).
 
 type Sub = { endpoint: string; p256dh: string; auth: string } & (
   | { kind: "noon" | "night" }
@@ -28,17 +31,21 @@ export async function POST(req: Request) {
   if (!Array.isArray(subs)) return new Response("Bad request", { status: 400 });
 
   webpush.setVapidDetails("https://mysong.day", pub, priv);
+  const message = (s: Sub): ApnsMessage =>
+    s.kind === "reaction" || s.kind === "post"
+      ? { title: s.title, body: s.body, tag: s.tag, url: "/" }
+      : { ...(NUDGE[s.kind] ?? NUDGE.noon), tag: "song-nudge", url: "/" };
+
+  const apple = subs.filter((s) => s.endpoint.startsWith("apns:"));
+  const appleGone = sendApns(apple.map((s) => ({ token: s.endpoint.slice(5), msg: message(s) })));
+
   const gone: string[] = [];
   await Promise.all(
-    subs.map((s) =>
+    subs.filter((s) => !s.endpoint.startsWith("apns:")).map((s) =>
       webpush
         .sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          JSON.stringify(
-            s.kind === "reaction" || s.kind === "post"
-              ? { title: s.title, body: s.body, tag: s.tag, url: "/" }
-              : { ...(NUDGE[s.kind] ?? NUDGE.noon), url: "/" },
-          ),
+          JSON.stringify(message(s)),
           { TTL: 60 * 60 * 3, urgency: "normal" },
         )
         .catch((e: { statusCode?: number }) => {
@@ -46,6 +53,7 @@ export async function POST(req: Request) {
         }),
     ),
   );
+  for (const t of await appleGone) gone.push(`apns:${t}`);
   if (gone.length) {
     await createClient(supabaseUrl, supabaseKey).rpc("push_gone", { key: secret, endpoints: gone });
   }

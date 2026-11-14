@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { GlobeApi } from "./api";
 import { glass } from "./ui";
+import { enableAppPush, isApp } from "@/lib/native";
 
 // What TopTrack is, shown once on each device and again from the
 // little ? at the top right. Closing it is also when we ask to send nudges,
@@ -80,7 +81,7 @@ export function Welcome({ api, onClose, onApp, onKey }: { api: GlobeApi; onClose
             seen.set();
             onApp();
           }}
-          className="-mt-1.5 flex h-10 items-center justify-center gap-2 text-sm font-semibold text-card-ink"
+          className="web-only -mt-1.5 flex h-10 items-center justify-center gap-2 text-sm font-semibold text-card-ink"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon-192.png" alt="" width={20} height={20} className="h-5 w-5 rounded-[5px]" />
@@ -121,7 +122,13 @@ export function notifyLater(days: number) {
 // refreshes a subscription the person already allowed.
 export async function enablePush(api: GlobeApi, ask: boolean) {
   const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!api.savePush || !key || typeof window === "undefined") return;
+  if (!api.savePush || typeof window === "undefined") return;
+  // the iPhone app: Apple's own notifications instead (lib/native)
+  if (isApp()) {
+    const save = api.savePush;
+    return enableAppPush((endpoint) => save({ endpoint, p256dh: "", auth: "" }), ask);
+  }
+  if (!key) return;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
   try {
     if (Notification.permission === "default" && ask && (await Notification.requestPermission()) !== "granted") return;

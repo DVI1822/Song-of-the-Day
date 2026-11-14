@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { isApp } from "@/lib/native";
 
 // How to put TopTrack on your home screen, as a short slideshow: each
 // tap drawn on a little phone screen, with the spot to tap pulsing. It shows
@@ -43,6 +44,7 @@ type Way = "safari" | "chrome" | "inapp" | "prompt";
 
 // this phone, if it's a phone still using a browser
 function here(): { os: Os; way: Way } | null {
+  if (isApp()) return null;
   const nav = navigator as Navigator & { standalone?: boolean };
   if (nav.standalone || window.matchMedia("(display-mode: standalone)").matches) return null;
   const ua = nav.userAgent;

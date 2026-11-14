@@ -382,3 +382,9 @@ body {
 }
 /* flatter light on the covers, closer to a drawing than a photo of glass */
 [data-ink] [data-facet]:not([data-wait]) > div:last-child { opacity: 0.45; }
+
+/* Inside the TopTrack iPhone app (components/AppBoot.tsx): no "add to your
+   home screen" help, it's already an app. */
+html[data-app] .web-only {
+  display: none !important;
+}
