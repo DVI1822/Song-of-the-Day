@@ -60,6 +60,7 @@ export function CoreView({
   globe?: { people: number; posted: number }; // your own globe, as it is right now
 }) {
   const [flagging, setFlagging] = useState(false);
+  const [full, setFull] = useState(false);
   const [tab, setTab] = useState<Tab>("taste");
   // the rest of the core, fetched as you arrive: picks, feels, people, taste
   const id = profile?.id ?? null;
@@ -76,6 +77,8 @@ export function CoreView({
     setTasteFailed(false);
     setRank(null);
     setTab("taste");
+    // back down to rest, so their picture and name show as you arrive
+    setFull(false);
   }
   useEffect(() => {
     if (!id) return;
@@ -107,7 +110,6 @@ export function CoreView({
   // the sheet slides up to fill the screen: drag its handle, tap it, or scroll.
   // Dragged down far enough, from the handle or from anywhere while it's
   // scrolled to the top, it lets go of the core and you're back on the globe.
-  const [full, setFull] = useState(false);
   const drag = useRef<number | null>(null);
   const sheet = useRef<HTMLDivElement>(null);
   // the sheet rests just under the picture and name, the core's rings above
@@ -125,6 +127,10 @@ export function CoreView({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [onCenter]);
+  // another core: start at the top of its sheet
+  useEffect(() => {
+    if (sheet.current) sheet.current.scrollTop = 0;
+  }, [id]);
   const top = measured ?? sheetTop;
   const low = `translateY(calc(${top}px - ${FULL_TOP}))`; // where it rests until pulled up
   const live = useRef({ full, low, sheetTop: top, onClose });
@@ -145,6 +151,9 @@ export function CoreView({
     const move = (e: TouchEvent) => {
       if (y0 === null) return;
       dy = e.touches[0].clientY - y0;
+      // a finger that wobbles a few pixels is still a tap: taking over the
+      // touch here would cancel the tap on iPhone (a name in People did nothing)
+      if (dy > 0 && dy < 10 && el.style.transition !== "none") return;
       if (dy <= 0 || el.scrollTop > 0) {
         if (dy < 0) y0 = null; // scrolling up through the songs as usual
         return;
