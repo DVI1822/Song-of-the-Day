@@ -70,7 +70,8 @@ export type InkInside = {
   order: number[]; // far first
   deep: number;
   wave: (th: number, i: number, t: number) => number;
-  covers: (HTMLImageElement | null)[];
+  covers: (HTMLImageElement | null)[]; // the song riding each ring
+  angles?: number[]; // where round the ring each one rides
 };
 
 export function drawInkInside(g: CanvasRenderingContext2D, f: InkInside) {
@@ -171,7 +172,7 @@ export function drawInkInside(g: CanvasRenderingContext2D, f: InkInside) {
     const s = Math.min(150, r * 0.34);
     const a = clamp01((f.deep + 1.2 - d) / 0.9) * clamp01((d - 0.25) / 0.35) * clamp01(p * 2 - 1) * clamp01((r - 95) / 40);
     if (a < 0.01 || s < 6) continue;
-    const ang = i * 2.39996 + t * 0.03;
+    const ang = (f.angles?.[i] ?? i * 2.39996) + t * 0.03;
     const x = cx + Math.cos(ang) * r - s / 2,
       y = cy + Math.sin(ang) * r * 0.94 - s / 2;
     const sq = squarePts(x, y, s, s * 0.22);

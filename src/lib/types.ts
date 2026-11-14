@@ -92,3 +92,29 @@ export function needsFullName(p: Pick<Profile, "first_name" | "last_name">) {
 // Someone's points on the leaderboard: this month's finished days, and what
 // yesterday's song got. Today's points arrive tomorrow.
 export type Score = { who: string; month: number; last: number };
+
+// Your taste, built from the songs you've picked (lib/taste.ts), shown in the
+// core. The overview is written by Claude; the rest is counted.
+export type TasteOverview = {
+  name: string; // a name for their sound, e.g. "The Golden Hour Drifter"
+  blurb: string; // two or three sentences about it
+  words: string[]; // a few short words for it
+  month?: string | null; // how this month's picks compare with last month's
+};
+export type Taste = {
+  picks: number; // how many songs it's built from
+  overview: TasteOverview | null;
+  genres: { name: string; n: number }[]; // most picked first
+  decades: { decade: number; n: number }[]; // 1970, 1980... oldest first
+  artists: { name: string; n: number; artwork: string | null }[]; // most picked first
+  pending: boolean; // some songs are still being looked up: ask again in a bit
+};
+
+// The rest of someone's core: TopTrack picks and feels on each of their
+// songs, and the people on either side of them.
+export type CoreExtras = {
+  picks: Record<string, number>; // post id -> TopTrack picks, once its day is over
+  feels: Record<string, number>; // post id -> feels
+  followers: Profile[]; // people who have them on their globe
+  following: Profile[]; // people on their globe
+};

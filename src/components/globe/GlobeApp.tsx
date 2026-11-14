@@ -1697,6 +1697,8 @@ function Globe({
           onBlocked={() => window.location.reload()}
           onAvatar={coreData.profile.id === me.id ? onAvatar : undefined}
           onCenter={setCoreCenter}
+          onPerson={(p) => openCore(null, p)}
+          globe={coreWho ? undefined : { people: friends.length, posted: friends.filter((f) => f.post).length }}
           rootRef={(el) => void (R.current.prof = el)}
           sheetRef={(el) => void (R.current.profSheet = el)}
         />

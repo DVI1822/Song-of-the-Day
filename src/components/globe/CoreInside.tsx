@@ -18,6 +18,9 @@ import { drawInkInside } from "./coreInk";
 const NEON = ["#5ef2ff", "#9b8cff", "#ff5fd2", "#b4ff5e"];
 const RINGS = 16;
 const DEEP = 4; // how far down the tunnel the rings go
+const SONGS = 80; // how many of their songs come by
+// once you're in, the rings keep coming at you, bringing their songs past
+const DRIFT_INK = 0.3;
 const TAU = Math.PI * 2;
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -65,8 +68,9 @@ export function CoreInside({
   const colors = look?.colors.length ? look.colors.map(vivid) : NEON;
   const live = useRef({ colors, cy, from, coreR, zoom, night, covers: [] as (HTMLImageElement | null)[] });
 
-  // the covers that ride the rings: their newest songs
-  const coverKey = (posts ?? []).slice(0, RINGS).map((p) => p.artwork_url ?? "").join("|");
+  // the covers that ride the rings: their newest songs first, then on back
+  // through the rest, one more each time a ring passes you
+  const coverKey = (posts ?? []).slice(0, SONGS).map((p) => p.artwork_url ?? "").join("|");
   // each one joins the rings only once it's unpacked: drawing a picture the
   // phone hasn't decoded yet makes it stop and decode it right then, a stall
   // in the middle of the dive
@@ -102,6 +106,13 @@ export function CoreInside({
     const calm = !ink && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // the core's rings, smallest deepest
     const z = Array.from({ length: RINGS }, (_, i) => (i / RINGS) * DEEP + 1.6);
+    // which song rides each ring, and where round it: a ring that passes you
+    // comes back from the far end with the next song, somewhere in the top
+    // half, above the sheet
+    const slot = Array.from({ length: RINGS }, (_, i) => i);
+    let next = RINGS;
+    const spot = (i: number) => -Math.PI / 2 + Math.sin(i * 12.9898) * 1.25;
+    const angles = slot.map(spot);
     let t0: number | null = null; // when the core started to open
     let last = performance.now(),
       lastZm = live.current.zoom(),
@@ -148,18 +159,24 @@ export function CoreInside({
 
       // diving in, the rings rush past you; flying out, they fall back into
       // the core; in between they drift slowly towards you
-      const move = (calm ? 0.05 : 0.14) * dt + dz * 0.9;
+      const move = (calm ? 0.05 : ink ? DRIFT_INK : 0.14) * dt + dz * 0.9;
+      const n = Math.max(1, covers.length);
       for (let i = 0; i < RINGS; i++) {
         z[i] -= move;
-        if (z[i] < 0.12) z[i] += DEEP;
+        if (z[i] < 0.12) {
+          z[i] += DEEP;
+          slot[i] = next++;
+          angles[i] = spot(next);
+        }
         if (z[i] > DEEP + 1.6) z[i] -= DEEP;
       }
+      const riding = slot.map((k) => covers[k % n] ?? null);
       const order = [...z.keys()].sort((a, b) => z[b] - z[a]); // far first
 
 
       if (ink) {
         const rush = dt > 0 ? dz / Math.max(1, zm) / dt : 0;
-        drawInkInside(ctx, { w, h, cx, cy, p, F, R0, edge, t, rush, night: live.current.night, z, order, deep: DEEP, wave, covers });
+        drawInkInside(ctx, { w, h, cx, cy, p, F, R0, edge, t, rush, night: live.current.night, z, order, deep: DEEP, wave, covers: riding, angles });
         raf = requestAnimationFrame(frame);
         return;
       }
@@ -222,7 +239,7 @@ export function CoreInside({
       // their songs, riding the rings
       ctx.globalCompositeOperation = "source-over";
       for (const i of order) {
-        const im = covers[i];
+        const im = riding[i];
         if (!im || !im.complete || !im.naturalWidth) continue;
         const d = z[i];
         const r = F / d;

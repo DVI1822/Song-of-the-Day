@@ -210,6 +210,24 @@ Without `ANTHROPIC_API_KEY` the facts are the opening lines of the Wikipedia
 article instead. Without `SUPABASE_SECRET_KEY` they still show but aren't
 kept, so every visit looks them up again.
 
+## Part 4e: Your core and your taste
+
+The core is your profile: a Taste tab, your songs as a calendar and
+playlists, and the people on either side of your globe.
+
+1. In Supabase's **SQL Editor**, run
+   `supabase/migrations/20261116000000_core_taste.sql`. Until then the core
+   still opens, but crowns show as 0 and the Taste tab can't keep anything.
+2. The Taste tab looks each song up on Apple's iTunes catalog (free, no key)
+   for its genre and release year, and keeps it in `song_tags` using
+   `SUPABASE_SECRET_KEY`. Long histories fill in a dozen songs at a time.
+3. The Taste Overview (a name for your sound and a few lines about it) is
+   written by Claude with the same `ANTHROPIC_API_KEY` as the song facts, and
+   written again after three new picks or a week. `TASTE_MODEL` overrides the
+   model (it defaults to `FACTS_MODEL`, then Haiku).
+4. Optional: add `LASTFM_API_KEY` (free at last.fm/api/account/create) for
+   Last.fm's tags on each song, which give the overview more to go on.
+
 ## Part 5: Try it
 
 1. Open your site, click **Get started**, and enter the email you invited.
