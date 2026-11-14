@@ -157,7 +157,6 @@ function globe(t: number, squash: number) {
       [-1, 1],
     ].map(([a, b]) => [(a * e[0] + b * n[0]) * HALF * R, (a * e[1] + b * n[1]) * HALF * R]);
     const start = T.land - FLY;
-    // tiles that land out of sight round the back are simply there already
     const arrives = view(T.p, T.land * SPIN)[2] > 0.2;
     if (arrives && t < T.land) {
       if (t < start) continue;
@@ -189,10 +188,13 @@ function globe(t: number, squash: number) {
       flying.push(tile(pts, T.color, T.dot, px, py, grow));
       continue;
     }
-    if (c[2] <= 0.02) continue;
+    // the rest land round the back, out of sight: they only exist once they
+    // have, so the globe starts with nothing on it
+    if (t < T.land || c[2] <= 0.02) continue;
+    const appear = arrives ? 1 : smooth((t - T.land) / 0.2);
     // the ones near the edge are seen side on, and a touch darker
     landed.push(
-      `<g opacity="${f(0.55 + 0.45 * clamp(c[2] * 2))}">${tile(
+      `<g opacity="${f((0.55 + 0.45 * clamp(c[2] * 2)) * appear)}">${tile(
         offs.map(([ox, oy]) => [cx + ox, cy + oy]),
         T.color,
         T.dot,

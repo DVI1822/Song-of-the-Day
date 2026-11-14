@@ -26,11 +26,11 @@ export function Landing() {
       </svg>
 
       <main className="relative mx-auto flex min-h-dvh max-w-md flex-col px-6 pb-8 pt-[max(28px,env(safe-area-inset-top))]">
-        <div className="mt-4 flex justify-center">
-          <Wordmark size={38} />
+        <div className="mt-1 flex justify-center">
+          <Wordmark size={32} />
         </div>
 
-        <h1 className="mt-7 text-center text-[40px] leading-[1.02]" style={hand}>
+        <h1 className="mt-4 text-center text-[33px] leading-[1.02]" style={hand}>
           Every day has
           <br />
           <span className="relative inline-block">
@@ -38,11 +38,11 @@ export function Landing() {
             <Squiggle />
           </span>
         </h1>
-        <p className="mx-auto mt-4 max-w-[300px] text-center text-[22px] leading-snug" style={hand}>
-          What was yours? Post it, then hear everyone else&apos;s.
+        <p className="mx-auto mt-3 max-w-[300px] text-center text-[19px] leading-tight" style={hand}>
+          What was yours today?
         </p>
 
-        <ol className="mt-8 flex flex-col gap-6">
+        <ol className="mt-7 flex flex-col gap-6">
           <Step art={<RecordDoodle />} title="Pick your top track">
             The one song that ran your day. Paste its link and it lands on your globe.
           </Step>
