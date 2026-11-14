@@ -45,7 +45,7 @@ export default function PrivacyPage() {
       <p>
         If you turn notifications on, we keep an address for your browser or phone (on the iPhone app, the device token
         Apple gives it) so we can tell you when friends post, when someone likes your song or leaves a note, and remind
-        you at noon and 9 PM if you haven&apos;t posted. It&apos;s used for nothing else, and it&apos;s deleted when you
+        you at noon and 9 PM if you haven&apos;t posted, and at 6 PM if you haven&apos;t crowned a song yet. It&apos;s used for nothing else, and it&apos;s deleted when you
         turn notifications off or delete your account. You can turn them off any time in your phone&apos;s Settings.
       </p>
 
