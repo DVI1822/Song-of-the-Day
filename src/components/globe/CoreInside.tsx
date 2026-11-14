@@ -67,12 +67,20 @@ export function CoreInside({
 
   // the covers that ride the rings: their newest songs
   const coverKey = (posts ?? []).slice(0, RINGS).map((p) => p.artwork_url ?? "").join("|");
+  // each one joins the rings only once it's unpacked: drawing a picture the
+  // phone hasn't decoded yet makes it stop and decode it right then, a stall
+  // in the middle of the dive
   useEffect(() => {
-    live.current.covers = coverKey.split("|").filter(Boolean).map((src) => {
+    const srcs = coverKey.split("|").filter(Boolean);
+    const list: (HTMLImageElement | null)[] = srcs.map(() => null);
+    live.current.covers = list;
+    srcs.forEach((src, i) => {
       const im = new Image();
       im.decoding = "async";
       im.src = coverAt(src, 60);
-      return im;
+      const ready = () => void (list[i] = im);
+      if (im.decode) im.decode().then(ready, () => {});
+      else im.onload = ready;
     });
   }, [coverKey]);
   useEffect(() => {
@@ -114,7 +122,10 @@ export function CoreInside({
       }
       if (t0 === null) t0 = now;
       const t = (now - t0) / 1000;
-      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      // twice the CSS pixels is plenty for soft rings and ink lines; at the
+      // phone's full 3x this full-screen canvas was over twice the pixels to
+      // clear and draw every frame of the dive
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = window.innerWidth,
         h = window.innerHeight;
       if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {

@@ -11,11 +11,30 @@ import { CloseIcon, Face } from "./ui";
 // bars that jump up and light up when tapped, with the count beside it;
 // notes open in a sheet under the song. (The likes are "feels" in the data.)
 
+// Asked for the moment a song is tapped, while the camera's still flying to
+// it, so the card opens with its likes and notes already filled in rather
+// than its buttons popping in a beat later.
+const early = new Map<string, { at: number; p: Promise<Reactions | null>; v?: Reactions | null }>();
+export function prefetchReactions(api: GlobeApi, postId: string) {
+  const e: { at: number; p: Promise<Reactions | null>; v?: Reactions | null } = { at: Date.now(), p: api.reactions(postId) };
+  e.p.then((v) => void (e.v = v)).catch(() => early.delete(postId));
+  early.set(postId, e);
+}
+const fresh = (postId: string) => {
+  const e = early.get(postId);
+  return e && Date.now() - e.at < 20_000 ? e : undefined;
+};
+
 export function useReactions(api: GlobeApi, postId: string) {
-  const [r, setR] = useState<Reactions | null>(null);
+  const [r, setR] = useState<Reactions | null>(() => {
+    const v = fresh(postId)?.v;
+    return v === undefined ? null : (v ?? { feels: [], notes: [] });
+  });
   useEffect(() => {
     let on = true;
-    api.reactions(postId).then((x) => on && setR(x ?? { feels: [], notes: [] }));
+    const e = fresh(postId);
+    early.delete(postId);
+    (e?.p ?? api.reactions(postId)).then((x) => on && setR(x ?? { feels: [], notes: [] }));
     return () => {
       on = false;
     };

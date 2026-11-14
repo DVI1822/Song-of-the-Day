@@ -223,7 +223,11 @@ export function Feature({
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[480]">
-      <div ref={backdropRef} className="absolute inset-0" />
+      <div
+        ref={backdropRef}
+        className="absolute inset-0"
+        style={{ opacity: 0, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      />
       <button
         type="button"
         onClick={onClose}

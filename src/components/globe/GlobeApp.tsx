@@ -39,6 +39,8 @@ import { PullTab } from "./pull";
 import { usePreview } from "./Preview";
 import { beatOf, type Beat } from "./beat";
 import { BackIcon, coverRadius, glass, RecenterIcon, TabIcon } from "./ui";
+import { prefetchReactions } from "./Reactions";
+import { coverAt } from "@/lib/cover";
 import {
   PERSPECTIVE,
   RIPPLE_LIFE,
@@ -83,6 +85,7 @@ type PanelName = "friends";
 type TileInfo = { k: number; wait: boolean; art: string; label: string };
 type TileEls = {
   box: HTMLDivElement | null;
+  face: HTMLButtonElement | null; // the cover's facets, hidden round the far side
   facets: (HTMLDivElement | null)[];
   shades: (HTMLDivElement | null)[];
   coats: (HTMLDivElement | null)[]; // frost on the cover
@@ -569,12 +572,25 @@ function Globe({
       if (k === ME && wait) openCompose();
       else if (wait) spinTo(k);
       else {
+        // get the card's full-size cover and its likes coming now, while the
+        // camera flies, so the card opens complete
+        const post = k === ME ? myPost : live.current.friends[k]?.post;
+        if (post) {
+          prefetchReactions(api, post.id);
+          const big = coverAt(post.artwork_url, live.current.L.cover);
+          if (big) {
+            const im = new Image();
+            im.src = big;
+            im.decode?.().catch(() => {});
+            held.cover = im; // held, so the browser keeps it ready for the card
+          }
+        }
         // it dips into the water first, then the camera flies in
         sim.current.dip(k);
         setTimeout(() => fly(k), 220);
       }
     },
-    [fly, openCompose, spinTo],
+    [fly, openCompose, spinTo, api, myPost],
   );
 
   // Load the archive of whoever's core we're flying into.
@@ -1690,6 +1706,24 @@ function Globe({
 }
 
 // Writes one frame of motion and light straight to the DOM.
+// the full-size cover of the song being flown to, fetched as it was tapped
+const held = { cover: null as HTMLImageElement | null };
+
+// The frame loop's style writes, skipped when the value hasn't changed. A
+// still tile, a faded-out layer or a resting card then costs the phone
+// nothing, where rewriting the same lighting on hundreds of facets every frame
+// had it restyle and repaint them all, sixty times a second.
+const wrote = new WeakMap<HTMLElement, Record<string, string>>();
+function put(el: HTMLElement, k: string, v: string) {
+  let m = wrote.get(el);
+  if (!m) wrote.set(el, (m = {}));
+  if (m[k] === v) return;
+  m[k] = v;
+  (el.style as unknown as Record<string, string>)[k] = v;
+}
+// React rewrote this element's style: forget what was written to it
+const forget = (el: HTMLElement | null) => void (el && wrote.delete(el));
+
 function draw(
 s: Motion,
 r: Els,
@@ -1718,11 +1752,11 @@ sim: TileSim,
   }
 
   if (r.world) {
-    r.world.style.transform = `scale3d(${s.zoom},${s.zoom},${s.zoom}) rotateZ(${cam.roll.toFixed(4)}rad) rotateX(${s.pitch}rad) rotateZ(${TILT}rad) rotateY(${s.yaw}rad)`;
-    r.world.style.pointerEvents = reveal > 0.5 ? "none" : "";
+    put(r.world, "transform", `scale3d(${s.zoom},${s.zoom},${s.zoom}) rotateZ(${cam.roll.toFixed(4)}rad) rotateX(${s.pitch}rad) rotateZ(${TILT}rad) rotateY(${s.yaw}rad)`);
+    put(r.world, "pointerEvents", reveal > 0.5 ? "none" : "");
   }
   if (r.core)
-    r.core.style.transform = `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) rotateZ(${(-cam.roll).toFixed(4)}rad) scale(${(0.3333 * L.s * Math.min(1, 3.9 / s.zoom)).toFixed(4)})`;
+    put(r.core, "transform", `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) rotateZ(${(-cam.roll).toFixed(4)}rad) scale(${(0.3333 * L.s * Math.min(1, 3.9 / s.zoom)).toFixed(4)})`);
 
   // tiles
   const Lc = sun.L,
@@ -1771,12 +1805,15 @@ sim: TileSim,
     const ez = camV([cla * slo, -sla, cla * clo], cam);
     const camZ = s.zoom * Rb * ez[2];
     const nearFade = clamp01((880 - camZ) / 220);
-    te.box.style.visibility = nearFade <= 0 || unborn ? "hidden" : "";
+    put(te.box, "visibility", nearFade <= 0 || unborn ? "hidden" : "");
     // riding the water: up and down, and rocked a little
     const fl = sim.float(k);
-    te.box.style.transform =
-      `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h + lift).toFixed(2)}px) ` +
-      `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`;
+    put(te.box, "transform", `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h + lift).toFixed(2)}px) ` +
+      `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`);
+    // well round the far side, the cover's facets are all turned away (only
+    // its faint back shows): hide them outright, so the phone stops moving
+    // and compositing nine layers it was never going to show
+    if (te.face) put(te.face, "visibility", ez[2] < visibleZ - 0.3 ? "hidden" : "");
     if (nearFade <= 0 || ez[2] < visibleZ) continue; // facing away: nothing to light
 
     const ex = camV([clo, 0, -slo], cam),
@@ -1799,20 +1836,20 @@ sim: TileSim,
       if (i === 0 || i === 2 || i === 6 || i === 8) {
         const ci = i === 0 ? 0 : i === 2 ? 1 : i === 8 ? 2 : 3;
         const base = morph ? (0.31 + 0.05 * Math.sin(s.mt * (0.8 + ci * 0.2) + ci + k)) * W : r0;
-        const rad = Math.min(fs, base).toFixed(1) + "px";
-        if (i === 0) f.style.borderTopLeftRadius = rad;
-        else if (i === 2) f.style.borderTopRightRadius = rad;
-        else if (i === 8) f.style.borderBottomRightRadius = rad;
-        else f.style.borderBottomLeftRadius = rad;
+        const rad = (Math.round(Math.min(fs, base) * 2) / 2).toFixed(1) + "px"; // half-pixel steps
+        if (i === 0) put(f, "borderTopLeftRadius", rad);
+        else if (i === 2) put(f, "borderTopRightRadius", rad);
+        else if (i === 8) put(f, "borderBottomRightRadius", rad);
+        else put(f, "borderBottomLeftRadius", rad);
       }
       if (wait) {
         const sx = Math.sin(ox / Rb),
           sy = Math.sin(oy / Rb);
         const wn = [0, 1, 2].map((j) => ex[j] * sx + ey[j] * sy + ez[j]);
         const wl = (wn[0] * Lc[0] + wn[1] * Lc[1] + wn[2] * Lc[2]) / Math.hypot(wn[0], wn[1], wn[2]);
-        f.style.backgroundColor = `rgba(13,42,63,${(0.02 + 0.16 * Math.max(0, -wl) * day).toFixed(3)})`;
-        f.style.borderColor = line;
-        f.style.opacity = fadeOp.toFixed(3);
+        put(f, "backgroundColor", `rgba(13,42,63,${(0.02 + 0.16 * Math.max(0, -wl) * day).toFixed(2)})`);
+        put(f, "borderColor", line);
+        put(f, "opacity", fadeOp.toFixed(3));
       } else {
         const fa = ox / Rb,
           fb = -oy / Rb;
@@ -1823,9 +1860,9 @@ sim: TileSim,
         // cloud cover takes the edge off the sun: softer light, softer shadows
         const shade =
           lit > 0
-            ? `rgba(255,247,226,${(0.32 * lit * day * direct).toFixed(3)})`
-            : `rgba(13,42,63,${(Math.min(0.62, 0.75 * -lit + 0.12) * day * (0.4 + 0.6 * direct)).toFixed(3)})`;
-        const amb = `rgba(13,42,63,${(0.1 * (1 - day) + 0.05 * lk.wet).toFixed(3)})`;
+            ? `rgba(255,247,226,${(0.32 * lit * day * direct).toFixed(2)})`
+            : `rgba(13,42,63,${(Math.min(0.62, 0.75 * -lit + 0.12) * day * (0.4 + 0.6 * direct)).toFixed(2)})`;
+        const amb = `rgba(13,42,63,${(0.1 * (1 - day) + 0.05 * lk.wet).toFixed(2)})`;
         let layers = `linear-gradient(${shade},${shade}), `;
         if (grey > 0.005) layers += `linear-gradient(rgba(120,130,140,${grey.toFixed(3)}),rgba(120,130,140,${grey.toFixed(3)})), `;
         if (lk.wet > 0.01) {
@@ -1843,17 +1880,17 @@ sim: TileSim,
           layers += `linear-gradient(${c},${c}), `;
         }
         const sh = te.shades[i];
-        if (sh) sh.style.background = layers + amb;
+        if (sh) put(sh, "background", layers + amb);
         // frost rims the covers in winter and when it's freezing; the sun melts it back
         const coat = te.coats[i];
         if (coat) {
           if (lk.frost > 0.01 && !coat.dataset.k) {
             coat.dataset.k = "frost";
-            coat.style.backgroundImage = `url(${frostTexture()})`;
+            put(coat, "backgroundImage", `url(${frostTexture()})`);
           }
-          coat.style.opacity = (lk.frost > 0.01 ? lk.frost * (0.95 - 0.5 * Math.max(0, lit) * day) : 0).toFixed(3);
+          put(coat, "opacity", (lk.frost > 0.01 ? lk.frost * (0.95 - 0.5 * Math.max(0, lit) * day) : 0).toFixed(3));
         }
-        f.style.opacity = (fadeOp * lockE).toFixed(3);
+        put(f, "opacity", (fadeOp * lockE).toFixed(3));
       }
     }
   }
@@ -1872,16 +1909,15 @@ sim: TileSim,
     const cx = L.cx - lx * len,
       cy = L.cy + 216 * L.s - lz * len * 0.3;
     const a = (0.12 * (1 - day) + (day * 0.72) / (1 + 0.3 * cot)) * (0.35 + 0.65 * direct);
-    const st = r.sunShadow.style;
-    st.left = (cx - w / 2).toFixed(1) + "px";
-    st.top = (cy - h / 2).toFixed(1) + "px";
-    st.width = w.toFixed(1) + "px";
-    st.height = h.toFixed(1) + "px";
-    st.opacity = roomOp.toFixed(3);
-    st.background = `radial-gradient(closest-side, rgba(13,42,63,${a.toFixed(3)}), rgba(13,42,63,${(a * 0.7).toFixed(3)}) 50%, rgba(13,42,63,0))`;
-    st.filter = `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day) + 7 * lk.overcast).toFixed(1)}px)`;
+    put(r.sunShadow, "left", (cx - w / 2).toFixed(1) + "px");
+    put(r.sunShadow, "top", (cy - h / 2).toFixed(1) + "px");
+    put(r.sunShadow, "width", w.toFixed(1) + "px");
+    put(r.sunShadow, "height", h.toFixed(1) + "px");
+    put(r.sunShadow, "opacity", roomOp.toFixed(3));
+    put(r.sunShadow, "background", `radial-gradient(closest-side, rgba(13,42,63,${a.toFixed(3)}), rgba(13,42,63,${(a * 0.7).toFixed(3)}) 50%, rgba(13,42,63,0))`);
+    put(r.sunShadow, "filter", `blur(${(1.5 + 1.5 * cot * day + 5 * (1 - day) + 7 * lk.overcast).toFixed(1)}px)`);
   }
-  if (r.floor) r.floor.style.opacity = roomOp.toFixed(3);
+  if (r.floor) put(r.floor, "opacity", roomOp.toFixed(3));
   const warm = s.sky?.warm ?? 0,
     wc = s.sky?.warmC ?? [1, 1, 1];
   const glass = [0, 1, 2].map((j) => Math.round([255, 250, 236][j] * (1 - 0.6 * warm) + 255 * wc[j] * 0.6 * warm)).join(",");
@@ -1889,21 +1925,21 @@ sim: TileSim,
     const hx = 50 + 42 * Lc[0],
       hy = 50 + 42 * Lc[1],
       lit = 18 + (30 * (1 + Lc[2])) / 2;
-    r.sphere.style.opacity = ((1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3)).toFixed(3);
-    r.sphere.style.background = `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(${glass},${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk + 0.12 * warm * direct).toFixed(3)}) 0%, rgba(${glass},0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`;
-    r.sphere.style.boxShadow = dk > 0 ? `0 0 ${(40 * dk).toFixed(0)}px rgba(180,210,255,${(0.08 * dk).toFixed(3)})` : "";
+    put(r.sphere, "opacity", ((1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3)).toFixed(3));
+    put(r.sphere, "background", `radial-gradient(circle at ${hx.toFixed(1)}% ${hy.toFixed(1)}%, rgba(${glass},${((0.35 + 0.2 * dk) * day * direct + 0.05 * dk + 0.12 * warm * direct).toFixed(3)}) 0%, rgba(${glass},0) ${lit.toFixed(1)}%, rgba(${dk > 0.5 ? "0,0,0" : "13,42,63"},${((0.04 + 0.11 * day) * (dk > 0.5 ? 2.2 : 1)).toFixed(3)}) 100%)`);
+    put(r.sphere, "boxShadow", dk > 0 ? `0 0 ${(40 * dk).toFixed(0)}px rgba(180,210,255,${(0.08 * dk).toFixed(3)})` : "");
   }
   if (inkMode()) {
     // the drawn look: an ink ball instead of the glass one
     const op = (1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3);
-    if (r.sphere) r.sphere.style.opacity = "0";
-    if (r.sunShadow) r.sunShadow.style.opacity = "0";
-    if (r.floor) r.floor.style.opacity = "0";
+    if (r.sphere) put(r.sphere, "opacity", "0");
+    if (r.sunShadow) put(r.sunShadow, "opacity", "0");
+    if (r.floor) put(r.floor, "opacity", "0");
     if (r.frost) {
       const fs = r.frost.style;
-      fs.opacity = op.toFixed(3);
-      fs.transform = `scale(${s.zoom.toFixed(4)})`;
-      fs.background = dk > 0.5 ? "rgba(22,28,40,0.34)" : "rgba(251,248,240,0.34)";
+      put(r.frost, "opacity", op.toFixed(3));
+      put(r.frost, "transform", `scale(${s.zoom.toFixed(4)})`);
+      put(r.frost, "background", dk > 0.5 ? "rgba(22,28,40,0.34)" : "rgba(251,248,240,0.34)");
       const blur = "blur(7px) saturate(0.85)";
       if (fs.backdropFilter !== blur) {
         fs.backdropFilter = blur;
@@ -1928,37 +1964,37 @@ sim: TileSim,
   }
   if (s.sky && r.day && s.sky.bg !== s.skyBg) {
     s.skyBg = s.sky.bg;
-    r.day.style.background = s.skyBg;
+    put(r.day, "background", s.skyBg);
   }
-  if (r.space) r.space.style.opacity = (s.sky ? s.sky.space : dk).toFixed(3);
-  if (r.stars) r.stars.style.transform = `rotate(${(s.yaw * 0.08).toFixed(4)}rad)`;
-  if (r.starsB) r.starsB.style.opacity = (0.65 + 0.35 * Math.sin(s.mt * 1.7)).toFixed(3);
+  if (r.space) put(r.space, "opacity", (s.sky ? s.sky.space : dk).toFixed(3));
+  if (r.stars) put(r.stars, "transform", `rotate(${(s.yaw * 0.08).toFixed(4)}rad)`);
+  if (r.starsB) put(r.starsB, "opacity", (0.65 + 0.35 * Math.sin(s.mt * 1.7)).toFixed(3));
 
   // chrome fades away while flying to a song or into a core
   const chrome = Math.min(1 - s.fp, 1 - reveal, 1 - lensP);
   const off = s.fp > 0.3 || reveal > 0.3 || lensP > 0.3;
   for (const el of r.chrome)
     if (el) {
-      el.style.opacity = chrome.toFixed(3);
-      el.style.pointerEvents = off ? "none" : "";
+      put(el, "opacity", chrome.toFixed(3));
+      put(el, "pointerEvents", off ? "none" : "");
     }
 
   // the song card and the core fade with the camera
   // the world stays there behind a song, softly blurred
+  // (the blur is set once and faded in: changing its size every frame made
+  // the phone rebuild the whole blurred screen each frame of the fly-in)
   if (r.featBack) {
-    const blur = `blur(${(6 * s.fp).toFixed(1)}px)`;
-    r.featBack.style.background = `rgba(${dk > 0.5 ? "8,14,26" : "248,250,252"},${(0.18 * s.fp).toFixed(3)})`;
-    r.featBack.style.backdropFilter = blur;
-    r.featBack.style.setProperty("-webkit-backdrop-filter", blur);
+    put(r.featBack, "background", `rgba(${dk > 0.5 ? "8,14,26" : "248,250,252"},0.18)`);
+    put(r.featBack, "opacity", s.fp.toFixed(3));
   }
-  if (r.featCard) r.featCard.style.opacity = (1 - Math.pow(1 - s.fp, 3)).toFixed(3);
+  if (r.featCard) put(r.featCard, "opacity", (1 - Math.pow(1 - s.fp, 3)).toFixed(3));
   // the core's page fades in while its sheet glides up from below the screen
-  if (r.prof) r.prof.style.opacity = Math.min(1, s.profP * 2.2).toFixed(3);
-  if (r.profSheet) r.profSheet.style.transform = `translateY(${(Math.pow(1 - s.profP, 4) * 70).toFixed(2)}vh)`;
+  if (r.prof) put(r.prof, "opacity", Math.min(1, s.profP * 2.2).toFixed(3));
+  if (r.profSheet) put(r.profSheet, "transform", `translateY(${(Math.pow(1 - s.profP, 4) * 70).toFixed(2)}vh)`);
 
   // your song dropping into the globe
   if (r.launch) {
-    if (s.launch === null) r.launch.style.opacity = "0";
+    if (s.launch === null) put(r.launch, "opacity", "0");
     else {
       const p = s.launch;
       let y: number,
@@ -1976,15 +2012,15 @@ sim: TileSim,
         op = p > 0.92 ? (1 - p) / 0.08 : 1;
       }
       const box = 220 * L.s;
-      r.launch.style.left = (L.cx - box / 2).toFixed(1) + "px";
-      r.launch.style.top = (L.cy + y * L.s - box / 2).toFixed(1) + "px";
-      r.launch.style.opacity = op.toFixed(3);
-      r.launch.style.transform = `scale(${sc.toFixed(3)})`;
+      put(r.launch, "left", (L.cx - box / 2).toFixed(1) + "px");
+      put(r.launch, "top", (L.cy + y * L.s - box / 2).toFixed(1) + "px");
+      put(r.launch, "opacity", op.toFixed(3));
+      put(r.launch, "transform", `scale(${sc.toFixed(3)})`);
       if (inkMode()) {
         // the drawn look: a fat ink edge and a hard drawn shadow, like the songs
-        r.launch.style.outline = `${(2.5 / sc).toFixed(2)}px solid #1d2433`;
-        r.launch.style.boxShadow = `${(4 + 6 * (1 - p)).toFixed(1)}px ${(6 + 10 * (1 - p)).toFixed(1)}px 0 rgba(29,36,51,0.22)`;
-      } else r.launch.style.boxShadow = `0 30px 70px -20px rgba(13,42,63,0.5), 0 0 ${Math.round(30 + 50 * p)}px ${Math.round(6 + 10 * p)}px rgba(13,42,63,${(0.06 + 0.1 * p).toFixed(2)})`;
+        put(r.launch, "outline", `${(2.5 / sc).toFixed(2)}px solid #1d2433`);
+        put(r.launch, "boxShadow", `${(4 + 6 * (1 - p)).toFixed(1)}px ${(6 + 10 * (1 - p)).toFixed(1)}px 0 rgba(29,36,51,0.22)`);
+      } else put(r.launch, "boxShadow", `0 30px 70px -20px rgba(13,42,63,0.5), 0 0 ${Math.round(30 + 50 * p)}px ${Math.round(6 + 10 * p)}px rgba(13,42,63,${(0.06 + 0.1 * p).toFixed(2)})`);
     }
   }
 }
@@ -2165,7 +2201,7 @@ const TileLayer = memo(function TileLayer({
     fs = W / 3,
     r0 = Math.round(0.26 * W);
   return tiles.map(({ k, wait, art, label }) => {
-    if (!els.current.has(k)) els.current.set(k, { box: null, facets: [], shades: [], coats: [] });
+    if (!els.current.has(k)) els.current.set(k, { box: null, face: null, facets: [], shades: [], coats: [] });
     const te = els.current.get(k)!;
     const facets = [];
     for (let i = 0; i < 9; i++) {
@@ -2182,7 +2218,10 @@ const TileLayer = memo(function TileLayer({
       facets.push(
         <div
           key={i}
-          ref={(el) => void (te.facets[i] = el)}
+          ref={(el) => {
+            te.facets[i] = el;
+            forget(el);
+          }}
           data-facet=""
           data-wait={wait ? "" : undefined}
           data-t={row === 0 ? "" : undefined}
@@ -2213,7 +2252,10 @@ const TileLayer = memo(function TileLayer({
         >
           {!wait && (
             <div
-              ref={(el) => void (te.coats[i] = el)}
+              ref={(el) => {
+                te.coats[i] = el;
+                forget(el);
+              }}
               className="absolute inset-0 opacity-0"
               style={{
                 backgroundSize: `${W}px ${W}px`,
@@ -2221,7 +2263,15 @@ const TileLayer = memo(function TileLayer({
               }}
             />
           )}
-          {!wait && <div ref={(el) => void (te.shades[i] = el)} className="absolute inset-0" />}
+          {!wait && (
+            <div
+              ref={(el) => {
+                te.shades[i] = el;
+                forget(el);
+              }}
+              className="absolute inset-0"
+            />
+          )}
         </div>,
       );
     }
@@ -2243,6 +2293,10 @@ const TileLayer = memo(function TileLayer({
           />
         )}
         <button
+          ref={(el) => {
+            te.face = el;
+            forget(el);
+          }}
           type="button"
           onClick={() => onPick(k, wait)}
           aria-label={label}
