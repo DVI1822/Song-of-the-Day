@@ -4,19 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { isApp } from "@/lib/native";
 
-// What you see when TopTrack first opens: the drawn Globe from the logo,
-// spinning on its tilted axis, then the gold crown drops in from above the
-// screen, bounces twice on top of the globe, and floats up to its spot over
-// the north pole, where it keeps turning with the globe. Then it all fades
-// into the app.
+// What you see when TopTrack first opens: song covers fly in from every side
+// and build the Globe (it's made of everyone's posts), spinning on its tilted
+// axis; then the gold crown shoots down that axis, bounces twice on the north
+// pole and floats up to its spot, where it keeps turning with the globe. Then
+// it all fades into the app.
 //
 // It plays once per visit (a tab, or a launch of the iPhone app): a script
 // in <head> (LAUNCH_SCRIPT, layout.tsx) marks the page before it's drawn so
 // later page loads skip it without a flash. Tapping skips it.
 //
 // In the iPhone app, the native splash screen (ios/App/App/Assets.xcassets/
-// Splash.imageset) is this exact first frame, the still globe centred on
-// paper, so hiding it here is invisible and the animation simply starts.
+// Splash.imageset) is this exact first frame, plain paper before the first
+// tile flies in, so hiding it here is invisible and the animation simply starts.
 //
 // It's drawn into an SVG every frame from JavaScript, not CSS animations, so
 // it plays with Reduce Motion on too (the Globe's other moments do).
@@ -46,20 +46,23 @@ const FLARE = 3; // the points lean outward
 const TIP = 27,
   VALLEY = 10;
 const LOOK = 0.2; // how far we look down onto the band (ellipse squash)
-const CONTACT = -R - LOOK * CR * CS + 3; // crown base resting on the globe's top
+const CONTACT = R + LOOK * CR * CS - 3; // crown base resting on the north pole, along the axis
 const FLOAT = R + 17 + LOOK * CR * CS; // crown base, along the axis, floating
 
 // timeline, seconds
-const DROP = 0.5; // the crown starts falling
-const FALL = 0.5;
+const FLY = 0.5; // each song tile's flight in
+const TILES_FROM = 0.5,
+  TILES_TO = 1.3; // when the tiles land
+const DROP = 1.45; // the crown shoots down the axis
+const FALL = 0.32;
 const HIT1 = DROP + FALL;
-const B1 = 0.32; // first bounce
+const B1 = 0.3; // first bounce
 const HIT2 = HIT1 + B1;
-const B2 = 0.17; // second, smaller
+const B2 = 0.16; // second, smaller
 const HIT3 = HIT2 + B2;
-const RISE = 0.65; // floats up to its spot
+const RISE = 0.6; // floats up to its spot
 const FLOATED = HIT3 + RISE;
-const FADE = 3.3; // the whole thing fades into the app
+const FADE = 3.75; // the whole thing fades into the app
 const FADE_FOR = 0.45;
 const DONE = FADE + FADE_FOR;
 
@@ -72,60 +75,150 @@ const easeOut = (x: number) => 1 - Math.pow(1 - clamp(x), 3);
 const f = (n: number) => (Math.round(n * 100) / 100).toString();
 // a quick squash that springs back
 const pulse = (dt: number, len: number) => (dt < 0 || dt > len ? 0 : Math.sin((dt / len) * Math.PI) * (1 - dt / len));
+const rand = (n: number) => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
 
 // ---------------------------------------------------------------- the globe
+// The globe is made of songs: square covers spread evenly over the ball,
+// turning with it. They fly in from every side to build it.
 
-function halfEllipse(rx: number, ry: number, side: 1 | -1, vertical: boolean) {
-  // half an ellipse centred on 0,0: the right/left half of a meridian, or the
-  // lower/upper half of a line of latitude
-  if (vertical) return `M0 ${f(-ry)} A${f(Math.abs(rx))} ${f(ry)} 0 0 ${side > 0 ? 1 : 0} 0 ${f(ry)}`;
-  return `M${f(-rx)} 0 A${f(rx)} ${f(Math.abs(ry))} 0 0 ${side > 0 ? 0 : 1} ${f(rx)} 0`;
+type V = [number, number, number];
+const TAU_TILT = (TILT * Math.PI) / 180;
+const PITCH = 0.24; // we look down on it a little, so the north pole leans toward us
+const AXIS: [number, number] = [Math.sin(TAU_TILT), -Math.cos(TAU_TILT)]; // up the axis, on screen
+const COLORS = ["#ff5e57", "#ffc94a", "#b9f0a8", "#8fd0ff", "#0d2a3f", "#c9b6ff", "#ffb38a", "#7fd8c6"];
+const HALF = 0.2; // a tile's half-width, in globe radii
+
+const COUNT = 40;
+const TILES = Array.from({ length: COUNT }, (_, i) => {
+  // a Fibonacci sphere: points spread evenly over the ball
+  const y = 1 - ((i + 0.5) / COUNT) * 2;
+  const r = Math.sqrt(1 - y * y);
+  const lon = i * 2.39996;
+  const p: V = [r * Math.sin(lon), y, r * Math.cos(lon)];
+  const el = Math.hypot(p[2], p[0]) || 1;
+  const e: V = [p[2] / el, 0, -p[0] / el]; // east
+  const n: V = [p[1] * e[2] - p[2] * e[1], p[2] * e[0] - p[0] * e[2], p[0] * e[1] - p[1] * e[0]]; // north
+  return {
+    p,
+    e,
+    n,
+    color: COLORS[Math.floor(rand(i + 3) * COLORS.length)],
+    land: TILES_FROM + rand(i + 40) * (TILES_TO - TILES_FROM),
+    jitter: (rand(i + 80) - 0.5) * 1.1,
+    reach: 560 + rand(i + 120) * 260,
+    twist: (rand(i + 160) - 0.5) * 2 * Math.PI,
+    dot: rand(i + 200) < 0.45,
+  };
+});
+
+// a direction on the ball to the screen (x right, y down, z toward us)
+function view(v: V, spin: number): V {
+  const cs = Math.cos(spin),
+    ss = Math.sin(spin);
+  const x1 = v[0] * cs + v[2] * ss,
+    z1 = -v[0] * ss + v[2] * cs;
+  const cp = Math.cos(PITCH),
+    sp = Math.sin(PITCH);
+  const y2 = v[1] * cp - z1 * sp,
+    z2 = v[1] * sp + z1 * cp;
+  const X = x1,
+    Y = -y2;
+  const ct = Math.cos(TAU_TILT),
+    st = Math.sin(TAU_TILT);
+  return [X * ct - Y * st, X * st + Y * ct, z2];
 }
 
-function globe(spin: number, squash: number) {
-  const back: string[] = [];
-  const front: string[] = [];
-  // meridians: three, 60° apart, each a full circle round the axis
-  for (let m = 0; m < 3; m++) {
-    const lon = spin + (m * Math.PI) / 3 + 0.37;
-    const rx = R * Math.sin(lon);
-    // the half at +rx faces us while cos(lon) > 0, and the other half the rest of the time
-    const near = Math.cos(lon) > 0;
-    const side = rx >= 0 ? 1 : -1;
-    (near ? front : back).push(halfEllipse(rx, R, side as 1 | -1, true));
-    (near ? back : front).push(halfEllipse(rx, R, -side as 1 | -1, true));
+const poly = (pts: [number, number][]) => pts.map(([x, y]) => `${f(x)},${f(y)}`).join(" ");
+
+function tile(corners: [number, number][], c: string, dot: boolean, cx: number, cy: number, scale: number) {
+  const inner = dot
+    ? `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(4.2 * scale)}" fill="${c === NAVY ? PAPER : NAVY}" opacity=".85"/>`
+    : "";
+  return `<polygon points="${poly(corners)}" fill="${c}" stroke="${NAVY}" stroke-width="${f(1.9 * SW)}" stroke-linejoin="round"/>${inner}`;
+}
+
+function globe(t: number, squash: number) {
+  const spin = t * SPIN;
+  const landed: string[] = [];
+  const flying: string[] = [];
+  for (const [i, T] of TILES.entries()) {
+    const c = view(T.p, spin);
+    const e = view(T.e, spin),
+      n = view(T.n, spin);
+    const cx = c[0] * R,
+      cy = c[1] * R;
+    const offs: [number, number][] = [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].map(([a, b]) => [(a * e[0] + b * n[0]) * HALF * R, (a * e[1] + b * n[1]) * HALF * R]);
+    const start = T.land - FLY;
+    // tiles that land out of sight round the back are simply there already
+    const arrives = view(T.p, T.land * SPIN)[2] > 0.2;
+    if (arrives && t < T.land) {
+      if (t < start) continue;
+      const k = easeOut((t - start) / FLY);
+      const at = view(T.p, T.land * SPIN);
+      const len = Math.hypot(at[0], at[1]) || 1;
+      const ang = Math.atan2(at[1] / len, at[0] / len) + T.jitter + (len < 0.15 ? i : 0);
+      const sx = Math.cos(ang) * T.reach,
+        sy = Math.sin(ang) * T.reach;
+      const px = sx + (cx - sx) * k,
+        py = sy + (cy - sy) * k;
+      const rot = T.twist * (1 - k),
+        grow = 1 + 0.9 * (1 - k);
+      const cr = Math.cos(rot),
+        sr = Math.sin(rot);
+      // in the air it's a flat card; it settles onto the curve as it lands
+      const flat = (1 - k) * 0.85;
+      const sq: [number, number][] = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ];
+      const pts = offs.map(([ox, oy], j): [number, number] => {
+        const bx = ox * (1 - flat) + sq[j][0] * HALF * R * flat;
+        const by = oy * (1 - flat) + sq[j][1] * HALF * R * flat;
+        return [px + (bx * cr - by * sr) * grow, py + (bx * sr + by * cr) * grow];
+      });
+      flying.push(tile(pts, T.color, T.dot, px, py, grow));
+      continue;
+    }
+    if (c[2] <= 0.02) continue;
+    // the ones near the edge are seen side on, and a touch darker
+    landed.push(
+      `<g opacity="${f(0.55 + 0.45 * clamp(c[2] * 2))}">${tile(
+        offs.map(([ox, oy]) => [cx + ox, cy + oy]),
+        T.color,
+        T.dot,
+        cx,
+        cy,
+        Math.max(0.3, c[2]),
+      )}</g>`,
+    );
   }
-  // lines of latitude: the equator and two more, as on the logo
-  const lats: [number, number, number][] = [
-    [0, R, R * 0.24],
-    [-R * 0.52, R * 0.854, R * 0.205],
-    [R * 0.52, R * 0.854, R * 0.205],
-  ];
-  for (const [y, rx, ry] of lats) {
-    front.push(`<g transform="translate(0 ${f(y)})">`);
-    back.push(`<g transform="translate(0 ${f(y)})">`);
-    // we look down a little, so the lower half is the near one
-    front.push(halfEllipse(rx, ry, 1, false));
-    back.push(halfEllipse(rx, ry, -1, false));
-    front.push("</g>");
-    back.push("</g>");
-  }
-  const path = (list: string[]) => list.map((d) => (d.startsWith("<") ? d : `<path d="${d}"/>`)).join("");
-  const sx = 1 + squash * 0.05,
-    sy = 1 - squash * 0.07;
-  return `<g transform="translate(0 ${f(R * (1 - sy))}) scale(${f(sx)} ${f(sy)})">
-    <circle cx="${f(R * 0.14)}" cy="${f(R * 0.14)}" r="${R}" fill="${NAVY}"/>
-    <circle r="${R}" fill="${PAPER}"/>
-    <g clip-path="url(#ttl-clip)">
-      <circle cx="${f(-R * 0.3)}" cy="${f(-R * 0.3)}" r="${f(R * 1.45)}" fill="none" stroke="url(#ttl-hatch)" stroke-width="${f(R * 0.9)}" opacity="0.55"/>
-      <g transform="rotate(${TILT})" fill="none" stroke="${NAVY}" stroke-linecap="round">
-        <g stroke-width="${f(1.3 * SW)}" stroke-dasharray="${f(2 * SW)} ${f(3.2 * SW)}" opacity="0.32">${path(back)}</g>
-        <g stroke-width="${f(1.8 * SW)}">${path(front)}</g>
-      </g>
+  // the ball itself fills in as the songs arrive, and its ink line goes round
+  const body = smooth((t - 0.45) / 0.75);
+  const line = smooth((t - 0.8) / 0.55);
+  const C = 2 * Math.PI * R;
+  const sxq = 1 + squash * 0.05,
+    syq = 1 - squash * 0.07;
+  return `<g transform="rotate(${TILT}) scale(${f(sxq)} ${f(syq)}) rotate(${-TILT})">
+    <g opacity="${f(body)}">
+      <circle cx="${f(R * 0.14)}" cy="${f(R * 0.14)}" r="${R}" fill="${NAVY}"/>
+      <circle r="${R}" fill="${PAPER}"/>
     </g>
-    <circle r="${R}" fill="none" stroke="${NAVY}" stroke-width="${f(3 * SW)}"/>
-    <path d="M${f(-R * 0.66)} ${f(-R * 0.3)} q ${f(R * 0.12)} ${f(-R * 0.3)} ${f(R * 0.42)} ${f(-R * 0.42)}" stroke="${NAVY}" stroke-width="${f(2.4 * SW)}" fill="none" stroke-linecap="round"/>
-  </g>`;
+    ${landed.join("")}
+    <g clip-path="url(#ttl-clip)" opacity="${f(body * 0.3)}">
+      <circle cx="${f(-R * 0.3)}" cy="${f(-R * 0.3)}" r="${f(R * 1.45)}" fill="none" stroke="url(#ttl-hatch)" stroke-width="${f(R * 0.9)}"/>
+    </g>
+    <circle r="${R}" fill="none" stroke="${NAVY}" stroke-width="${f(3 * SW)}" stroke-dasharray="${f(C)}" stroke-dashoffset="${f(C * (1 - line))}" transform="rotate(-120)" stroke-linecap="round"/>
+  </g>${flying.join("")}`;
 }
 
 // ---------------------------------------------------------------- the crown
@@ -185,41 +278,33 @@ function crown(spin: number) {
     ${gems(false)}`;
 }
 
-// where the crown is at time t: its base point, tilt, squash and spin
-function crownAt(t: number, top: number) {
+// where the crown is at time t: it shoots down the globe's tilted axis, lands
+// on the north pole, bounces twice along the axis and floats up to its spot
+function crownAt(t: number, far: number) {
   if (t < DROP) return null;
-  let y: number,
-    squash = 0;
+  let d: number;
   if (t < HIT1) {
     const k = (t - DROP) / FALL;
-    y = top + (CONTACT - top) * k * k; // falling, faster and faster
+    d = far + (CONTACT - far) * Math.pow(k, 1.6); // shot down, still speeding up
   } else if (t < HIT2) {
     const k = (t - HIT1) / B1;
-    y = CONTACT - R * 0.62 * 4 * k * (1 - k);
+    d = CONTACT + R * 0.55 * 4 * k * (1 - k);
   } else if (t < HIT3) {
     const k = (t - HIT2) / B2;
-    y = CONTACT - R * 0.17 * 4 * k * (1 - k);
-  } else y = CONTACT;
-  squash = pulse(t - HIT1, 0.16) * 1 + pulse(t - HIT2, 0.12) * 0.45 + pulse(t - HIT3, 0.1) * 0.2;
+    d = CONTACT + R * 0.16 * 4 * k * (1 - k);
+  } else d = CONTACT;
+  const squash = pulse(t - HIT1, 0.16) + pulse(t - HIT2, 0.12) * 0.45 + pulse(t - HIT3, 0.1) * 0.2;
+  d += (FLOAT - CONTACT) * easeOut((t - HIT3) / RISE);
+  d += t > FLOATED ? Math.sin((t - FLOATED) * 2.6) * 2.4 * smooth((t - FLOATED) / 0.4) : 0;
 
-  // from the top of the globe to its spot over the north pole, leaning with the axis
-  const lean = smooth((t - HIT1) / (FLOATED - HIT1));
-  const rise = easeOut((t - HIT3) / RISE);
-  const a = (TILT * Math.PI) / 180;
-  const fx = FLOAT * Math.sin(a),
-    fy = -FLOAT * Math.cos(a);
-  const bx = (fx - 0) * rise,
-    by = y + (fy - CONTACT) * rise;
-  const bob = t > FLOATED ? Math.sin((t - FLOATED) * 2.6) * 2.4 * smooth((t - FLOATED) / 0.4) : 0;
-
-  // the crown starts turning when it first hits, and soon keeps pace with the globe
+  // the crown starts turning when it hits, and soon keeps pace with the globe
   const ramp = 0.9;
   const s = Math.max(0, t - HIT1);
   const spin = s < ramp ? (SPIN * s * s) / (2 * ramp) : SPIN * (ramp / 2 + s - ramp);
-  return { x: bx, y: by + bob, tilt: TILT * lean, squash, spin };
+  return { x: AXIS[0] * d, y: AXIS[1] * d, squash, spin };
 }
 
-// little ink lines where the crown hits
+// little ink lines where the crown hits, round the axis
 function burst(t: number) {
   let s = "";
   for (const [hit, size] of [
@@ -230,27 +315,25 @@ function burst(t: number) {
     if (k < 0 || k > 1) continue;
     for (const side of [-1, 1]) {
       for (let i = 0; i < 3; i++) {
-        const ang = (-Math.PI / 2) + side * (0.5 + i * 0.34);
+        const ang = -Math.PI / 2 + side * (0.5 + i * 0.34);
         const r0 = R * (0.5 + 0.35 * k) * size + 14,
           r1 = r0 + 12 * size * (1 - k * 0.6);
-        const ox = 0,
-          oy = CONTACT + 6;
-        s += `<line x1="${f(ox + Math.cos(ang) * r0 * 0.8)}" y1="${f(oy + Math.sin(ang) * r0 * 0.5)}" x2="${f(ox + Math.cos(ang) * r1 * 0.8)}" y2="${f(oy + Math.sin(ang) * r1 * 0.5)}" stroke="${NAVY}" stroke-width="${f(3 * (1 - k * 0.7))}" stroke-linecap="round" opacity="${f(1 - k)}"/>`;
+        s += `<line x1="${f(Math.cos(ang) * r0 * 0.8)}" y1="${f(6 + Math.sin(ang) * r0 * 0.5)}" x2="${f(Math.cos(ang) * r1 * 0.8)}" y2="${f(6 + Math.sin(ang) * r1 * 0.5)}" stroke="${NAVY}" stroke-width="${f(3 * (1 - k * 0.7))}" stroke-linecap="round" opacity="${f(1 - k)}"/>`;
       }
     }
   }
-  return s;
+  return s ? `<g transform="translate(${f(AXIS[0] * CONTACT)} ${f(AXIS[1] * CONTACT)}) rotate(${TILT})">${s}</g>` : "";
 }
 
-export function launchFrame(t: number, top = -600) {
-  const c = crownAt(t, top);
+export function launchFrame(t: number, far = 700) {
+  const c = crownAt(t, far);
   const hitGlobe = pulse(t - HIT1, 0.22) + pulse(t - HIT2, 0.16) * 0.4;
   const boil = Math.floor(t * 4) % 3;
-  let out = `<g filter="url(#ttl-w${boil})">${globe(t * SPIN, hitGlobe)}</g>`;
+  let out = `<g filter="url(#ttl-w${boil})">${globe(t, hitGlobe)}</g>`;
   if (c) {
     const sx = 1 + c.squash * 0.16,
       sy = 1 - c.squash * 0.24;
-    out += `<g filter="url(#ttl-w${(boil + 1) % 3})" transform="translate(${f(c.x)} ${f(c.y)}) rotate(${f(c.tilt)}) scale(${f(CS * sx)} ${f(CS * sy)})">${crown(c.spin)}</g>`;
+    out += `<g filter="url(#ttl-w${(boil + 1) % 3})" transform="translate(${f(c.x)} ${f(c.y)}) rotate(${TILT}) scale(${f(CS * sx)} ${f(CS * sy)})">${crown(c.spin)}</g>`;
     out += `<g filter="url(#ttl-w${boil})">${burst(t)}</g>`;
   }
   return out;
@@ -290,12 +373,13 @@ export function Launch() {
     let raf = 0;
     let t0 = 0;
     let fadeAt = FADE;
-    const top = -(window.innerHeight / 2) - 90; // just above the screen
+    // off the screen, up the axis
+    const far = (Math.max(window.innerHeight, window.innerWidth) / 2 + 110) / Math.cos(TAU_TILT);
     const frame = (now: number) => {
       if (!t0) t0 = now;
       const t = (now - t0) / 1000;
       if (skip.current && fadeAt > t) fadeAt = t;
-      g.innerHTML = launchFrame(t, top);
+      g.innerHTML = launchFrame(t, far);
       el.style.opacity = String(1 - clamp((t - fadeAt) / FADE_FOR));
       if (t < fadeAt + FADE_FOR) raf = requestAnimationFrame(frame);
       else setGone(true);

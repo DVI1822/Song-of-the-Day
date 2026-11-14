@@ -54,7 +54,7 @@ export function Landing() {
           </Step>
         </ol>
 
-        <div className="mt-9 flex flex-col items-center gap-3">
+        <div className="mt-9 flex flex-col items-center gap-3.5">
           <Link
             href="/login"
             className="relative inline-flex h-14 w-full max-w-[300px] items-center justify-center rounded-full text-[24px]"
@@ -63,8 +63,13 @@ export function Landing() {
             Start your globe
             <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full" style={{ border: `2.5px solid ${INK}`, filter: "url(#pen-edge)" }} />
           </Link>
-          <Link href="/login" className="h-10 text-[19px] underline decoration-2 underline-offset-4" style={hand}>
-            Already on TopTrack? Sign in
+          <Link
+            href="/login"
+            className="relative inline-flex h-14 w-full max-w-[300px] items-center justify-center rounded-full text-[24px]"
+            style={{ ...hand, background: "#fffdf6", color: INK, boxShadow: `3px 4px 0 ${INK}` }}
+          >
+            Sign in
+            <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full" style={{ border: `2.5px solid ${INK}`, filter: "url(#pen-edge)" }} />
           </Link>
         </div>
 

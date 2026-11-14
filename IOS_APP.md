@@ -27,7 +27,7 @@ What the app adds over the website:
 | `capacitor.config.ts` | app id `io.mytoptrack.app`, the site URL, splash |
 | `ios/` | the Xcode project (Swift Package Manager, no CocoaPods) |
 | `app-shell/` | the offline screen |
-| `assets/` | icon source. Regenerate the icon with `npx @capacitor/assets generate --ios --iconBackgroundColor '#FF5E57'`, then put back `ios/App/App/Assets.xcassets/Splash.imageset` and `LaunchScreen.storyboard` from git: the splash is a 500 pt image drawn centred (not stretched) so its Globe lands exactly where the web animation's does (src/components/Launch.tsx) |
+| `assets/` | icon source. Regenerate the icon with `npx @capacitor/assets generate --ios --iconBackgroundColor '#FF5E57'`, then put back `ios/App/App/Assets.xcassets/Splash.imageset` and `LaunchScreen.storyboard` from git: the splash is a 500 pt image drawn centred (not stretched) so it matches the web animation's first frame (src/components/Launch.tsx) |
 | `codemagic.yaml` | cloud build that sends the app to TestFlight |
 | `src/lib/native.ts`, `src/components/AppBoot.tsx` | what the site does differently inside the app |
 

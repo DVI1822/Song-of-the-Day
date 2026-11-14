@@ -25,8 +25,8 @@ const config: CapacitorConfig = {
     limitsNavigationsToAppBoundDomains: false,
   },
   plugins: {
-    // The splash is the opening animation's first frame (the still Globe on
-    // paper, centred), and the site hides it the moment the animation can
+    // The splash is the opening animation's first frame (plain paper, before
+    // the first song tile flies in), and the site hides it the moment the animation can
     // start (components/Launch.tsx), so the two join up seamlessly. The 6 s
     // is only a fallback in case the site never loads.
     SplashScreen: {
