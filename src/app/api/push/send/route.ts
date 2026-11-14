@@ -3,7 +3,8 @@ import webpush from "web-push";
 import { supabaseKey, supabaseUrl } from "@/lib/supabase/env";
 import { sendApns, type ApnsMessage } from "@/lib/apns";
 
-// The database calls this every hour with the people to nudge, and whenever
+// The database calls this every hour with the people to nudge (post at noon
+// and 9 PM, crown a song at 6 PM), and whenever
 // someone likes a song or leaves a note on it, and when someone posts their
 // song for the friends who have them on their globe (see the push migrations). It's
 // signed with PUSH_SECRET, so nobody else can send anything. Browsers get web
@@ -11,12 +12,13 @@ import { sendApns, type ApnsMessage } from "@/lib/apns";
 // goes through Apple instead (lib/apns.ts).
 
 type Sub = { endpoint: string; p256dh: string; auth: string } & (
-  | { kind: "noon" | "night" }
+  | { kind: "noon" | "crown" | "night" }
   | { kind: "reaction" | "post"; title: string; body: string; tag: string }
 );
 
 const NUDGE = {
   noon: { title: "What's your top track today?", body: "Pick the song that ran your day and put it on your globe." },
+  crown: { title: "Who gets your crown today?", body: "Tap the crown on the song that hit hardest. Picks close at midnight." },
   night: { title: "Still time for your top track", body: "Your globe closes at midnight." },
 };
 
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
   const message = (s: Sub): ApnsMessage =>
     s.kind === "reaction" || s.kind === "post"
       ? { title: s.title, body: s.body, tag: s.tag, url: "/" }
-      : { ...(NUDGE[s.kind] ?? NUDGE.noon), tag: "song-nudge", url: "/" };
+      : { ...(NUDGE[s.kind] ?? NUDGE.noon), tag: s.kind === "crown" ? "crown-nudge" : "song-nudge", url: "/" };
 
   const apple = subs.filter((s) => s.endpoint.startsWith("apns:"));
   const appleGone = sendApns(apple.map((s) => ({ token: s.endpoint.slice(5), msg: message(s) })));

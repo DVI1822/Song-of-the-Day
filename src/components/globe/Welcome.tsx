@@ -116,7 +116,7 @@ export function notifyLater(days: number) {
   } catch {}
 }
 
-// Nudges at noon and 9 PM. With `ask`, a browser that hasn't been asked yet
+// Nudges at noon and 9 PM, and the 6 PM crown reminder. With `ask`, a browser that hasn't been asked yet
 // gets asked (this has to start right inside a tap); otherwise this only
 // refreshes a subscription the person already allowed.
 export async function enablePush(api: GlobeApi, ask: boolean) {
