@@ -170,21 +170,33 @@ export { runs as nearFar };
 
 // The core, on its own canvas in the globe's middle so the tiles in front
 // cover it and the ones behind don't.
+let coreRes = 1; // the core canvas's sharpness, as a multiple of the screen's
 export function drawSignalCore(s: Motion, cv: HTMLCanvasElement | null, { L }: Live, weather: Weather | null) {
   if (!cv) return;
   const e = envOf(s, weather);
   const Rc = 50 * L.s,
     size = Rc * 3.2;
-  // the globe scales the core up as you zoom in; draw it at that size so it
-  // stays sharp (in half steps, so it isn't resized every frame)
-  const dpr = fit(cv, size, size, Math.min(4, Math.max(1, Math.ceil(s.zoom * 2) / 2)));
-  cv.style.width = cv.style.height = `${size}px`;
-  cv.style.left = cv.style.top = `${-size / 2}px`;
-  // undo the globe's turn so the canvas always faces you; the rings turn instead
-  cv.style.transform = `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) rotateZ(${(-s.cam.roll).toFixed(4)}rad)`;
   // flying into it, the inside view takes over (CoreInside.tsx) before this
   // canvas is blown up past its sharpness
-  cv.style.opacity = s.lens === null ? Math.max(0, Math.min(1, 1 - (s.zoom - 1.35) / 0.45)).toFixed(3) : "1";
+  const op = s.lens === null ? Math.max(0, Math.min(1, 1 - (s.zoom - 1.35) / 0.45)) : 1;
+  const opS = op.toFixed(3);
+  if (cv.style.opacity !== opS) cv.style.opacity = opS;
+  if (op <= 0) return; // gone: nothing to draw until you fly back out
+  // the globe scales the core up as you zoom in; draw it at that size so it
+  // stays sharp. Sized for where the camera is headed, once, as a move
+  // starts: growing it a step at a time on the way in had the phone throw
+  // away and reallocate the canvas several times mid-zoom, a hitch each time.
+  // (diving into a core it's gone by 1.8x, so it never needs more than 2)
+  const goal = Math.max(s.zoom, s.zoomTarget ?? 0);
+  const want = Math.min(s.lens === null ? 2 : 4, Math.max(1, Math.ceil(goal * 2) / 2));
+  coreRes = s.zoomTarget !== null ? Math.max(coreRes, want) : want;
+  const dpr = fit(cv, size, size, coreRes);
+  const px = `${size}px`,
+    at = `${-size / 2}px`;
+  if (cv.style.width !== px) cv.style.width = cv.style.height = px;
+  if (cv.style.left !== at) cv.style.left = cv.style.top = at;
+  // undo the globe's turn so the canvas always faces you; the rings turn instead
+  cv.style.transform = `rotateY(${(-s.yaw).toFixed(4)}rad) rotateZ(${(-TILT).toFixed(4)}rad) rotateX(${(-s.pitch).toFixed(4)}rad) rotateZ(${(-s.cam.roll).toFixed(4)}rad)`;
   const ctx = cv.getContext("2d");
   if (!ctx) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);

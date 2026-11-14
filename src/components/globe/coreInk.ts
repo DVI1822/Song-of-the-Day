@@ -95,43 +95,48 @@ export function drawInkInside(g: CanvasRenderingContext2D, f: InkInside) {
   // a faint grain of pencil hatching in the paper, so it reads as a page
   g.strokeStyle = css(ink, 0.05 * clamp01(p * 2));
   g.lineWidth = 1;
+  // (all in one path: one stroke instead of seventy-eight)
+  g.beginPath();
   for (let i = 0; i < 26; i++) {
     const x = hash(i * 3.3 + 1) * w,
       y = hash(i * 7.1 + 2) * h,
       L = 8 + 10 * hash(i);
     for (let k = 0; k < 3; k++) {
-      g.beginPath();
       g.moveTo(x + k * 4, y + k * 2);
       g.lineTo(x + k * 4 + L * 0.6, y + k * 2 - L);
-      g.stroke();
     }
   }
+  g.stroke();
 
   // speed lines: falling in they streak out from the middle, flying out
   // they pull in; redrawn on twos so they flicker like a drawn rush
   const sp = clamp01(Math.abs(f.rush) / 1.1);
   if (sp > 0.03) {
     const n = Math.round(16 + 26 * sp);
-    for (let i = 0; i < n; i++) {
-      const s = frame * 31.7 + i * 5.13;
-      const a = hash(s) * TAU;
-      const r0 = (0.16 + 0.34 * hash(s + 1)) * diag * 0.5;
-      const len = (0.12 + 0.3 * hash(s + 2)) * diag * 0.5 * (0.5 + sp);
-      const wdt = 0.8 + 2.2 * hash(s + 3) * sp;
-      const c = i % 9 === 4 ? CORAL : ink;
-      // a wedge: thick at the outside, a point toward the middle
-      const ca = Math.cos(a),
-        sa = Math.sin(a);
-      const x0 = cx + ca * r0,
-        y0 = cy + sa * r0,
-        x1 = cx + ca * (r0 + len),
-        y1 = cy + sa * (r0 + len);
-      g.fillStyle = css(c, (0.25 + 0.55 * sp) * clamp01(p * 4));
+    // the ink wedges in one path and the coral ones in another, one fill each
+    const alpha = (0.25 + 0.55 * sp) * clamp01(p * 4);
+    for (const coral of [false, true]) {
       g.beginPath();
-      g.moveTo(x0, y0);
-      g.lineTo(x1 - sa * wdt, y1 + ca * wdt);
-      g.lineTo(x1 + sa * wdt, y1 - ca * wdt);
-      g.closePath();
+      for (let i = 0; i < n; i++) {
+        if ((i % 9 === 4) !== coral) continue;
+        const s = frame * 31.7 + i * 5.13;
+        const a = hash(s) * TAU;
+        const r0 = (0.16 + 0.34 * hash(s + 1)) * diag * 0.5;
+        const len = (0.12 + 0.3 * hash(s + 2)) * diag * 0.5 * (0.5 + sp);
+        const wdt = 0.8 + 2.2 * hash(s + 3) * sp;
+        // a wedge: thick at the outside, a point toward the middle
+        const ca = Math.cos(a),
+          sa = Math.sin(a);
+        const x0 = cx + ca * r0,
+          y0 = cy + sa * r0,
+          x1 = cx + ca * (r0 + len),
+          y1 = cy + sa * (r0 + len);
+        g.moveTo(x0, y0);
+        g.lineTo(x1 - sa * wdt, y1 + ca * wdt);
+        g.lineTo(x1 + sa * wdt, y1 - ca * wdt);
+        g.closePath();
+      }
+      g.fillStyle = css(coral ? CORAL : ink, alpha);
       g.fill();
     }
   }

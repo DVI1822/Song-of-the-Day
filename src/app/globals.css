@@ -166,7 +166,11 @@ body {
   *:not([data-motion] *)::before,
   *:not([data-motion] *)::after {
     animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    /* 0s, not a sliver of a millisecond: any duration above zero turns every
+       element's default "transition: all" on, so the Globe's per-frame style
+       writes each started (and cancelled) a transition, about 1,400 a second */
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 }
 

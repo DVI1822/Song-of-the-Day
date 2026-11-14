@@ -21,14 +21,26 @@ export function Cover({
   className?: string;
   style?: CSSProperties;
 }) {
+  // Big covers (an opened song) sit on the copy the Globe's tile already
+  // loaded, so the real artwork is there from the first frame and only
+  // sharpens when the full-size one arrives, instead of a blank painted
+  // square for as long as the download takes.
+  const under = src && size > 200 ? `url("${coverAt(src, 200).replace(/"/g, "%22")}") center / cover, ` : "";
   return (
     <div
       className={`relative flex-none overflow-hidden ${className}`}
-      style={{ width: size, height: size, borderRadius: coverRadius(size), background: paintedCover(seed), ...style }}
+      style={{ width: size, height: size, borderRadius: coverRadius(size), background: under + paintedCover(seed), ...style }}
     >
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={coverAt(src, size)} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" draggable={false} />
+        <img
+          src={coverAt(src, size)}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          loading={size > 200 ? "eager" : "lazy"}
+          decoding="async"
+          draggable={false}
+        />
       )}
     </div>
   );

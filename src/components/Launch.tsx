@@ -381,8 +381,26 @@ export function Launch() {
     const svg = el.querySelector("svg") as SVGSVGElement;
     // off the screen, up the axis
     const far = (Math.max(window.innerHeight, window.innerWidth) / 2 + 110) / Math.cos(TAU_TILT);
+    // The page underneath (the Globe) does its heaviest work in its first
+    // half second: building every tile, painting the backdrop. Started at
+    // once, the songs flying in landed right on top of that and stuttered.
+    // The first frame is plain paper (and the iPhone splash is the same), so
+    // the clock waits on it until the page has settled, three smooth frames
+    // in a row, or a second and a half at most.
+    let born = 0,
+      prev = 0,
+      calm = 0;
     const frame = (now: number) => {
-      if (!t0) t0 = now;
+      if (!t0) {
+        if (!born) born = now;
+        calm = prev && now - prev < 34 ? calm + 1 : 0;
+        prev = now;
+        if (calm < 3 && now - born < 1500 && !skip.current) {
+          raf = requestAnimationFrame(frame);
+          return;
+        }
+        t0 = now;
+      }
       const t = (now - t0) / 1000;
       if (skip.current && fadeAt > t) fadeAt = t;
       g.innerHTML = launchFrame(t, far);
