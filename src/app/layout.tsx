@@ -60,8 +60,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           only reads <head>, so friends adding from an invite link got a gray
           letter instead of the icon. */}
       <head>
-        <link rel="icon" href="/icon.png" sizes="256x256" type="image/png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" type="image/png" />
+        {/* Tab icon: the app icon's crowned Globe. The 16 and 32 px files are a
+            simpler drawing of it (two globe lines, thicker ink) so it reads
+            in a browser tab; ?v= makes browsers drop the old cached one. */}
+        <link rel="icon" href="/favicon.ico?v=3" sizes="48x48 32x32 16x16" />
+        <link rel="icon" href="/favicon-32.png?v=3" sizes="32x32" type="image/png" />
+        <link rel="icon" href="/favicon-16.png?v=3" sizes="16x16" type="image/png" />
+        <link rel="icon" href="/icon.png?v=3" sizes="256x256" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" sizes="180x180" type="image/png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="apple-mobile-web-app-title" content="TopTrack" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
