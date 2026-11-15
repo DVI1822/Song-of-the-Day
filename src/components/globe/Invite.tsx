@@ -8,10 +8,12 @@ import type { Friend, Profile } from "@/lib/types";
 import { Face } from "./ui";
 import type { GlobeApi } from "./api";
 
-// Top of Find a friend: your invite link, and (where the phone allows it)
-// your contacts, split into who's already here and who to invite.
-// Browsers only let a site read contacts the person picks, and only Chrome on
-// Android does it at all; iPhone gets the share sheet.
+// Invites. InviteButton sits beside the Friends header: one tap opens the
+// share sheet with your link (or copies it where there's no share sheet).
+// InviteCard, lower in the tab, lets you pick contacts (where the phone allows
+// it) and splits them into who's already here and who to invite. Browsers only
+// let a site read contacts the person picks, and only Chrome on Android does
+// it at all, so on iPhone the card doesn't show and the button is the way.
 
 type Picked = { name: string; email?: string; tel?: string };
 type ContactsApi = {
@@ -23,6 +25,40 @@ type ContactsApi = {
 const contactsApi = () =>
   typeof navigator !== "undefined" ? ((navigator as Navigator & { contacts?: ContactsApi }).contacts ?? null) : null;
 const noop = () => () => {};
+const useOrigin = () =>
+  useSyncExternalStore(
+    noop,
+    () => window.location.origin,
+    () => "",
+  );
+const inviteMessage = (link: string) => `Come put your top track on my globe: ${link}`;
+
+export function InviteButton({ username }: { username: string }) {
+  const origin = useOrigin();
+  const [copied, setCopied] = useState(false);
+  const link = inviteUrl(origin, username);
+
+  const share = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: "TopTrack", text: inviteMessage(link) }).catch(() => {});
+      return;
+    }
+    await navigator.clipboard?.writeText(link).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={share}
+      className="flex h-9 flex-none items-center gap-1.5 rounded-full bg-accent px-3.5 text-xs font-semibold text-white active:scale-95"
+    >
+      <ShareIcon />
+      {copied ? "Link copied" : "Invite"}
+    </button>
+  );
+}
 
 export function InviteCard({
   api,
@@ -37,34 +73,19 @@ export function InviteCard({
   friends: Friend[];
   onFollowed(f: Friend): void;
 }) {
-  const origin = useSyncExternalStore(
-    noop,
-    () => window.location.origin,
-    () => "",
-  );
+  const origin = useOrigin();
   const canPick = useSyncExternalStore(
     noop,
     () => Boolean(contactsApi()),
     () => false,
   );
-  const [copied, setCopied] = useState(false);
   const [picked, setPicked] = useState<Picked[] | null>(null);
   const [here, setHere] = useState<ContactMatch[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const link = inviteUrl(origin, username);
-  const message = `Come put your top track on my globe: ${link}`;
-
-  const share = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: "TopTrack", text: message }).catch(() => {});
-      return;
-    }
-    await navigator.clipboard?.writeText(link).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
+  const message = inviteMessage(link);
 
   const pick = async () => {
     setError(null);
@@ -104,39 +125,19 @@ export function InviteCard({
 
   const pill = "flex h-9 flex-none items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold";
 
+  if (!canPick) return null;
+
   return (
     <div className="px-3.5 pb-1">
-      {/* the ticket: your link, torn off and handed over */}
-      <div
-        className="relative overflow-hidden rounded-[20px] p-3.5"
-        style={{ background: "linear-gradient(135deg, #FFF3E6 0%, #FFE1D6 45%, #DDF2EE 100%)" }}
+      <button
+        type="button"
+        onClick={pick}
+        disabled={busy === "pick"}
+        className={`${pill} border border-card-ink/20 disabled:opacity-60`}
       >
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold">Bring your people</div>
-            <div className="truncate text-[11px] text-muted">
-              {origin ? link.replace(/^https?:\/\//, "") : `/join/${username}`}
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 flex gap-2 border-t border-dashed border-card-ink/20 pt-3">
-          <button type="button" onClick={share} className={`${pill} bg-accent text-white`}>
-            <ShareIcon />
-            {copied ? "Link copied" : "Share invite"}
-          </button>
-          {canPick && (
-            <button
-              type="button"
-              onClick={pick}
-              disabled={busy === "pick"}
-              className={`${pill} bg-white/70 disabled:opacity-60`}
-            >
-              <PeopleIcon />
-              {busy === "pick" ? "Looking…" : "From contacts"}
-            </button>
-          )}
-        </div>
-      </div>
+        <PeopleIcon />
+        {busy === "pick" ? "Looking…" : "Invite from contacts"}
+      </button>
 
       {picked && (
         <div className="pt-2">

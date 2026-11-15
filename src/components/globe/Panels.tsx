@@ -410,7 +410,8 @@ function PersonRow({
 // search by username. Then likes and notes on your song, "Added you" (people
 // who want to be your friend), who's posted today (folds up), "You may know"
 // (people who know someone on your globe, most shared friends first; tap a
-// name to see who you share), your invite link to send outside the app, and
+// name to see who you share), picking contacts to invite (Android only; the
+// Invite button beside the header shares your link everywhere), and
 // whose songs you've hidden. Searching swaps all of that for the results.
 // ---------------------------------------------------------------------------
 
@@ -560,7 +561,7 @@ export function FriendsTab({
             {friends.length ? (
               <GlobeList friends={friends} seenBefore={seenBefore} onOpen={onOpen} onCore={onCore} />
             ) : (
-              <div className="px-2 pb-2 pt-1 text-[13px] text-muted">No one on your globe yet. Search above, or send your link.</div>
+              <div className="px-2 pb-2 pt-1 text-[13px] text-muted">No one on your globe yet. Search above, or tap Invite to send your link.</div>
             )}
             <div className="pb-2.5">
               <Kicker>You may know{mayKnow.length ? ` · ${mayKnow.length}` : ""}</Kicker>
