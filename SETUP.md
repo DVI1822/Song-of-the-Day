@@ -255,6 +255,19 @@ visitors who aren't signed in. Switch it back to `TRUE` to close it again
 Someone who isn't invited can still request a sign-in email, but after
 clicking it they only see an "invite only, for now" page.
 
+## Your dashboard (/admin)
+
+A private page with every number: total and new users, daily/weekly/monthly
+active people, songs, crowns, likes, retention by signup week, streaks, top
+artists and a searchable list of everyone (with a CSV download).
+
+1. In Vercel → **Settings → Environment Variables**, add `ADMIN_EMAILS` set to
+   the email you sign in to TopTrack with (more than one: separate with commas).
+   `SUPABASE_SECRET_KEY` must be set too (it already is for song facts).
+2. Redeploy (or merge anything), then open `/admin` while signed in.
+
+Anyone else, signed in or not, gets the normal "page not found".
+
 ## Good to know
 
 - **Sign-in emails are limited.** Supabase's built-in email sender only sends a
