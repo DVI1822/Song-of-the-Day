@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isConfigured } from "@/lib/supabase/env";
-import { adminEmails, loadStats, type Stats } from "@/lib/admin";
+import { isAdminEmail, loadStats, type Stats } from "@/lib/admin";
 import { BarChart, Columns, HBars, LineChart, Spark } from "./Charts";
 import { People } from "./People";
 import { ADMIN_CSS } from "./style";
@@ -57,8 +57,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (!isConfigured) notFound();
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  const email = typeof data?.claims?.email === "string" ? data.claims.email.toLowerCase() : null;
-  if (!email || !adminEmails().includes(email)) notFound();
+  // Signed out (often a browser other than the one you use TopTrack in; the
+  // home screen app keeps its own sign-in): say so instead of a bare 404.
+  if (!data?.claims?.sub) {
+    return (
+      <div className="adm">
+        <style dangerouslySetInnerHTML={{ __html: ADMIN_CSS }} />
+        <main>
+          <div className="card" style={{ maxWidth: 420, margin: "15vh auto 0" }}>
+            <h3>Sign in first</h3>
+            <p className="muted">This browser isn&apos;t signed in to TopTrack. Sign in, then come back to this page.</p>
+            <p>
+              <a href="/login" className="seg" style={{ padding: "8px 14px", fontWeight: 600 }}>
+                Sign in
+              </a>
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+  if (!isAdminEmail(data.claims.email)) notFound();
 
   const { range: rangeKey } = await searchParams;
   const range = RANGES.find((r) => r.key === rangeKey) ?? RANGES[0];

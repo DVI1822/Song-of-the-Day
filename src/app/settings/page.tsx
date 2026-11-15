@@ -3,12 +3,15 @@ import { ProfileForm } from "@/app/welcome/ProfileForm";
 import { LegalLinks } from "@/components/Legal";
 import { Card, Shell, ghostButtonClass } from "@/components/Shell";
 import { requireProfile } from "@/lib/data";
+import { isAdminEmail } from "@/lib/admin";
 import { DeleteAccount } from "./DeleteAccount";
 import { ScenePicker } from "./ScenePicker";
 
 export default async function SettingsPage() {
   const { supabase, profile } = await requireProfile();
   const { data: blocks } = await supabase.rpc("my_blocks");
+  const { data: claims } = await supabase.auth.getClaims();
+  const isAdmin = isAdminEmail(claims?.claims?.email);
   const blocked = (blocks ?? []) as { id: string; username: string; display_name: string }[];
 
   return (
@@ -39,6 +42,18 @@ export default async function SettingsPage() {
                 <button className="text-xs font-semibold text-accent-deep">Unblock</button>
               </form>
             ))}
+          </Card>
+        </>
+      )}
+
+      {isAdmin && (
+        <>
+          <h2 className="display mb-3 mt-10 text-xl">Dashboard</h2>
+          <Card>
+            <a href="/admin" className={ghostButtonClass}>
+              Open your stats dashboard
+            </a>
+            <p className="mt-2 text-xs text-card-muted">Only you can see this.</p>
           </Card>
         </>
       )}
