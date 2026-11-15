@@ -33,6 +33,7 @@ import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FriendsTab } from "./Panels";
+import { InviteButton } from "./Invite";
 import { BoardTab, Leaderboard } from "./Ranks";
 import { NewsCard } from "./News";
 import { PanelSwipe, PullTab } from "./pull";
@@ -1530,6 +1531,9 @@ function Globe({
             <h2 className="display text-lg">
               Friends
             </h2>
+            <span className="ml-3">
+              <InviteButton username={me.username} />
+            </span>
             <button type="button" onClick={closePanel} aria-label="Close" className="ml-auto flex h-11 w-11 items-center justify-center">
               <BackIcon />
             </button>

@@ -145,8 +145,8 @@ const PAGES: Page[] = [
     tab: "Friends",
     title: "Friends, leaderboard and chat",
     rows: [
-      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "Friends", text: "Search by username up top. Below: who added you, then who has posted today (tap the header to fold it up), newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
-      { icon: <Tab><TabIcon name="find" /></Tab>, name: "Find friends", text: "In Friends: “You may know” shows friends of your friends, and Share sends your link to anyone outside the app." },
+      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "Friends", text: "Invite, beside the Friends header, sends your link to anyone in one tap. Search by username up top. Below: who added you, then who has posted today (tap the header to fold it up), newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
+      { icon: <Tab><TabIcon name="find" /></Tab>, name: "Find friends", text: "In Friends: “You may know” shows friends of your friends. Invite, up top, sends your link to anyone outside the app." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full bg-accent px-2 py-1 text-[10px] font-semibold text-white">Add</span></span>,
         name: "Add",
