@@ -27,6 +27,7 @@ import { skyNow } from "./storyVideo";
 import { SignalCore } from "./SignalCore";
 import { HalloweenScene } from "./HalloweenScene";
 import { SettingScene, settingFor } from "./setting";
+import { Doodle } from "./doodle";
 import { settingOverride, type SettingKind } from "@/lib/setting";
 import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
@@ -233,6 +234,7 @@ function newEls() {
     wxSky: null as HTMLCanvasElement | null,
     setStill: null as HTMLCanvasElement | null,
     setLive: null as HTMLCanvasElement | null,
+    doodle: null as HTMLDivElement | null,
     wxBack: null as HTMLCanvasElement | null,
     wxFront: null as HTMLCanvasElement | null,
     wxFlash: null as HTMLDivElement | null,
@@ -341,7 +343,7 @@ function Globe({
   const R = useRef(newEls());
   // the kind of place you're in, shown behind the globe (setting.ts)
   // auto: what the lookup says for where you are, kept for when the wheel goes back to "Where I am"
-  const setting = useRef({ scene: null as SettingScene | null, kind: null as SettingKind | null, auto: null as SettingKind | null, at: "" });
+  const setting = useRef({ scene: null as SettingScene | null, doodle: null as Doodle | null, noDoodle: false, kind: null as SettingKind | null, auto: null as SettingKind | null, at: "" });
   // the drawn look (ink.ts) also restyles the buttons and panels (globals.css)
   useEffect(() => {
     if (inkMode()) document.documentElement.dataset.ink = "";
@@ -899,13 +901,39 @@ function Globe({
           hour: d.getHours() + d.getMinutes() / 60,
           temp: tempOverride() ?? w.weather?.temp ?? null,
         });
-        if (el.wxBack) el.wxBack.style.opacity = show.toFixed(3);
-        if (el.wxFront) el.wxFront.style.opacity = show.toFixed(3);
+        // the doodle world draws its own sky and weather
+        const dood = setting.current.doodle?.on ? "0" : show.toFixed(3);
+        if (el.wxBack) el.wxBack.style.opacity = dood;
+        if (el.wxFront) el.wxFront.style.opacity = dood;
         s.look = w.scene.look;
       }
       // the place you're in, behind it all
       const st = setting.current;
-      if (!st.scene && el.setStill && el.setLive)
+      // the doodle world (doodle.ts), drawn over the plain sky; the older
+      // drawn panoramas only where WebGL2 is missing
+      if (!st.doodle && !st.noDoodle && el.doodle)
+        try {
+          st.doodle = new Doodle(el.doodle);
+        } catch {
+          st.noDoodle = true;
+        }
+      if (st.doodle) {
+        st.doodle.set(s.haunt ? null : st.kind);
+        const { L: Lw } = live.current;
+        const hide = s.lens !== null || s.coreOn || s.featOn;
+        s.setShow += ((hide ? 0 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.setShow) * ease(0.1, dt);
+        st.doodle.step(dt, w.weather, {
+          show: s.setShow,
+          w: Lw.w,
+          h: Lw.h,
+          el: s.sun.el,
+          az: s.sun.az,
+          lat: s.geo.lat,
+          lon: s.geo.lon,
+          date: clockNow(),
+        });
+      }
+      if (!st.scene && st.noDoodle && el.setStill && el.setLive)
         try {
           st.scene = new SettingScene(el.setStill, el.setLive);
         } catch {}
@@ -1299,6 +1327,8 @@ function Globe({
         {/* where you are: a skyline, a mountain village (setting.ts) */}
         <canvas ref={(el) => void (R.current.setStill = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.setLive = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* the doodle world: a watercolor scene turning on a little planet, with its own sky and weather (doodle.ts) */}
+        <div ref={(el) => void (R.current.doodle = el)} className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden" />
         <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
         {/* the drawn look: the ball frosts what's behind it, so the songs read
