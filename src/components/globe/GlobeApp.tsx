@@ -1127,6 +1127,33 @@ function Globe({
     };
   }, [api]);
 
+  // A new day starts fresh. Left open past midnight (a home-screen app
+  // kept in memory overnight), the Globe would still hold yesterday: your
+  // song and your friends' songs, which can't be crowned any more, and no
+  // way to post today's. So once the date where you live changes, the page
+  // loads again: right away if you're not looking, otherwise as soon as
+  // you're not in the middle of adding a song.
+  const composingNow = useRef(compose);
+  useEffect(() => {
+    composingNow.current = compose;
+  }, [compose]);
+  useEffect(() => {
+    const day = todayIn(me.timezone);
+    const check = () => {
+      if (todayIn(me.timezone) === day) return;
+      if (!document.hidden && composingNow.current) return;
+      window.location.reload();
+    };
+    const t = setInterval(check, 30_000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
+  }, [me.timezone]);
+
   // Hide someone's songs from your globe (their tile leaves once the song
   // view has closed), or bring them back.
   const setHidden = async (f: Friend, hide: boolean) => {
@@ -1671,8 +1698,14 @@ function Globe({
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
           crown={
-            feat !== ME && myPost && landed && api.ranks
-              ? { on: myPick === featPost.id, set: (on: boolean) => choose(on ? featPost.id : null) }
+            // always there on a friend's song, so nobody wonders where it went;
+            // before you've posted, a tap just says to post first
+            feat !== ME && api.ranks
+              ? {
+                  on: myPick === featPost.id,
+                  set: async (on: boolean) =>
+                    myPost && landed ? choose(on ? featPost.id : null) : "Post today's song first, then you can crown one.",
+                }
               : undefined
           }
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
