@@ -1698,8 +1698,14 @@ function Globe({
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
           crown={
-            feat !== ME && myPost && landed && api.ranks
-              ? { on: myPick === featPost.id, set: (on: boolean) => choose(on ? featPost.id : null) }
+            // always there on a friend's song, so nobody wonders where it went;
+            // before you've posted, a tap just says to post first
+            feat !== ME && api.ranks
+              ? {
+                  on: myPick === featPost.id,
+                  set: async (on: boolean) =>
+                    myPost && landed ? choose(on ? featPost.id : null) : "Post today's song first, then you can crown one.",
+                }
               : undefined
           }
           story={{ songs: mySongs, colors: look?.colors ?? null, sky: () => skyNow(weather, m.current.geo) }}
