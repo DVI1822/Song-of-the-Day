@@ -23,7 +23,7 @@ const H = 2 * Math.ceil(Math.sqrt(RO * RO - OFF * OFF)) + 4;
 const CX = W + OFF,
   CY = H / 2;
 const STEP = 40; // degrees between emblems
-const TUCK = 30; // how far it slides in at rest
+const TUCK = 10; // how far it slides in at rest (most of the emblem still shows)
 const REST = 1200; // ms after the last touch before it tucks away
 const HOME = 180; // where the shown emblem sits: straight in from the edge
 
@@ -317,16 +317,16 @@ export function SceneWheel({
             cx={CX}
             cy={CY}
             r={RO - 1}
-            fill={dark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.18)"}
-            stroke="rgba(13,42,63,0.18)"
-            strokeWidth="1"
+            fill={dark ? "rgba(28,34,50,0.94)" : "rgba(251,248,240,0.96)"}
+            stroke={dark ? "rgba(236,240,248,0.75)" : "rgba(13,42,63,0.85)"}
+            strokeWidth="2"
           />
           <circle
             cx={CX}
             cy={CY}
             r={RIM - 26}
             fill="none"
-            stroke="rgba(13,42,63,0.14)"
+            stroke={dark ? "rgba(236,240,248,0.25)" : "rgba(13,42,63,0.25)"}
             strokeWidth="1"
             strokeDasharray="2 4"
           />
@@ -350,7 +350,7 @@ export function SceneWheel({
                   y1={+(CY + Math.sin(a) * r1).toFixed(2)}
                   x2={+(CX + Math.cos(a) * r2).toFixed(2)}
                   y2={+(CY + Math.sin(a) * r2).toFixed(2)}
-                  stroke={dark ? "rgba(236,240,248,0.3)" : "rgba(13,42,63,0.25)"}
+                  stroke={dark ? "rgba(236,240,248,0.5)" : "rgba(13,42,63,0.45)"}
                   strokeWidth={i % 4 === 0 ? 1.4 : 0.8}
                   strokeLinecap="round"
                 />
@@ -376,10 +376,11 @@ export function SceneWheel({
                 left: x - 20,
                 opacity: Math.round(Math.max(0, 1 - Math.max(0, off - 8) / 22) * 100) / 100,
                 top: y - 20,
-                // see-through, so it sits quietly at the edge
-                background: dark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.38)",
-                border: `1.5px solid ${dark ? "rgba(236,240,248,0.45)" : "rgba(29,36,51,0.35)"}`,
-                color: dark ? "rgba(236,240,248,0.75)" : "rgba(13,42,63,0.7)",
+                // nearly solid, so people spot it
+                background: dark ? "rgba(40,48,68,0.95)" : "rgba(255,255,255,0.96)",
+                border: `2px solid ${dark ? "rgba(236,240,248,0.8)" : "rgba(13,42,63,0.85)"}`,
+                color: dark ? "rgba(236,240,248,0.95)" : "rgba(13,42,63,0.95)",
+                boxShadow: "0 1px 4px rgba(13,42,63,0.18)",
                 transition: dragging
                   ? "none"
                   : "left 420ms cubic-bezier(.2,1.4,.4,1), top 420ms cubic-bezier(.2,1.4,.4,1), opacity 300ms",

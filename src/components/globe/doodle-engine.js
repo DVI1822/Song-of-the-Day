@@ -186,7 +186,7 @@ function bush(){const w=rnd(40,95),h=rnd(26,50),n=noise1(),pts=[];for(let i=0;i<
 function lamp(){const h=rnd(130,160);seg(0,0,0,-h,LW*1.1);seg(0,-h,8,-h-6,LW*.9);const lp=[[2,-h-4],[16,-h-4],[14,-h+12],[4,-h+12]];wash(lp,'#f3d27a',.9,.3);inkLine([...lp,lp[0]],LW*.8);
   if(LCTX){const m=ctx.getTransform();LCTX.setTransform(m);const g=LCTX.createRadialGradient(9,-h+6,2,9,-h+6,44);g.addColorStop(0,'rgba(255,214,120,.85)');g.addColorStop(1,'rgba(255,190,90,0)');LCTX.fillStyle=g;LCTX.fillRect(-40,-h-40,100,100);LCTX.fillStyle='#fff0b8';LCTX.fillRect(4,-h-2,10,12)}}
 function bench(){const w=rnd(44,60);wash(rectPoly(-w/2,-16,w,5),'#b5835a',.9,.3);inkRect(-w/2,-16,w,5,LW*.8);seg(-w/2+5,-11,-w/2+5,0,LW*.8);seg(w/2-5,-11,w/2-5,0,LW*.8);
-  seg(-w/2+2,-26,w/2-2,-26,LW*.8);seg(-w/2+2,-32,w/2-2,-32,LW*.8);seg(-w/2+6,-34,-w/2+6,-16,LW*.7);seg(w/2-6,-34,w/2-6,-16,LW*.7);if(chance(.12)){ctx.save();ctx.translate(rnd(-8,8),-14);ctx.scale(.85,.6);person();ctx.restore()}}
+  seg(-w/2+2,-26,w/2-2,-26,LW*.8);seg(-w/2+2,-32,w/2-2,-32,LW*.8);seg(-w/2+6,-34,-w/2+6,-16,LW*.7);seg(w/2-6,-34,w/2-6,-16,LW*.7);}
 function fence(){const w=rnd(60,130);for(let x=-w/2;x<=w/2;x+=9){inkLine([[x,0],[x,-28],[x+2.5,-32],[x+5,-28],[x+5,0]],LW*.7)}seg(-w/2,-10,w/2+5,-10,LW*.8);seg(-w/2,-22,w/2+5,-22,LW*.8)}
 function planter(){const w=rnd(30,46);base(rectPoly(-w/2,-16,w,16));wash(rectPoly(-w/2,-16,w,16),'#c9744a',.9,.4);inkRect(-w/2,-16,w,16,LW*.8);for(let i=0;i<6;i++){const x=rnd(-w/2+4,w/2-4),h=rnd(8,20);seg(x,-16,x+rnd(-2,2),-16-h,LW*.6);ctx.beginPath();ctx.arc(x,-16-h,3.2,0,7);ctx.fillStyle=pick(['#c8553d','#e9b949','#f0b7a4','#8e8fd6','#fbf8f1']);ctx.fill();ctx.strokeStyle=INK;ctx.lineWidth=.8;ctx.stroke()}}
 function hydrant(){const p=[[-6,0],[6,0],[6,-18],[3,-24],[-3,-24],[-6,-18]];base(p);wash(p,'#c8553d',.95,.3);inkLine([...p,p[0]],LW*.8);seg(-9,-14,9,-14,LW*.8)}
@@ -194,7 +194,7 @@ function mailbox(){seg(0,0,0,-30,LW);const b=rectPoly(-9,-48,18,18);base(b);wash
 function bike(){for(const x of[-15,15]){ctx.beginPath();ctx.arc(x,-10,10,0,7);ctx.strokeStyle=INK;ctx.lineWidth=LW*.8;ctx.stroke()}inkLine([[-15,-10],[-3,-10],[6,-24],[-8,-24],[-15,-10]],LW*.8);inkLine([[6,-24],[15,-10]],LW*.8);seg(6,-24,9,-30,LW*.8);seg(-8,-24,-9,-28,LW*.8)}
 function busSign(){seg(0,0,0,-70,LW);ctx.beginPath();ctx.arc(0,-78,10,0,7);ctx.fillStyle=hexA('#c8553d',.9);ctx.fill();ctx.strokeStyle=INK;ctx.lineWidth=LW*.8;ctx.stroke();seg(-5,-78,5,-78,LW*.7)}
 function fTree(){tree(rnd(50,85),rnd(-.08,.08),6);for(let i=0;i<10;i++){ctx.beginPath();ctx.arc(rnd(-30,30),rnd(-110,-50),2.2,0,7);ctx.fillStyle=pick(['#e39a3b','#c9744a','#e9b949']);ctx.fill()}}
-const FKINDS=[['bush',4],['lamp',1.6],['bench',1.2],['fence',1],['planter',1],['person',.45],['hydrant',.5],['mailbox',.5],['bike',.6],['busSign',.4],['fTree',1.1]];
+const FKINDS=[['bush',4],['lamp',1.6],['bench',1.2],['fence',1],['planter',1],['hydrant',.5],['mailbox',.5],['bike',.6],['busSign',.4],['fTree',1.1]];
 const FFN={bush,lamp,bench,fence,planter,person,hydrant,mailbox,bike,busSign,fTree};
 function buildFront(seed){
   const outerR=mulberry(seed+7);R=outerR;nz=noise1();
@@ -593,14 +593,14 @@ function trailSign(){seg(-10,0,-10,-44,LW);seg(10,0,10,-44,LW);const b=rectPoly(
 function campfire(){for(let i=0;i<5;i++){const x=-14+i*7;ctx.beginPath();ctx.arc(x,-2,3,0,7);ctx.fillStyle=MP.stone;ctx.fill();ctx.strokeStyle=INK;ctx.lineWidth=.8;ctx.stroke()}
   seg(-12,-2,10,-8,LW*.9);seg(12,-2,-10,-8,LW*.9);{const m=ctx.getTransform();const fx=((Math.round(m.e)%Lf)+Lf)%Lf;if(!CAMPS.some(c=>Math.abs(c.x-fx)<4))CAMPS.push({x:fx,ph:Math.random()*6})}
 }
-function campsite(){ctx.save();ctx.translate(-46,0);tent();ctx.restore();campfire();for(const s of[-1,1]){const lg=rectPoly(s*26-12,-8,24,8);base(lg);wash(lg,'#a8714a',.9,.2);inkRect(s*26-12,-8,24,8,LW*.7)}ctx.save();ctx.translate(34,-6);ctx.scale(.85,.62);person();ctx.restore()}
+function campsite(){ctx.save();ctx.translate(-46,0);tent();ctx.restore();campfire();for(const s of[-1,1]){const lg=rectPoly(s*26-12,-8,24,8);base(lg);wash(lg,'#a8714a',.9,.2);inkRect(s*26-12,-8,24,8,LW*.7)}}
 function tent(){const w=rnd(44,60),h=rnd(30,40),t=[[-w/2,0],[w/2,0],[0,-h]];base(t);wash(t,pick(['#e9b949','#c8553d','#7fb0e6']),.92,.3);inkLine([...t,t[0]]);inkLine([[0,-h],[-6,0]],LW*.7);inkLine([[0,-h],[6,0]],LW*.7);seg(0,-h,0,-h-8,LW*.6)}
 function deer(){ctx.save();if(chance(.5))ctx.scale(-1,1);const bd=[];for(let i=0;i<=16;i++){const a=i/16*6.283;bd.push([Math.cos(a)*17,-36+Math.sin(a)*8])}base(bd);wash(bd,'#c49a6c',.92,.3);inkLine([...bd,bd[0]],LW*.8);
   for(const lx of[-12,-7,8,13])seg(lx,-30,lx+rnd(-1,1),0,LW*.7);inkLine([[-14,-40],[-20,-56]],LW*.9);const hd=[[-26,-58],[-16,-60],[-18,-54],[-26,-54]];base(hd);wash(hd,'#c49a6c',.95,.2);inkLine([...hd,hd[0]],LW*.7);
   if(chance(.5)){inkLine([[-19,-60],[-17,-70],[-13,-74]],LW*.6);inkLine([[-17,-70],[-21,-75]],LW*.6)}ctx.beginPath();ctx.arc(18,-38,2.5,0,7);ctx.fillStyle='#fbf8f1';ctx.fill();ctx.restore()}
 function bigPine(){pine(rnd(70,120),pick(MP.pine))}
 function hiker(){person();const bp=rectPoly(-12,-46,7,16);base(bp);wash(bp,pick(['#c8553d','#7f9468','#e9b949']),.95,.2);inkRect(-12,-46,7,16,LW*.6)}
-const MFKINDS=[['bigPine',3.2],['boulder',1.6],['flowers',1.6],['bush',1.4],['stump',.8],['railFence',1],['trailSign',.35],['tent',.3],['deer',.45],['bench',.3],['mailbox',.25],['hiker',.3]];
+const MFKINDS=[['bigPine',3.2],['boulder',1.6],['flowers',1.6],['bush',1.4],['stump',.8],['railFence',1],['trailSign',.35],['tent',.3],['deer',.45],['bench',.3],['mailbox',.25]];
 const MFFN={campsite,bigPine,boulder,flowers,bush,stump,railFence,trailSign,campfire,tent,deer,bench,mailbox,hiker};
 let CAMPS=[];
 function buildMountainFront(seed){CAMPS=[];
@@ -873,7 +873,7 @@ function towel(){const col=pick(['#c8553d','#7fb0e6','#e9b949','#b5576b']),p=[[-
 function shells(){for(let i=0;i<4;i++){const x=rnd(-20,20);ctx.beginPath();ctx.arc(x,-2,3,Math.PI,0);ctx.fillStyle=pick(['#f0b7a4','#fbf8f1','#e8c86a']);ctx.fill();ctx.strokeStyle=INK;ctx.lineWidth=.7;ctx.stroke()}
   if(chance(.5)){ctx.beginPath();for(let i=0;i<10;i++){const a=i/10*6.283-Math.PI/2,r=i%2?3:8;ctx.lineTo(14+Math.cos(a)*r,-8+Math.sin(a)*r)}ctx.closePath();ctx.fillStyle='#e39a3b';ctx.fill();ctx.strokeStyle=INK;ctx.lineWidth=.8;ctx.stroke()}}
 function beachgoer(){person();if(chance(.6)){ctx.beginPath();ctx.arc(0,-59,10,Math.PI,0);ctx.fillStyle='#e8c86a';ctx.fill();ctx.strokeStyle=INK;ctx.lineWidth=LW*.6;ctx.stroke();seg(-13,-59,13,-59,LW*.7)}}
-const CFKINDS=[['umbrella',2.4],['beachChair',1.4],['surfboard',1.2],['sandcastle',.7],['gullStand',.9],['duneGrass',2.4],['sandFence',1.2],['lifebuoy',.5],['towel',.9],['shells',1],['palm',.5],['beachgoer',.3]];
+const CFKINDS=[['umbrella',2.4],['beachChair',1.4],['surfboard',1.2],['sandcastle',.7],['gullStand',.9],['duneGrass',2.4],['sandFence',1.2],['lifebuoy',.5],['towel',.9],['shells',1],['palm',.5]];
 const CFFN={umbrella,beachChair,surfboard,sandcastle,gullStand,duneGrass,sandFence,lifebuoy,towel,shells,palm,beachgoer,bonfire};
 
 // ================= FARM =================
@@ -950,7 +950,7 @@ function milkCan(){inkPoly([[-7,0],[7,0],[7,-18],[4,-22],[4,-26],[-4,-26],[-4,-2
 function wheelbarrow(){inkPoly([[-18,-20],[14,-20],[8,-8],[-12,-8]],'#c8553d',.9,LW*.7);inkCircle(14,-6,6,'#3b3a40',LW*.6);seg(-18,-14,-30,-10,LW*.7);seg(-10,-8,-12,0,LW*.6)}
 function farmer(){person();inkPoly([[-12,-58],[12,-58],[6,-62],[5,-68],[-5,-68],[-6,-62]],'#e8c86a',.95,LW*.6,.2)}
 function mailboxRural(){seg(0,0,0,-34,LW);const b=[[-12,-34],[12,-34],[12,-44],[0,-50],[-12,-44]];inkPoly(b,pick(['#b9bfcc','#3b3f6e','#c8553d']),.9,LW*.7);seg(12,-40,16,-52,LW*.6);inkPoly([[16,-52],[22,-50],[16,-47]],'#c8553d',.95,LW*.4,.1)}
-const FMKINDS=[['railFence',2.4],['sunflowers',1.6],['corn',1.6],['pumpkins',season()==='fall'?1.4:.3],['scarecrow',.4],['chickens',.8],['smallBale',1.2],['milkCan',.5],['wheelbarrow',.4],['bush',1.2],['flowers',1.2],['mailboxRural',.5],['farmer',.25]];
+const FMKINDS=[['railFence',2.4],['sunflowers',1.6],['corn',1.6],['pumpkins',season()==='fall'?1.4:.3],['scarecrow',.4],['chickens',.8],['smallBale',1.2],['milkCan',.5],['wheelbarrow',.4],['bush',1.2],['flowers',1.2],['mailboxRural',.5]];
 const FMFN={railFence,sunflowers,corn,pumpkins,scarecrow,chickens,smallBale,milkCan,wheelbarrow,bush,flowers,mailboxRural,farmer};
 
 // ================= SUBURBS =================
@@ -975,7 +975,7 @@ function kidWagon(){inkPoly(rectPoly(-16,-16,32,10),'#c8553d',.95,LW*.7);inkCirc
 function mailbox2(){mailboxRural()}
 function subTree(){roundTree(rnd(72,108))}
 function sprinkler(){seg(0,0,0,-6,LW*.6);for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(0,-6);ctx.quadraticCurveTo(s*16,-26,s*30,-4);ctx.strokeStyle='rgba(95,143,216,.7)';ctx.lineWidth=1.2;ctx.setLineDash([2,3]);ctx.stroke();ctx.setLineDash([])}}
-const SFKINDS=[['picketWhite',2.6],['subTree',1.8],['bush',2],['mailbox2',.9],['bins',.6],['swingSet',.35],['hoop',.35],['gnome',.3],['kidWagon',.3],['bike',.4],['planter',.7],['lamp',1],['sprinkler',.3],['person',.3]];
+const SFKINDS=[['picketWhite',2.6],['subTree',1.8],['bush',2],['mailbox2',.9],['bins',.6],['swingSet',.35],['hoop',.35],['gnome',.3],['kidWagon',.3],['bike',.4],['planter',.7],['lamp',1],['sprinkler',.3]];
 const SFFN={picketWhite,subTree,bush,mailbox2,bins,swingSet,hoop,gnome,kidWagon,bike,planter,lamp,sprinkler,person};
 function buildSuburbsMain(seed){const{outerR,c,lc}=mainSetup(seed,71);
   // a gentle hill of distant rooftops and trees behind
@@ -1059,7 +1059,7 @@ function agave(){for(let i=0;i<9;i++){const a=-Math.PI/2+(i-4)*.32,h=rnd(18,30);
 function routeSign(){seg(0,0,0,-58,LW);inkPoly([[-14,-84],[14,-84],[14,-66],[0,-58],[-14,-66]],'#fbf8f1',.95,LW*.8,.1);inkText(pick(['66','89','93','191']),0,-68,12)}
 function lizardRock(){rocks();ctx.save();ctx.translate(rnd(-10,10),-rnd(28,36));inkPoly([[-10,0],[8,-2],[12,0],[8,2]],'#7f9468',.95,LW*.4,.1);inkLine([[-10,0],[-22,-4]],LW*.5);ctx.restore()}
 function cowboy(){person();inkPoly([[-14,-58],[14,-58],[7,-61],[6,-68],[-6,-68],[-7,-61]],'#8a5a3c',.95,LW*.6,.2)}
-const DFKINDS=[['pricklyPear',2.4],['barrel',1.6],['saguaroS',1.4],['skull',.4],['wireFence',1.8],['tumbleStatic',.9],['agave',1.4],['boulder',1.4],['routeSign',.4],['lizardRock',.4],['ocotillo',.6],['cowboy',.25]];
+const DFKINDS=[['pricklyPear',2.4],['barrel',1.6],['saguaroS',1.4],['skull',.4],['wireFence',1.8],['tumbleStatic',.9],['agave',1.4],['boulder',1.4],['routeSign',.4],['lizardRock',.4],['ocotillo',.6]];
 const DFFN={pricklyPear,barrel,saguaroS:()=>saguaro(rnd(46,80)),skull,wireFence,tumbleStatic,agave,boulder,routeSign,lizardRock,ocotillo,cowboy};
 
 // ================= WOODS & LAKES =================
@@ -1107,7 +1107,7 @@ function fisherman(){person();seg(10,-30,52,-74,LW*.7);ctx.beginPath();ctx.moveT
 function fox(){ctx.save();if(chance(.5))ctx.scale(-1,1);const bd=blobPts(0,-14,15,7,14,.05);inkPoly(bd,'#e39a3b',.95,LW*.7,.2);for(const lx of[-10,-6,7,11])seg(lx,-9,lx,0,LW*.6);inkPoly([[-14,-18],[-24,-20],[-30,-14],[-20,-10]],'#e39a3b',.95,LW*.6,.1);inkPoly([[-18,-20],[-20,-27],[-14,-20]],'#e39a3b',.95,LW*.5,.1);
   inkPoly([[13,-14],[30,-22],[36,-14],[22,-10]],'#e39a3b',.95,LW*.6,.1);inkPoly([[32,-19],[36,-14],[31,-13]],'#fbf8f1',.95,LW*.4,.1);inkCircle(-30,-14,1.2,'#1d1b20',.3);ctx.restore()}
 function smallBirch(){birch(rnd(70,100))}
-const WFKINDS=[['bigPine',2.6],['smallBirch',1.4],['fern',2],['mushrooms',.9],['fallenLog',.8],['stump',.8],['boulder',1.2],['flowers',1],['bush',1.2],['canoeShore',.35],['fox',.35],['trailSign',.3],['fisherman',.22]];
+const WFKINDS=[['bigPine',2.6],['smallBirch',1.4],['fern',2],['mushrooms',.9],['fallenLog',.8],['stump',.8],['boulder',1.2],['flowers',1],['bush',1.2],['canoeShore',.35],['fox',.35],['trailSign',.3]];
 const WFFN={bigPine,smallBirch,fern,mushrooms,fallenLog,stump,boulder,flowers,bush,canoeShore,fox,trailSign,fisherman,campsite};
 
 // ---------- spinning windmills and the lighthouse beam (drawn live, under the foreground)
@@ -1181,7 +1181,7 @@ Object.assign(EVDEF,{
     draw(c,e,p){if(!e.lk)return;const k=e.lk,P=stripXY(k.x0+(k.x1-k.x0)*e.u,16);if(Math.abs(P.dx)>CW*.8)return;c.save();c.translate(P.x,P.y);c.rotate(P.a);c.scale(e.s*1.3,1.3);
       if(p<.6){const q=p/.6,x=-26+q*52,y=-Math.sin(Math.PI*q)*44;c.save();c.translate(x,y);c.rotate(-Math.cos(Math.PI*q)*.9);c.beginPath();c.ellipse(0,0,11,4.5,0,0,7);c.fillStyle='#a9b7c8';c.fill();inkStroke(c,1.3);c.beginPath();c.moveTo(-10,0);c.lineTo(-17,-5);c.lineTo(-17,5);c.closePath();c.fillStyle='#a9b7c8';c.fill();inkStroke(c,1.1);c.restore()}
       for(const[sx,t0]of[[-26,0],[26,.55]]){const q=(p-t0)/.45;if(q<0||q>1)continue;c.globalAlpha=1-q;c.beginPath();c.ellipse(sx,2,6+q*26,2+q*5,0,0,7);c.strokeStyle='#1d1b20';c.lineWidth=1.1;c.stroke();c.beginPath();c.ellipse(sx,2,3+q*14,1+q*3,0,0,7);c.stroke();c.globalAlpha=1}c.restore()}},
-  canoeTrip:{name:'Canoe',layer:'cars',dur:26,scenes:['woods'],w:m=>nearLake()&&!severe(m.kind)?1.8:0,
+  canoeTrip:{name:'Canoe',layer:'cars',dur:26,scenes:[],w:m=>0,
     init(e){e.lk=anyLake();e.dir=Math.random()<.5?1:-1;e.col=['#c8553d','#e9b949','#7f9468'][Math.floor(rr(0,3))]},
     draw(c,e,p,t){if(!e.lk)return;const k=e.lk,u=e.dir>0?.08+p*.84:.92-p*.84,P=stripXY(k.x0+(k.x1-k.x0)*u,18);if(Math.abs(P.dx)>CW*.8)return;const env=Math.min(1,p*8,(1-p)*8);c.save();c.globalAlpha=env;c.translate(P.x,P.y);c.rotate(P.a);c.scale(e.dir*1.25,1.25);
       for(const px of[-12,12]){const sw=Math.sin(t*3+px)*.5;c.save();c.translate(px,-10);c.beginPath();c.moveTo(0,0);c.lineTo(0,-12);inkStroke(c,1.4);c.beginPath();c.arc(0,-16,4,0,7);c.fillStyle='#f3dcc6';c.fill();inkStroke(c,1.1);c.rotate(sw);c.beginPath();c.moveTo(-6,-14);c.lineTo(8,10);inkStroke(c,1.3);c.beginPath();c.ellipse(9,12,2,4,-.6,0,7);c.fillStyle='#b5835a';c.fill();inkStroke(c,1);c.restore()}
@@ -1208,7 +1208,7 @@ function makeBirds(){const out=[];for(let i=0;i<5;i++){const fr=[];for(let f=0;f
 let SCENE=null;
 function buildAll(){TOWER=null;SMOKE=[];EVS=[];CAMPS=[];ANIMS=[];LAKES=[];GONDOLA=null;const[bm,bf,bb]=BUILDERS[SCENE];const c=bm(citySeed),fr=bf(citySeed),bk=bb(citySeed);
   if(city){GLm.free(city.tex);GLl.free(city.ltex);GLf.free(front.tex);GLl.free(front.ltex);GLl.free(front.mask);GLm.free(backTex)}
-  city={tex:GLm.tex(c.strip),ltex:GLl.tex(c.lights),cars:c.cars};front={tex:GLf.tex(fr.strip),ltex:GLl.tex(fr.lights),mask:GLl.tex(fr.strip),walkers:fr.walkers};backTex=GLm.tex(bk);fillEv()}
+  city={tex:GLm.tex(c.strip),ltex:GLl.tex(c.lights),cars:c.cars};front={tex:GLf.tex(fr.strip),ltex:GLl.tex(fr.lights),mask:GLl.tex(fr.strip),walkers:[]};backTex=GLm.tex(bk);fillEv()}
 let built=null,ready=false;
 GLm=makeGL(glC);GLf=makeGL(glFC);GLl=makeGL(glLC);cloudSprites=makeClouds();birds=makeBirds();
 return{
