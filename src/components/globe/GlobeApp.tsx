@@ -903,6 +903,7 @@ function Globe({
         });
         // the doodle world draws its own sky and weather
         const dood = setting.current.doodle?.on ? "0" : show.toFixed(3);
+        if (el.wxSky) put(el.wxSky, "opacity", setting.current.doodle?.on ? "0" : "");
         if (el.wxBack) el.wxBack.style.opacity = dood;
         if (el.wxFront) el.wxFront.style.opacity = dood;
         s.look = w.scene.look;
@@ -920,8 +921,11 @@ function Globe({
       if (st.doodle) {
         st.doodle.set(s.haunt ? null : st.kind);
         const { L: Lw } = live.current;
-        const hide = s.lens !== null || s.coreOn || s.featOn;
-        s.setShow += ((hide ? 0 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.setShow) * ease(0.1, dt);
+        // the scene stays behind a song you fly to and its card: fading it
+        // there only uncovered the old plain sky, a dark mess at night. It
+        // still gives way as you dive into a core.
+        const song = (s.lens !== null || s.featOn) && !s.coreOn && !s.pendingCore;
+        s.setShow += ((s.coreOn ? 0 : song ? 1 : clamp01(1 - (s.zoom - 1) * 2.5)) - s.setShow) * ease(0.1, dt);
         st.doodle.step(dt, w.weather, {
           show: s.setShow,
           w: Lw.w,
@@ -1845,6 +1849,15 @@ sim: TileSim,
     const camZ = s.zoom * Rb * ez[2];
     const nearFade = clamp01((880 - camZ) / 220);
     put(te.box, "visibility", nearFade <= 0 || unborn ? "hidden" : "");
+    // Flying to a song: each tile is drawn flat, as one picture. Bent into
+    // nine facets it tore along their seams once blown up, and the fading
+    // ones showed a bright grid where their see-through facets overlapped.
+    // So the fade goes on the whole tile, not on each facet.
+    const flat = s.lens !== null;
+    put(te.box, "transformStyle", flat ? "flat" : "");
+    put(te.box, "backfaceVisibility", flat ? "hidden" : "");
+    put(te.box, "webkitBackfaceVisibility", flat ? "hidden" : "");
+    put(te.box, "opacity", flat ? (k !== s.lens ? 1 - 0.88 * lensP : 1 - s.fp).toFixed(3) : "");
     // riding the water: up and down, and rocked a little
     const fl = sim.float(k);
     put(te.box, "transform", `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h + lift).toFixed(2)}px) ` +
@@ -1857,8 +1870,7 @@ sim: TileSim,
 
     const ex = camV([clo, 0, -slo], cam),
       ey = camV([sla * slo, cla, sla * clo], cam);
-    const fadeOp =
-      nearFade * (1 - reveal * 0.6) * (s.lens !== null ? (k !== s.lens ? 1 - 0.88 * lensP : 1 - s.fp) : 1);
+    const fadeOp = nearFade * (1 - reveal * 0.6); // a song's fade is on its whole tile, above
     const morph = lockE < 1 || wait;
     const line = wait
       ? dk > 0.5
