@@ -4,9 +4,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatDay, formatTime, todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, MayKnow, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
-import { InviteCard } from "./Invite";
+import { InviteButton, InviteCard } from "./Invite";
 import { SignalCore } from "./SignalCore";
-import { SongPlayer } from "./Preview";
+import { SongPlayer, usePreview } from "./Preview";
 import { LevelsIcon } from "./Reactions";
 import { Cover, Face, SearchIcon, coverRadius } from "./ui";
 
@@ -104,6 +104,125 @@ function GlobeList({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// The Globe tab: today's songs as a list, the list view of the Globe. Only
+// people who have posted today show up, newest song on top (it rises in and
+// the rest slide down). Each row leads with the cover and the song, then who
+// picked it, their streak and when. Tap anywhere on the row to fly to the
+// song on the Globe; the play button on the right plays its clip right here
+// (tap again to pause). Their core is a tap away on the song's card. Everyone you follow, who added you
+// and finding friends live in My Core, under People.
+// ---------------------------------------------------------------------------
+
+export function GlobeTab({
+  friends,
+  seenBefore,
+  onOpen,
+}: {
+  friends: Friend[];
+  seenBefore: number;
+  onOpen(k: number): void;
+}) {
+  const shown = friends
+    .map((f, k) => ({ f, k }))
+    .filter((x) => !x.f.hidden && x.f.post)
+    .sort((a, b) => b.f.post!.created_at.localeCompare(a.f.post!.created_at));
+  const rows = useSlide(shown.map((x) => x.f.id).join(" "));
+  const zone = localZone();
+  const pv = usePreview();
+  const playing = pv.shuffle ? null : pv.track;
+  const play = (p: Post, k: number) => {
+    if (playing?.post.id === p.id) return pv.toggle();
+    if (p.preview_url) pv.play(`song-${p.id}`, p.preview_url, undefined, p);
+    else onOpen(k); // no clip: the song's card has the Spotify player
+  };
+  return (
+    <div className="flex-1 overflow-y-auto px-2.5 pb-4">
+      {shown.length ? (
+        <>
+          <Kicker>
+            Today&apos;s songs · {shown.length} of {friends.filter((f) => !f.hidden).length}
+          </Kicker>
+          {shown.map(({ f, k }) => {
+            const p = f.post!;
+            return (
+              <div
+                key={f.id}
+                ref={rows(f.id)}
+                data-motion
+                className="relative flex items-center gap-1 rounded-[18px] py-1 pl-1.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => onOpen(k)}
+                  aria-label={`Open ${f.display_name}'s song, ${p.title}${p.artist ? ` by ${p.artist}` : ""}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 py-1 text-left"
+                >
+                  <Cover
+                    src={p.artwork_url}
+                    seed={p.title}
+                    size={56}
+                    style={{ boxShadow: "0 6px 14px -6px rgba(13,42,63,0.55)" }}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-[15px] font-semibold leading-tight">{p.title}</span>
+                      {Date.parse(p.created_at) > seenBefore && <NewDot />}
+                    </div>
+                    {p.artist && <div className="truncate text-xs text-muted">{p.artist}</div>}
+                    <div className="flex min-w-0 items-center gap-1.5 pt-0.5">
+                      <Face p={f} size={18} />
+                      <span className="truncate text-[11px] font-semibold">{f.display_name}</span>
+                      {Boolean(f.streak) && <Streak days={f.streak!} />}
+                      <span className="flex-none text-[11px] text-muted">· {formatTime(p.created_at, zone)}</span>
+                    </div>
+                  </div>
+                </button>
+                {(() => {
+                  const on = playing?.post.id === p.id && !playing.paused;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => play(p, k)}
+                      aria-label={`${on ? "Pause" : "Play"} ${p.title}`}
+                      aria-pressed={on}
+                      className="flex h-11 w-11 flex-none items-center justify-center"
+                    >
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] border-card-ink/70 text-card-ink ${on ? "bg-card-ink/[0.08]" : ""}`}
+                      >
+                        {on ? <RowPause /> : <RowPlay />}
+                      </span>
+                    </button>
+                  );
+                })()}
+              </div>
+            );
+          })}
+        </>
+      ) : (
+        <div className="px-2 pb-2 pt-2 text-[13px] leading-snug text-muted">
+          {friends.length
+            ? "No one has posted yet today. Their songs show up here as they come in."
+            : "No one on your globe yet. Tap Invite to send your link, or find friends in My Core under People."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// navy line icons, like the song card's buttons
+const RowPlay = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" style={{ marginLeft: 2 }}>
+    <path d="M7 4.8v14.4a.6.6 0 0 0 .9.5l11.6-7.2a.6.6 0 0 0 0-1L7.9 4.3a.6.6 0 0 0-.9.5z" />
+  </svg>
+);
+const RowPause = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+    <path d="M8.5 5v14M15.5 5v14" />
+  </svg>
+);
 
 // Slides rows to their new places when the order changes: whoever just posted
 // rises to the top (over the others) and everyone above them slides down one.
@@ -406,7 +525,8 @@ function PersonRow({
 }
 
 // ---------------------------------------------------------------------------
-// Friends: one tab for the people on your globe and finding more. On top, a
+// Friends: in My Core's People tab (your own core), the people on your globe
+// and finding more. On top, a
 // search by username. Then likes and notes on your song, "Added you" (people
 // who want to be your friend), who's posted today (folds up), "You may know"
 // (people who know someone on your globe, most shared friends first; tap a
@@ -430,6 +550,7 @@ export function FriendsTab({
   onAddBack,
   onFollowed,
   onCore,
+  inline = false,
 }: {
   api: GlobeApi;
   me: Profile;
@@ -443,6 +564,7 @@ export function FriendsTab({
   onAddBack(p: AddedMe): Promise<string | null>;
   onFollowed(f: Friend): void;
   onCore(p: Profile): void;
+  inline?: boolean; // inside My Core's People tab, which scrolls itself
 }) {
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Found[] | null>(null);
@@ -516,7 +638,13 @@ export function FriendsTab({
 
   return (
     <>
-      <div className="px-3.5 pb-2.5 pt-1">
+      <div className={inline ? "pb-2.5" : "px-3.5 pb-2.5 pt-1"}>
+        {inline && (
+          <div className="flex items-center justify-between pb-2.5">
+            <span className="text-xs text-muted">Find friends, or send your link</span>
+            <InviteButton username={me.username} />
+          </div>
+        )}
         <label className="flex h-[46px] items-center gap-2 rounded-[23px] border border-card-ink/12 bg-card-ink/[0.04] px-3.5">
           <SearchIcon />
           <span className="text-[15px] text-muted">@</span>
@@ -533,7 +661,7 @@ export function FriendsTab({
         </label>
         {error && <p className="px-2 pt-2 text-xs text-accent-deep">{error}</p>}
       </div>
-      <div className="flex-1 overflow-y-auto px-2.5 pb-4">
+      <div className={inline ? "-mx-2" : "flex-1 overflow-y-auto px-2.5 pb-4"}>
         {searching ? (
           <>
             {results?.map((p) =>

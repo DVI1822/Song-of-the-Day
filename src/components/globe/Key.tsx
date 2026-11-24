@@ -140,10 +140,10 @@ const PAGES: Page[] = [
   },
   {
     tab: "Friends",
-    title: "Friends, leaderboard and chat",
+    title: "Today's songs, friends, leaderboard and chat",
     rows: [
-      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "Friends", text: "Invite, beside the Friends header, sends your link to anyone in one tap. Search by username up top. Below: who added you, then who has posted today (tap the header to fold it up), newest on top, then who hasn't yet. The flame is their streak: days in a row they've posted. Tap a song to fly to it. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
-      { icon: <Tab><TabIcon name="find" /></Tab>, name: "Find friends", text: "In Friends: “You may know” shows friends of your friends. Invite, up top, sends your link to anyone outside the app." },
+      { icon: <Tab><TabIcon name="globe" /></Tab>, name: "Globe", text: "The top tab on the left: today's songs as a list. Only people who have posted today show up, newest song on top, with who picked it, their streak (the flame: days in a row they've posted) and when. Tap anywhere on a row to fly to that song on the Globe. The play button on the right plays it right here; tap again to pause. Invite, beside the Globe header, sends your link to anyone in one tap. A red number means new songs. Tap any side tab, or grab it and pull it out like a drawer; push it back to put it away." },
+      { icon: <Tab><TabIcon name="friends" /></Tab>, name: "Friends", text: "In My Core, under People: search by username, who added you, likes and notes on your song, everyone on your globe (who has posted today and who hasn't), “You may know” (friends of your friends), Invite and anyone you've hidden. A red number on My Core means someone added you or liked your song." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full bg-accent px-2 py-1 text-[10px] font-semibold text-white">Add</span></span>,
         name: "Add",
@@ -151,7 +151,7 @@ const PAGES: Page[] = [
       },
       { icon: <span className="flex h-10 w-10 items-center justify-center text-card-ink"><CrownIcon on size={34} stroke={1.4} /></span>, name: "Your TopTrack", text: "Once you've posted, tap the crown, the fourth button under a friend's song, to crown it your TopTrack today. The crown lands on their cover with confetti. One crown a day, never your own, and you can move it until midnight. Each crown is a point for them, and nobody sees who crowned whom." },
       { icon: <Tab right><CrownIcon on={false} size={15} stroke={1.8} /></Tab>, name: "Leaderboard", text: "The tab on the right with the crown. Everyone on your globe by points this month, most first; the leader wears the crown. Each morning it adds the day before's crowns." },
-      { icon: <Tab><ChatIcon size={15} /></Tab>, name: "Chat", text: "On the left, between Friends and My Core. Globe chat is with your mutual friends and starts fresh every midnight, like the songs. Messages are one to one." },
+      { icon: <Tab><ChatIcon size={15} /></Tab>, name: "Chat", text: "On the left, between Globe and My Core. Globe chat is with your mutual friends and starts fresh every midnight, like the songs. Messages are one to one." },
       {
         icon: <span className="flex h-10 w-10 items-center justify-center"><span className="rounded-full px-1.5 py-1 text-[9px] font-semibold" style={glass(false)}>Message</span></span>,
         name: "Message",
