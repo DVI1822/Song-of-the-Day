@@ -1626,7 +1626,7 @@ function Globe({
             </button>
           </div>
           {panel === "friends" && (
-            <GlobeTab friends={friends} seenBefore={songsSeenBefore} onOpen={fly} onCore={(p) => openCore(null, p)} />
+            <GlobeTab friends={friends} seenBefore={songsSeenBefore} onOpen={fly} />
           )}
         </PanelSwipe>
       )}

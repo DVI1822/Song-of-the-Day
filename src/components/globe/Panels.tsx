@@ -6,7 +6,7 @@ import type { Activity, AddedMe, Friend, MayKnow, Post, Profile } from "@/lib/ty
 import type { GlobeApi } from "./api";
 import { InviteButton, InviteCard } from "./Invite";
 import { SignalCore } from "./SignalCore";
-import { SongPlayer } from "./Preview";
+import { SongPlayer, usePreview } from "./Preview";
 import { LevelsIcon } from "./Reactions";
 import { Cover, Face, SearchIcon, coverRadius } from "./ui";
 
@@ -109,8 +109,9 @@ function GlobeList({
 // The Globe tab: today's songs as a list, the list view of the Globe. Only
 // people who have posted today show up, newest song on top (it rises in and
 // the rest slide down). Each row leads with the cover and the song, then who
-// picked it, their streak and when. Tap the row to fly to the song on the
-// Globe, the little core for their core. Everyone you follow, who added you
+// picked it, their streak and when. Tap anywhere on the row to fly to the
+// song on the Globe; the play button on the right plays its clip right here
+// (tap again to pause). Their core is a tap away on the song's card. Everyone you follow, who added you
 // and finding friends live in My Core, under People.
 // ---------------------------------------------------------------------------
 
@@ -118,12 +119,10 @@ export function GlobeTab({
   friends,
   seenBefore,
   onOpen,
-  onCore,
 }: {
   friends: Friend[];
   seenBefore: number;
   onOpen(k: number): void;
-  onCore(p: Profile): void;
 }) {
   const shown = friends
     .map((f, k) => ({ f, k }))
@@ -131,6 +130,13 @@ export function GlobeTab({
     .sort((a, b) => b.f.post!.created_at.localeCompare(a.f.post!.created_at));
   const rows = useSlide(shown.map((x) => x.f.id).join(" "));
   const zone = localZone();
+  const pv = usePreview();
+  const playing = pv.shuffle ? null : pv.track;
+  const play = (p: Post, k: number) => {
+    if (playing?.post.id === p.id) return pv.toggle();
+    if (p.preview_url) pv.play(`song-${p.id}`, p.preview_url, undefined, p);
+    else onOpen(k); // no clip: the song's card has the Spotify player
+  };
   return (
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
       {shown.length ? (
@@ -173,7 +179,24 @@ export function GlobeTab({
                     </div>
                   </div>
                 </button>
-                <CoreButton name={f.display_name} onClick={() => onCore(f)} />
+                {(() => {
+                  const on = playing?.post.id === p.id && !playing.paused;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => play(p, k)}
+                      aria-label={`${on ? "Pause" : "Play"} ${p.title}`}
+                      aria-pressed={on}
+                      className="flex h-11 w-11 flex-none items-center justify-center"
+                    >
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] border-card-ink/70 text-card-ink ${on ? "bg-card-ink/[0.08]" : ""}`}
+                      >
+                        {on ? <RowPause /> : <RowPlay />}
+                      </span>
+                    </button>
+                  );
+                })()}
               </div>
             );
           })}
@@ -188,6 +211,18 @@ export function GlobeTab({
     </div>
   );
 }
+
+// navy line icons, like the song card's buttons
+const RowPlay = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" style={{ marginLeft: 2 }}>
+    <path d="M7 4.8v14.4a.6.6 0 0 0 .9.5l11.6-7.2a.6.6 0 0 0 0-1L7.9 4.3a.6.6 0 0 0-.9.5z" />
+  </svg>
+);
+const RowPause = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+    <path d="M8.5 5v14M15.5 5v14" />
+  </svg>
+);
 
 // Slides rows to their new places when the order changes: whoever just posted
 // rises to the top (over the others) and everyone above them slides down one.
