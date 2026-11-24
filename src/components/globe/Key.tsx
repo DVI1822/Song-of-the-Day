@@ -10,7 +10,7 @@ import { RedoArrows } from "./Redo";
 import { ShareIcon } from "./ShareStory";
 import { PlayAllIcon } from "./Shuffle";
 import { SignalCore } from "./SignalCore";
-import { CloseIcon, glass, RecenterIcon, TabIcon } from "./ui";
+import { CloseIcon, GearIcon, glass, RecenterIcon, TabIcon } from "./ui";
 import { SCENES } from "./SceneWheel";
 
 // The key: what every button on TopTrack does, drawn with the real icons.
@@ -74,12 +74,6 @@ const CalendarIcon = () => (
     <circle cx="12" cy="15.2" r="1.6" fill="currentColor" stroke="none" />
   </svg>
 );
-const GearIcon = () => (
-  <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" />
-  </svg>
-);
 const PersonIcon = () => (
   <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
     <circle cx="12" cy="9" r="3.6" />
@@ -120,7 +114,7 @@ const PAGES: Page[] = [
       { icon: <Words top="4:12" bottom="NEXT SONG" size={14} />, name: "Countdown", text: "Time until midnight. Then everyone picks a new song, and today's goes into your core." },
       { icon: <Round>{SCENES[1].icon}</Round>, name: "Backdrop wheel", text: "The see-through dial low on the right-hand side picks the scene behind your Globe. Tap it for the next one, or spin it. The pin means where you really are." },
       { icon: <Plain><SkyIcon /></Plain>, name: "Your sky", text: "The sky follows the real sun, weather and season where you are." },
-      { icon: <Round><span className="text-sm font-semibold">?</span></Round>, name: "About TopTrack", text: "What TopTrack is, and how to put it on your home screen." },
+      { icon: <Round><span className="text-sm font-semibold">?</span></Round>, name: "About TopTrack", text: "What TopTrack is and how it works." },
     ],
   },
   {
@@ -168,7 +162,7 @@ const PAGES: Page[] = [
       { icon: <Round><CalendarIcon /></Round>, name: "Your archive", text: "At midnight your song moves into your core, sorted into a playlist for each month." },
       { icon: <Half><CoreIcon on /></Half>, name: "Saved", text: "Songs you saved from friends, kept in your core." },
       { icon: <Round><PersonIcon /></Round>, name: "Your picture", text: "Tap your picture in your core to add or change it." },
-      { icon: <Round><GearIcon /></Round>, name: "Settings", text: "At the bottom of your core: people you've blocked, sign out, or delete your account." },
+      { icon: <Round><GearIcon /></Round>, name: "Settings", text: "The gear at the top of your core: your name, people you've blocked, sign out, or delete your account." },
     ],
   },
 ];

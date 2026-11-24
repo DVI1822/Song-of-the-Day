@@ -8,7 +8,7 @@ import type { GlobeApi } from "./api";
 import { ChatIcon } from "./Chat";
 import { PeoplePane, Shelf, SongsPane, Tabs, TastePane } from "./CoreTabs";
 import { Safety } from "./Safety";
-import { CloseIcon, glass, glassThin } from "./ui";
+import { CloseIcon, GearIcon, glass, glassThin } from "./ui";
 
 export type CoreTab = "taste" | "songs" | "people";
 type Tab = CoreTab;
@@ -224,6 +224,16 @@ export function CoreView({
         </div>
         {onAdd && <AddPill name={first ?? ""} onAdd={onAdd} />}
         {onMessage && <MessagePill name={first ?? ""} onMessage={onMessage} />}
+        {mine && (
+          <Link
+            href="/settings"
+            aria-label="Settings: sign out, delete account"
+            className="flex h-11 w-11 items-center justify-center rounded-full"
+            style={glass(dark)}
+          >
+            <GearIcon />
+          </Link>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -381,8 +391,8 @@ export function CoreView({
           )}
 
           {mine && (
-            <Link href="/settings" className="self-start text-xs font-semibold text-muted underline-offset-4 hover:underline">
-              Settings
+            <Link href="/settings" className="flex h-11 items-center self-start text-xs font-semibold text-muted underline-offset-4 hover:underline">
+              Settings, sign out, delete account
             </Link>
           )}
         </div>

@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "Privacy · TopTrack" };
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy policy" updated="November 13, 2026">
+    <LegalPage title="Privacy policy" updated="November 24, 2026">
       <p>
         TopTrack is a small site and iPhone app for sharing one song a day with friends. This page says what it keeps
         about you, why, and how to get rid of it. It covers the website (www.mytoptrack.io) and the TopTrack app, which
@@ -14,14 +14,18 @@ export default function PrivacyPage() {
 
       <h2>What we keep</h2>
       <ul>
+        <li>Your email address, so you can sign in.</li>
         <li>
-          Your email address, so you can sign in. If you sign in with Spotify instead, that&apos;s the name and email on
-          your Spotify account.
+          Your name, username, timezone and profile picture if you add one. The timezone decides when your day ends at
+          midnight.
         </li>
-        <li>Your name, username and timezone. The timezone decides when your day ends at midnight.</li>
         <li>
           Your songs: the link you paste, the song&apos;s title, artist and cover (looked up from public music pages), and
           any caption or photo you add. Photos are deleted when your day ends; the song and caption stay on your profile.
+        </li>
+        <li>
+          The town or city a song was posted from (like &ldquo;Austin, TX&rdquo;), worked out roughly from your internet
+          connection, never your exact location. It shows on the song&apos;s card.
         </li>
         <li>Likes, notes, your daily TopTrack pick, and the messages you send in chat.</li>
         <li>Who you follow and who follows you, and anyone you block.</li>
@@ -37,8 +41,9 @@ export default function PrivacyPage() {
       <h2>Weather</h2>
       <p>
         The Globe shows the weather where you are. To find it, we use your device&apos;s location if you&apos;ve allowed it,
-        or else a rough location from your internet connection. It&apos;s rounded to about 10 km, sent to Open-Meteo to
-        look up the weather, and never stored.
+        or else a rough location from your internet connection. It&apos;s rounded to about 10 km and sent to Open-Meteo
+        (weather) and OpenStreetMap (what kind of place it is, for the scene behind the Globe). Your device&apos;s location
+        is kept only on your device; we never store it.
       </p>
 
       <h2>Notifications</h2>
@@ -57,7 +62,9 @@ export default function PrivacyPage() {
 
       <h2>Who sees what</h2>
       <p>
-        People who follow you can see your songs, captions and photos. We don&apos;t sell or share your information with
+        TopTrack is public: your name, username, picture, songs, captions and photos can be seen by anyone with your
+        profile link, and they show on the globes of people who add you. Chat messages are seen by the people on your
+        globe, or only by the person you message. We don&apos;t sell or share your information with
         anyone, and there are no ads or trackers, in the app or on the site. The site runs on Supabase (accounts and
         data) and Vercel (hosting), which store it on our behalf, and sign-in emails go out through Resend.
       </p>
@@ -65,7 +72,8 @@ export default function PrivacyPage() {
       <h2>Deleting your data</h2>
       <p>
         You can delete a post on the day you share it. To delete your whole account and everything in it (songs,
-        photos, follows and blocks), go to <strong>Settings → Delete my account</strong>. It&apos;s
+        photos, likes, notes, messages, follows and blocks), open your core, tap the gear, then{" "}
+        <strong>Delete my account</strong>. It&apos;s
         erased right away and can&apos;t be undone. This works the same in the app.
       </p>
 

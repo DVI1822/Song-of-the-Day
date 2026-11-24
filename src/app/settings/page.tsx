@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   const blocked = (blocks ?? []) as { id: string; username: string; display_name: string }[];
 
   return (
-    <Shell back={{ href: `/u/${profile.username}`, label: "Your core" }}>
+    <Shell back={{ href: "/", label: "Globe" }}>
       <h1 className="display mb-6 text-3xl">Your profile</h1>
       <Card>
         <ProfileForm submitLabel="Save" initial={profile} />
@@ -43,14 +43,13 @@ export default async function SettingsPage() {
         </>
       )}
 
-      <h2 className="display mb-3 mt-10 text-xl">Leave</h2>
-      <Card>
-        <DeleteAccount username={profile.username} />
-      </Card>
-
-      <form action={signOut} className="mt-8">
+      <h2 className="display mb-3 mt-10 text-xl">Account</h2>
+      <form action={signOut}>
         <button className={ghostButtonClass}>Sign out</button>
       </form>
+      <Card className="mt-4">
+        <DeleteAccount username={profile.username} />
+      </Card>
       <LegalLinks className="mt-10" />
     </Shell>
   );

@@ -117,8 +117,14 @@ export async function deleteAccount(_: FormState, form: FormData): Promise<FormS
   const typed = String(form.get("confirm") ?? "").trim().replace(/^@/, "").toLowerCase();
   if (profile && typed !== profile.username) return { error: `Type ${profile.username} to confirm.` };
 
-  const { data: photos } = await supabase.storage.from("photos").list(userId, { limit: 1000 });
-  if (photos?.length) await supabase.storage.from("photos").remove(photos.map((f) => `${userId}/${f.name}`));
+  // song photos sit in <id>/, profile pictures in <id>/avatar/ (a folder
+  // lists as an entry with no id, and removing it by name removes nothing)
+  const files: string[] = [];
+  for (const dir of [userId, `${userId}/avatar`]) {
+    const { data } = await supabase.storage.from("photos").list(dir, { limit: 1000 });
+    for (const f of data ?? []) if (f.id) files.push(`${dir}/${f.name}`);
+  }
+  if (files.length) await supabase.storage.from("photos").remove(files);
   const { error } = await supabase.rpc("delete_me");
   if (error) return { error: "Couldn't delete your account. Try again in a minute." };
   await supabase.auth.signOut();
@@ -212,11 +218,19 @@ export async function createPost(input: NewPost): Promise<{ post?: Post; error?:
   return { post: data ?? undefined };
 }
 
+function safeDecode(v: string) {
+  try {
+    return decodeURIComponent(v);
+  } catch {
+    return v;
+  }
+}
+
 // Roughly where a song was posted from: the city their connection is in, as
 // Vercel sees it (the same guess the weather uses, so nobody is asked).
 async function postedFrom() {
   const h = await headers();
-  const city = decodeURIComponent(h.get("x-vercel-ip-city") ?? "").trim();
+  const city = safeDecode(h.get("x-vercel-ip-city") ?? "").trim();
   if (!city) return undefined;
   const country = h.get("x-vercel-ip-country") ?? "",
     region = h.get("x-vercel-ip-country-region") ?? "";
