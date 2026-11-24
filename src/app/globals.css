@@ -321,7 +321,8 @@ body {
   letter-spacing: 0.01em;
 }
 /* glass buttons, tabs, panels and cards become paper with a wobbly ink edge
-   (full-screen frosted backdrops keep their blur) */
+   (nothing blurs any more: re-blurring the moving scenery every frame was too
+   slow on phones) */
 [data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0):not([data-frost]) {
   background: var(--paper) !important;
   backdrop-filter: none !important;

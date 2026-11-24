@@ -47,18 +47,18 @@ export function Cover({
 }
 
 export const glass = (dark: boolean): CSSProperties => ({
-  background: `rgba(255,255,255,${dark ? 0.93 : 0.78})`,
-  backdropFilter: "blur(16px)",
-  WebkitBackdropFilter: "blur(16px)",
+  background: `rgba(255,255,255,${dark ? 0.95 : 0.94})`,
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
   border: "1px solid rgba(13,42,63,0.10)",
   boxShadow: "0 8px 30px -14px rgba(13,42,63,0.25)",
   color: "#0D2A3F",
 });
 
 export const glassThin = (dark: boolean): CSSProperties => ({
-  background: `rgba(255,255,255,${dark ? 0.9 : 0.62})`,
-  backdropFilter: "blur(10px)",
-  WebkitBackdropFilter: "blur(10px)",
+  background: `rgba(255,255,255,${dark ? 0.94 : 0.92})`,
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
   border: "1px solid rgba(13,42,63,0.08)",
   boxShadow: "0 -10px 40px -24px rgba(13,42,63,0.3)",
   color: "#0D2A3F",

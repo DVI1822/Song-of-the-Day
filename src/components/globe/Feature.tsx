@@ -225,7 +225,7 @@ export function Feature({
       <div
         ref={backdropRef}
         className="absolute inset-0"
-        style={{ opacity: 0, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+        style={{ opacity: 0, background: "rgba(251,248,240,0.22)" }}
       />
       <button
         type="button"
@@ -236,7 +236,7 @@ export function Feature({
       <div ref={cardRef} className="absolute flex flex-col gap-3.5" style={{ left, top: top - lift, width: cover, opacity: 0 }}>
         <div
           aria-hidden
-          className={`absolute -inset-x-3.5 -bottom-4 -top-2 rounded-[30px] border border-white/50 backdrop-blur-2xl ${dark ? "bg-white/85" : "bg-white/60"}`}
+          className={`absolute -inset-x-3.5 -bottom-4 -top-2 rounded-[30px] border border-white/50 backdrop-blur-none ${dark ? "bg-white/95" : "bg-white/90"}`}
           style={{
             // on Halloween the card glows in the look's colour (halloween.ts)
             boxShadow: `0 30px 80px -30px rgba(13,42,63,0.45)${hw ? `, 0 0 0 1.5px rgba(${hw.accentRgb},0.55), 0 0 60px -8px rgba(${hw.accentRgb},0.7)` : ""}`,
@@ -378,7 +378,7 @@ export function Feature({
             <div
               key={toast}
               role="status"
-              className="whitespace-nowrap rounded-full border border-coral/70 bg-white/90 px-4 py-2 text-[14px] font-semibold text-card-ink shadow-[0_10px_26px_-12px_rgba(13,42,63,0.5)] backdrop-blur-md"
+              className="whitespace-nowrap rounded-full border border-coral/70 bg-white/90 px-4 py-2 text-[14px] font-semibold text-card-ink shadow-[0_10px_26px_-12px_rgba(13,42,63,0.5)] backdrop-blur-none"
               style={{ animation: "toast-blip 1.6s cubic-bezier(.2,.75,.25,1) both" }}
             >
               Added to core

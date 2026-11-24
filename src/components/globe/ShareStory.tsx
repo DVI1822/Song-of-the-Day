@@ -125,7 +125,7 @@ export function ShareSheet({
       <div
         role="dialog"
         aria-label="Share to your Story"
-        className="rise-in relative mx-auto flex w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-2xl"
+        className="rise-in relative mx-auto flex w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 -20px 60px -30px rgba(13,42,63,0.45)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-center gap-2 px-5 pb-2 pt-4">
@@ -156,7 +156,7 @@ export function ShareSheet({
               <video src={ready.url} autoPlay loop muted playsInline aria-label="Your song on the globe, as a Story" className="absolute inset-0 h-full w-full object-cover" />
             )}
             {!ready && (
-              <div className="absolute inset-x-3 bottom-3 overflow-hidden rounded-full bg-black/25 text-center text-[11px] text-white backdrop-blur">
+              <div className="absolute inset-x-3 bottom-3 overflow-hidden rounded-full bg-black/50 text-center text-[11px] text-white backdrop-blur-none">
                 <div className="absolute inset-y-0 left-0 bg-white/25" style={{ width: `${Math.round(at * 100)}%` }} />
                 <div className="relative py-1">{story === "failed" ? "Couldn't make it. Try another sky." : "Making your Story…"}</div>
               </div>

@@ -182,7 +182,7 @@ export function Key({ onClose }: { onClose(): void }) {
       <div
         role="dialog"
         aria-label="Key: what every button does"
-        className="rise-in relative flex max-h-[min(720px,88dvh)] w-full max-w-[400px] flex-col rounded-[28px] border border-white/60 bg-white/[0.95] text-card-ink backdrop-blur-2xl"
+        className="rise-in relative flex max-h-[min(720px,88dvh)] w-full max-w-[400px] flex-col rounded-[28px] border border-white/60 bg-white/[0.95] text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.55)" }}
       >
         <div className="flex items-start px-6 pb-3 pt-5">

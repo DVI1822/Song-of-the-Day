@@ -880,6 +880,7 @@ function Globe({
         w.scene.step(dt, w.weather, {
           zoom: s.zoom,
           show,
+          off: !!setting.current.doodle?.on,
           w: Lw.w,
           h: Lw.h,
           cx: Lw.cx,
@@ -1971,15 +1972,11 @@ sim: TileSim,
     if (r.sunShadow) put(r.sunShadow, "opacity", "0");
     if (r.floor) put(r.floor, "opacity", "0");
     if (r.frost) {
-      const fs = r.frost.style;
       put(r.frost, "opacity", op.toFixed(3));
       put(r.frost, "transform", `scale(${s.zoom.toFixed(4)})`);
-      put(r.frost, "background", dk > 0.5 ? "rgba(22,28,40,0.34)" : "rgba(251,248,240,0.34)");
-      const blur = "blur(7px) saturate(0.85)";
-      if (fs.backdropFilter !== blur) {
-        fs.backdropFilter = blur;
-        fs.setProperty("-webkit-backdrop-filter", blur);
-      }
+      // a plain wash, no blur: re-blurring the moving scenery behind it
+      // every frame cost the phone too much
+      put(r.frost, "background", dk > 0.5 ? "rgba(22,28,40,0.5)" : "rgba(251,248,240,0.5)");
     }
     drawInkGlobe(r.inkGlobe, {
       w: L.w,

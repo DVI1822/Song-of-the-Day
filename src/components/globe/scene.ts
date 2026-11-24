@@ -40,6 +40,10 @@ export function seasonAt(date: Date, lat: number): Season {
 export type SceneFrame = {
   zoom: number;
   show: number; // 0..1, fades it all out in song view and the core
+  // the doodle world draws its own sky and weather over this one: keep the
+  // look on the songs up to date but draw nothing, so the phone isn't
+  // painting a sky nobody can see every frame
+  off?: boolean;
   w: number;
   h: number;
   cx: number;
@@ -639,7 +643,7 @@ export class Scene {
     const b0 = this.bolt[0];
     const flashAt: V3 = b0 ? [(f.cx + (b0[0] * f.zoom * P) / (P - b0[2] * f.zoom)) / f.w, 0.75, 1.4 * this.flash] : [0.5, 0.7, 0];
     this.sky.draw(f.w, f.h, this.t, {
-      cover: c.cover,
+      cover: f.off ? 0 : c.cover,
       off: [f.yaw * 0.03 + this.t * (0.004 + wind * 0.0015), 0],
       sun: [sun[0], sun[1]],
       lit: c.lit,
@@ -653,7 +657,7 @@ export class Scene {
       front = this.front;
     back.n = front.n = 0;
     const show = f.show;
-    if (show <= 0) {
+    if (show <= 0 || f.off) {
       back.draw(f, this.t, 1);
       front.draw(f, this.t, 1);
       this.flashOut(dt);

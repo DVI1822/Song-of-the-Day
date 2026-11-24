@@ -255,7 +255,7 @@ export function CoreView({
         >
           <div
             data-handle
-            className="sticky top-0 z-10 -mx-4 flex flex-none touch-none flex-col items-center px-4 pb-1 pt-2 backdrop-blur-xl"
+            className="sticky top-0 z-10 -mx-4 flex flex-none touch-none flex-col items-center px-4 pb-1 pt-2 bg-white/90 backdrop-blur-none"
             onPointerDown={(e) => {
               drag.current = e.clientY;
               e.currentTarget.setPointerCapture(e.pointerId);

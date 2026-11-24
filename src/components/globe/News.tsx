@@ -43,7 +43,7 @@ export function NewsCard() {
       <div
         role="dialog"
         aria-label="New: crown your TopTrack"
-        className="rise-in relative flex w-full max-w-[380px] flex-col gap-3 rounded-[28px] border border-white/60 bg-white/[0.95] px-6 pb-6 pt-4 text-center text-card-ink backdrop-blur-2xl"
+        className="rise-in relative flex w-full max-w-[380px] flex-col gap-3 rounded-[28px] border border-white/60 bg-white/[0.95] px-6 pb-6 pt-4 text-center text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.55)" }}
       >
         {/* the gold crown lands and the confetti rains down the card */}
