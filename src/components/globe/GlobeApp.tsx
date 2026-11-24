@@ -1810,7 +1810,9 @@ function Globe({
           onPerson={(p) => openCore(null, p)}
           globe={coreWho ? undefined : { people: friends.length, posted: friends.filter((f) => f.post).length }}
           startTab={coreWho ? "taste" : coreStart}
-          onTab={(t) => t === "people" && !coreWho && seePeople()}
+          onTab={(t) => {
+            if (t === "people" && !coreWho) seePeople();
+          }}
           friendsPane={
             coreWho ? undefined : (
               <FriendsTab
