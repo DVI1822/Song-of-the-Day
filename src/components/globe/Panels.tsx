@@ -10,6 +10,8 @@ import { SongPlayer, usePreview } from "./Preview";
 import { LevelsIcon } from "./Reactions";
 import { Cover, Face, SearchIcon, coverRadius } from "./ui";
 
+type Found = Profile & { following: boolean };
+
 const Kicker = ({ children }: { children: React.ReactNode }) => (
   <div className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">{children}</div>
 );
@@ -111,18 +113,29 @@ function GlobeList({
 // the rest slide down). Each row leads with the cover and the song, then who
 // picked it, their streak and when. Tap anywhere on the row to fly to the
 // song on the Globe; the play button on the right plays its clip right here
-// (tap again to pause). Their core is a tap away on the song's card. Everyone you follow, who added you
+// (tap again to pause). Their core is a tap away on the song's card. Below,
+// "Add to my globe" looks people up to add. Everyone you follow, who added you
 // and finding friends live in My Core, under People.
 // ---------------------------------------------------------------------------
 
 export function GlobeTab({
+  api,
   friends,
+  addedMe,
   seenBefore,
   onOpen,
+  onAddBack,
+  onFollowed,
+  onCore,
 }: {
+  api: GlobeApi;
   friends: Friend[];
+  addedMe: AddedMe[];
   seenBefore: number;
   onOpen(k: number): void;
+  onAddBack(p: AddedMe): Promise<string | null>;
+  onFollowed(f: Friend): void;
+  onCore(p: Profile): void;
 }) {
   const shown = friends
     .map((f, k) => ({ f, k }))
@@ -131,6 +144,7 @@ export function GlobeTab({
   const rows = useSlide(shown.map((x) => x.f.id).join(" "));
   const zone = localZone();
   const pv = usePreview();
+  const addRef = useRef<HTMLDivElement>(null);
   const playing = pv.shuffle ? null : pv.track;
   const play = (p: Post, k: number) => {
     if (playing?.post.id === p.id) return pv.toggle();
@@ -141,9 +155,24 @@ export function GlobeTab({
     <div className="flex-1 overflow-y-auto px-2.5 pb-4">
       {shown.length ? (
         <>
-          <Kicker>
-            Today&apos;s songs · {shown.length} of {friends.filter((f) => !f.hidden).length}
-          </Kicker>
+          <div className="flex items-center justify-between pr-1">
+            <Kicker>
+              Today&apos;s songs · {shown.length} of {friends.filter((f) => !f.hidden).length}
+            </Kicker>
+            {/* jumps down to "Add to my globe" and opens the keyboard */}
+            <button
+              type="button"
+              onClick={() => {
+                const el = addRef.current;
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                el?.querySelector("input")?.focus({ preventScroll: true });
+              }}
+              className="flex h-8 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold text-accent"
+            >
+              <PlusIcon />
+              Add people
+            </button>
+          </div>
           {shown.map(({ f, k }) => {
             const p = f.post!;
             return (
@@ -205,9 +234,142 @@ export function GlobeTab({
         <div className="px-2 pb-2 pt-2 text-[13px] leading-snug text-muted">
           {friends.length
             ? "No one has posted yet today. Their songs show up here as they come in."
-            : "No one on your globe yet. Tap Invite to send your link, or find friends in My Core under People."}
+            : "No one on your globe yet. Look people up below, or tap Invite to send your link."}
         </div>
       )}
+      <AddToGlobe
+        boxRef={addRef}
+        api={api}
+        friends={friends}
+        addedMe={addedMe}
+        onAddBack={onAddBack}
+        onFollowed={onFollowed}
+        onCore={onCore}
+      />
+    </div>
+  );
+}
+
+// The Globe tab's second half: look people up by name or username and add
+// them. Before you type, it offers whoever added you (Add back) and a few
+// people you may know.
+function AddToGlobe({
+  boxRef,
+  api,
+  friends,
+  addedMe,
+  onAddBack,
+  onFollowed,
+  onCore,
+}: {
+  boxRef: React.Ref<HTMLDivElement>;
+  api: GlobeApi;
+  friends: Friend[];
+  addedMe: AddedMe[];
+  onAddBack(p: AddedMe): Promise<string | null>;
+  onFollowed(f: Friend): void;
+  onCore(p: Profile): void;
+}) {
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<Found[] | null>(null);
+  const [known, setKnown] = useState<MayKnow[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const searching = Boolean(q.trim());
+
+  useEffect(() => {
+    let live = true;
+    api.mayKnow?.().then((r) => live && setKnown(r)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (!searching) return;
+    let live = true;
+    const t = setTimeout(() => {
+      api.searchPeople(q).then((r) => live && setFound(r));
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [q, searching, api]);
+
+  const onGlobe = new Set(friends.map((f) => f.id));
+  const asked = new Map(addedMe.map((p) => [p.id, p]));
+  const shared = new Map(known.map((p) => [p.id, p.mutuals]));
+  const mayKnow = known.filter((p) => !onGlobe.has(p.id) && !asked.has(p.id)).slice(0, 5);
+  const results = found?.filter((p) => !p.following && !onGlobe.has(p.id));
+
+  const add = async (p: Profile) => {
+    setBusy(p.id);
+    setError(null);
+    const them = asked.get(p.id);
+    const e = them ? await onAddBack(them) : await api.follow(p.id).then((r) => (r.friend ? (onFollowed(r.friend), null) : (r.error ?? "Couldn't add them. Try again.")));
+    setBusy(null);
+    if (e) setError(e);
+  };
+  const row = (p: Profile, sub: string) => (
+    <PersonRow
+      key={p.id}
+      p={p}
+      sub={sub}
+      mutuals={shared.get(p.id)}
+      addLabel={asked.has(p.id) ? "Add back" : "Add"}
+      busy={busy === p.id}
+      onAdd={() => add(p)}
+      onCore={onCore}
+    />
+  );
+
+  return (
+    <div ref={boxRef} className="mt-2 scroll-mt-2 border-t border-card-ink/10 pt-3">
+      <div className="px-2 pb-2">
+        <div className="display text-[17px] leading-tight">Add to my globe</div>
+      </div>
+      <label className="mx-1 flex h-[46px] items-center gap-2 rounded-[23px] border border-card-ink/12 bg-card-ink/[0.04] px-3.5">
+        <SearchIcon />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Name or @username"
+          aria-label="Look people up by name or username"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
+        />
+      </label>
+      {error && <p className="px-3 pt-2 text-xs text-accent-deep">{error}</p>}
+      <div className="pt-1.5">
+        {searching ? (
+          <>
+            {results?.map((p) => row(p, asked.has(p.id) ? `@${p.username} · added you` : `@${p.username}`))}
+            {results && !results.length && (
+              <div className="px-2.5 py-[18px] text-[13px] text-muted">
+                {found?.length ? "They're already on your globe" : "No one by that name yet"}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {addedMe.length > 0 && (
+              <>
+                <Kicker>Added you · {addedMe.length}</Kicker>
+                {addedMe.map((p) => row(p, `@${p.username}`))}
+              </>
+            )}
+            {mayKnow.length > 0 && (
+              <>
+                <Kicker>You may know</Kicker>
+                {mayKnow.map((p) => row(p, mutualText(p.mutuals.length)))}
+              </>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -534,8 +696,6 @@ function PersonRow({
 // Invite button beside the header shares your link everywhere), and
 // whose songs you've hidden. Searching swaps all of that for the results.
 // ---------------------------------------------------------------------------
-
-type Found = Profile & { following: boolean };
 
 export function FriendsTab({
   api,
