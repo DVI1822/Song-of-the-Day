@@ -3,7 +3,7 @@
 --
 -- song_tags: each song's genre and release year (from Apple's iTunes
 -- catalog) and, with a Last.fm key, its top tags. One row per song, keyed
--- like song_facts, so a song five friends posted is looked up once.
+-- one row per song, so a song five friends posted is looked up once.
 --
 -- taste_profiles: the Taste Overview Claude writes from someone's picks (a
 -- name for their sound, a few lines about it, a few words, and how this

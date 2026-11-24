@@ -10,7 +10,6 @@ import { RedoArrows } from "./Redo";
 import { ShareIcon } from "./ShareStory";
 import { PlayAllIcon } from "./Shuffle";
 import { SignalCore } from "./SignalCore";
-import { CompassStar } from "./SongFacts";
 import { CloseIcon, glass, RecenterIcon, TabIcon } from "./ui";
 import { SCENES } from "./SceneWheel";
 
@@ -116,7 +115,6 @@ const PAGES: Page[] = [
       { icon: <Round accent><PlusIcon /></Round>, name: "Add today's song", text: "Copy a song's link in your music app, tap +, and paste it. Add a comment or photo if you like. They go on the back of the cover." },
       { icon: <Tile />, name: "Songs", text: "Each square is a friend's song today. Tap one to open it. Drag anywhere to spin the globe." },
       { icon: <Round><RecenterIcon /></Round>, name: "Bring songs to the front", text: "Turns every song round to face you for a few seconds." },
-      { icon: <Round><CompassStar /></Round>, name: "Your song's facts", text: "Once you post, a few facts about your song land here, each from a real source." },
       { icon: <Round><PlayAllIcon /></Round>, name: "Play", text: "Plays every song on your globe, one after another. The player shows the cover, the song and who picked it, with back, play/pause and next. Tap the cover or the song to open its card." },
       { icon: <Words top="12" bottom="SONGS" size={17} />, name: "Songs today", text: "How many songs are on your globe right now." },
       { icon: <Words top="4:12" bottom="NEXT SONG" size={14} />, name: "Countdown", text: "Time until midnight. Then everyone picks a new song, and today's goes into your core." },
@@ -135,7 +133,6 @@ const PAGES: Page[] = [
       { icon: <Half><CoreIcon /></Half>, name: "Save to your core", text: "Keeps the song in your core for good. Once saved it lights up and spins." },
       { icon: <Half><LevelsIcon size={46} stroke={1.4} /></Half>, name: "Like", text: "The bars dance when you like a song. Tap the number to see who liked it." },
       { icon: <Half><NoteIcon ring={0} /></Half>, name: "Notes", text: "Leave a note on the song and read everyone else's." },
-      { icon: <Round><CompassStar /></Round>, name: "Facts", text: "Facts about the song open over the cover. Swipe for the next one." },
       { icon: <Plain><ShareIcon size={19} /></Plain>, name: "Share to your Story", text: "On your own song: turns it into an Instagram Story." },
       { icon: <Plain><MoreIcon /></Plain>, name: "More", text: "On a friend's song: report it, hide their songs, or block them." },
       { icon: <Round><PersonIcon /></Round>, name: "Their name", text: "Tap the name under a song to visit that person's core." },

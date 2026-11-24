@@ -26,7 +26,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ResolvedSong } from "@/lib/songs";
 import type { News } from "@/lib/data";
-import type { Core, CoreExtras, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, Score, SongFacts, Taste } from "@/lib/types";
+import type { Core, CoreExtras, Friend, MayKnow, Message, Note, Post, Profile, Reactions, SavedSong, Score, Taste } from "@/lib/types";
 
 // Everything the Globe asks the server for. The demo swaps in fakes.
 export type GlobeApi = {
@@ -62,8 +62,6 @@ export type GlobeApi = {
   savePush?(sub: { endpoint: string; p256dh: string; auth: string }): Promise<void>;
   // what's new since the Globe opened; the demo has nothing new
   news?(): Promise<News | null>;
-  // a few facts about the song you posted, from Wikipedia
-  facts?(postId: string): Promise<SongFacts | null>;
 };
 
 // The globe chat and messages to one person. These go straight to the
@@ -216,7 +214,7 @@ export const serverApi: GlobeApi = {
   mayKnow,
   loadCore,
   coreExtras: supabaseCoreExtras,
-  // a route, like facts: looking songs up and writing the overview takes a moment
+  // a route: looking songs up and writing the overview takes a moment
   async taste(userId) {
     const res = await fetch(`/api/taste?user=${encodeURIComponent(userId)}`, { cache: "no-store" }).catch(() => null);
     if (!res?.ok) return null;
@@ -234,15 +232,6 @@ export const serverApi: GlobeApi = {
   deleteNote,
   chat: supabaseChat,
   ranks: supabaseRanks,
-  // A route, not a server action: making a song's facts the first time can
-  // take a few seconds, and server actions wait in line behind each other.
-  async facts(postId) {
-    // never from the phone's cache: the server keeps each song's facts, and an
-    // old empty answer kept here would hide them
-    const res = await fetch(`/api/facts?post=${encodeURIComponent(postId)}`, { cache: "no-store" }).catch(() => null);
-    if (!res?.ok) return null;
-    return res.json();
-  },
   async savePush(sub) {
     await createClient().rpc("save_push", { sub_endpoint: sub.endpoint, sub_p256dh: sub.p256dh, sub_auth: sub.auth });
   },
