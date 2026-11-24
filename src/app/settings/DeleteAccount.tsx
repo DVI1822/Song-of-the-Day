@@ -19,8 +19,8 @@ export function DeleteAccount({ username }: { username: string }) {
           <SignalCore className="h-full w-full" />
         </div>
         <p className="text-sm leading-relaxed">
-          Deleting your account erases your core: every song you&apos;ve shared, your photos, who you follow and who
-          follows you, and your Spotify link. It can&apos;t be undone.
+          Deleting your account erases your core: every song you&apos;ve shared, your photos, likes, notes and
+          messages, and who you follow and who follows you. It can&apos;t be undone.
         </p>
       </div>
       {!open ? (

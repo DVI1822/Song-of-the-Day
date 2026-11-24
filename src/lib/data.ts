@@ -156,7 +156,7 @@ export async function getGlobe(profile: Profile) {
 
 // What's new since the Globe opened: today's songs from the people you
 // follow, who added you, who added you back, and feels and notes on your song.
-export type News = { posts: Post[]; addedMe: AddedMe[]; backAt: Record<string, string>; activity: Activity[] };
+export type News = { posts: Post[] | null; addedMe: AddedMe[]; backAt: Record<string, string>; activity: Activity[] };
 
 export async function getNews(userId: string): Promise<News> {
   const supabase = await createClient();
@@ -165,8 +165,8 @@ export async function getNews(userId: string): Promise<News> {
     supabase.from("today_posts").select("*").eq("user_id", userId).maybeSingle<Post>(),
   ]);
   const ids = (follows ?? []).map((f) => f.following_id as string);
-  const [{ data: posts }, { addedMe, addedAt }, activity] = await Promise.all([
-    ids.length ? supabase.from("today_posts").select("*").in("user_id", ids) : Promise.resolve({ data: [] as Post[] }),
+  const [{ data: posts, error }, { addedMe, addedAt }, activity] = await Promise.all([
+    ids.length ? supabase.from("today_posts").select("*").in("user_id", ids) : Promise.resolve({ data: [] as Post[], error: null }),
     addedYou(supabase, userId, new Set(ids)),
     activityOn(supabase, mine ?? null, userId),
   ]);
@@ -175,7 +175,8 @@ export async function getNews(userId: string): Promise<News> {
     const at = backAt(addedAt, f.following_id as string, f.created_at as string);
     if (at) back[f.following_id as string] = at;
   }
-  return { posts: (posts ?? []) as Post[], addedMe, backAt: back, activity };
+  // null when the lookup failed, so nobody's song vanishes over a hiccup
+  return { posts: error ? null : ((posts ?? []) as Post[]), addedMe, backAt: back, activity };
 }
 
 export async function getCore(userId: string): Promise<Core | null> {

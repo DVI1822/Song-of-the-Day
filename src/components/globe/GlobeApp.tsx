@@ -1198,18 +1198,21 @@ function Globe({
       last = Date.now();
       news().then((n) => {
         if (!n) return;
-        const byUser = new Map(n.posts.map((p) => [p.user_id, p]));
+        const byUser = new Map((n.posts ?? []).map((p) => [p.user_id, p]));
         setFriends((list) =>
           list.map((f) => {
-            const post = byUser.get(f.id) ?? f.post;
-            // a first song today adds today to their streak
-            const streak = f.streak !== undefined && post && !f.post ? f.streak + 1 : f.streak;
+            // a song from their today that's gone from the list was taken back
+            // with a redo; yesterday's stays until the app reloads, as before
+            const post = byUser.get(f.id) ?? (n.posts !== null && f.post?.day === todayIn(f.timezone) ? null : f.post);
+            // a first song today adds today to their streak, and taking it back takes today off again
+            const streak =
+              f.streak === undefined ? f.streak : post && !f.post ? f.streak + 1 : !post && f.post ? Math.max(0, f.streak - 1) : f.streak;
             return { ...f, post, streak, followed_back_at: n.backAt[f.id] ?? f.followed_back_at, follows_me: f.follows_me || Boolean(n.backAt[f.id]) };
           }),
         );
         setAddedMe(n.addedMe);
         setActivity(n.activity);
-      });
+      }).catch(() => {}); // offline for a moment: try again next time
     };
     const t = setInterval(check, 120_000);
     const back = () => !document.hidden && Date.now() - last > 30_000 && check();

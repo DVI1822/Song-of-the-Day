@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { installPending } from "./Install";
 import { LOCATED } from "./Weather";
 import { scenePick } from "@/lib/setting";
 
@@ -65,7 +66,8 @@ export function LocateCard() {
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (asked() || scenePick() !== "auto" || !("geolocation" in navigator)) return;
+    // the Get the app slideshow goes first; this one waits for the next visit
+    if (asked() || installPending() || scenePick() !== "auto" || !("geolocation" in navigator)) return;
     let on = true;
     const t = setTimeout(() => {
       const show = () => on && setAsk(true);

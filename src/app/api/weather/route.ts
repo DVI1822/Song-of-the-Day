@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
   // rounded, so neighbours share a cached answer (and nobody's exact spot is sent on)
   lat = Math.round(lat * 10) / 10;
   lon = Math.round(lon * 10) / 10;
-  const place = decodeURIComponent(h.get("x-vercel-ip-city") ?? "") || undefined;
+  let place: string | undefined;
+  try {
+    place = decodeURIComponent(h.get("x-vercel-ip-city") ?? "") || undefined;
+  } catch {}
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,cloud_cover,precipitation,wind_speed_10m,temperature_2m&wind_speed_unit=ms`;
   try {
     const res = await fetch(url, { next: { revalidate: 900 } });
