@@ -175,6 +175,7 @@ function newMotion(posted: boolean) {
     featFly: null as null | number,
     featOn: false,
     featOpen: false,
+    swing: false, // turning under an open card to the next song (a swipe)
     fp: 0,
     lens: null as null | number,
     rollHold: 0,
@@ -300,6 +301,8 @@ function Globe({
   useEffect(() => void enablePush(api, false), [api]);
   const [dmWith, setDmWith] = useState<{ p: Profile; n: number } | null>(null);
   const [feat, setFeat] = useState<number | null>(null);
+  // the side the open card slid in from, after a swipe (0: it was flown to)
+  const [featEnter, setFeatEnter] = useState<1 | -1 | 0>(0);
   const [flipped, setFlipped] = useState(false);
   const [compose, setCompose] = useState(false);
   // whose core we're in (null: yours), and their tile if they're on the globe
@@ -507,6 +510,7 @@ function Globe({
       setCoreFor(null);
       setFocus(null);
       setFlipped(false);
+      setFeatEnter(0);
       closePanel();
     },
     [closePanel],
@@ -562,32 +566,78 @@ function Globe({
     closePanel();
   }, [closePanel]);
 
+  // get a card's full-size cover and its likes coming now, while the camera
+  // moves, so the card opens complete
+  const warmCard = useCallback(
+    (post: Post | null | undefined) => {
+      if (!post) return;
+      prefetchReactions(api, post.id);
+      const big = coverAt(post.artwork_url, live.current.L.cover);
+      if (big) {
+        const im = new Image();
+        im.src = big;
+        im.decode?.().catch(() => {});
+        held.cover = im; // held, so the browser keeps it ready for the card
+      }
+    },
+    [api],
+  );
+
   const pick = useCallback(
     (k: number, wait: boolean) => {
       if (m.current.moved) return;
       if (k === ME && wait) openCompose();
       else if (wait) spinTo(k);
       else {
-        // get the card's full-size cover and its likes coming now, while the
-        // camera flies, so the card opens complete
-        const post = k === ME ? myPost : live.current.friends[k]?.post;
-        if (post) {
-          prefetchReactions(api, post.id);
-          const big = coverAt(post.artwork_url, live.current.L.cover);
-          if (big) {
-            const im = new Image();
-            im.src = big;
-            im.decode?.().catch(() => {});
-            held.cover = im; // held, so the browser keeps it ready for the card
-          }
-        }
+        warmCard(k === ME ? myPost : live.current.friends[k]?.post);
         // it dips into the water first, then the camera flies in
         sim.current.dip(k);
         setTimeout(() => fly(k), 220);
       }
     },
-    [fly, openCompose, spinTo, api, myPost],
+    [fly, openCompose, spinTo, warmCard, myPost],
   );
+
+  // Swiping an open song sideways: the next song someone posted (or the one
+  // before), round and round. Its sample starts straight away, while the
+  // finger's still on the glass (phones only let sound start from a touch),
+  // and the Globe turns under the card to it while the old card slides off.
+  const swapping = useRef(false);
+  const swipeFeat = useCallback(
+    (dir: 1 | -1) => {
+      const s = m.current;
+      if (feat === null || !s.featOpen || swapping.current) return false;
+      const order = [...friends.flatMap((f, i) => (f.post && !f.hidden ? [i] : [])), ...(myPost && landed ? [ME] : [])];
+      const i = order.indexOf(feat);
+      if (i < 0 || order.length < 2) return false;
+      const k = order[(i + dir + order.length) % order.length];
+      const post = k === ME ? myPost : friends[k]?.post;
+      if (!post) return false;
+      if (post.preview_url) pv.play(`song-${post.id}`, post.preview_url, undefined, post);
+      else pv.stop();
+      warmCard(post);
+      swapping.current = true;
+      s.vel = 0;
+      s.target = aim(sim.current.pos(k), s.yaw, true);
+      s.lens = k;
+      s.swing = true;
+      setTimeout(() => {
+        swapping.current = false;
+        if (!m.current.featOpen) return;
+        setFlipped(false);
+        setFeatEnter(dir);
+        setFeat(k);
+      }, 200);
+      return true;
+    },
+    [feat, friends, myPost, landed, pv, warmCard],
+  );
+  // Swiping it up: pushed back into the Globe, with a splash
+  const pushFeat = useCallback(() => {
+    const k = m.current.lens;
+    closeFeat();
+    if (k !== null) setTimeout(() => sim.current.dip(k), 280);
+  }, [closeFeat]);
 
   // Load the archive of whoever's core we're flying into.
   const coreWho = coreFor?.who ?? null;
@@ -789,7 +839,10 @@ function Globe({
           const f = ease(s.pendingCore ? 0.04 : 0.1, dt); // rising over a core: unhurried
           s.yaw += dy * f;
           s.pitch += dp * f;
-        } else if (s.featFly === null && s.launch === null) s.target = null; // arrived: let the spin carry on
+        } else if (s.featFly === null && s.launch === null) {
+          s.target = null; // arrived: let the spin carry on
+          s.swing = false;
+        }
       } else if (!s.drag && !s.pinch) {
         s.vel += ((0.14 * dt) / Math.sqrt(Math.max(1, s.zoom)) - s.vel) * ease(0.05, dt);
         s.yaw += s.vel * (Math.cos(s.pitch) < 0 ? -1 : 1);
@@ -1642,6 +1695,9 @@ function Globe({
           flipped={flipped}
           onFlip={() => setFlipped((f) => !f)}
           onClose={closeFeat}
+          onPush={pushFeat}
+          onSwipe={swipeFeat}
+          enter={featEnter}
           onCore={() => openCore(feat === ME ? null : feat)}
           api={api}
           onBlocked={() => window.location.reload()}
@@ -1760,10 +1816,12 @@ sim: TileSim,
   s.cam = cam;
   // the tilt leaves a centred tile leaning; roll the camera so the song lands upright
   if (s.lens !== null) {
-    if (!s.featOn) {
+    if (!s.featOn || s.swing) {
       const { lat, lon } = latLon(sim.pos(s.lens));
       const e = camV([Math.sin(lat) * Math.sin(lon), Math.cos(lat), Math.sin(lat) * Math.cos(lon)], cam, true);
-      s.rollHold = Math.atan2(e[0], e[1]);
+      const goal = Math.atan2(e[0], e[1]);
+      // turning to the next song under an open card: ease round, no snap
+      s.rollHold = s.swing ? s.rollHold + wrapPi(goal - s.rollHold) * 0.12 : goal;
     }
     cam.roll = s.rollHold * lensP;
   }

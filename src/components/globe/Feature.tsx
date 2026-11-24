@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { formatTime } from "@/lib/day";
 import type { Post, Profile } from "@/lib/types";
 import { SignalCore } from "./SignalCore";
@@ -20,6 +20,9 @@ import { RedoButton, Singularity } from "./Redo";
 // a place to report the song or block them. Beside the title: like it, and
 // the notes people left. On your own song today, the arrows on the cover's
 // bottom left are your one redo (Redo.tsx).
+// Swipe the card up and it's pushed back down into the Globe; swipe it left
+// or right and it slides away for the next (or last) song someone posted,
+// which starts playing as it comes in. Arrow keys do the same on a computer.
 export function Feature({
   post,
   me,
@@ -32,6 +35,9 @@ export function Feature({
   flipped,
   onFlip,
   onClose,
+  onPush,
+  onSwipe,
+  enter = 0,
   onCore,
   api,
   onBlocked,
@@ -55,6 +61,13 @@ export function Feature({
   flipped: boolean;
   onFlip(): void;
   onClose(): void;
+  // swiped up: back into the Globe
+  onPush?: () => void;
+  // swiped sideways: 1 for the next song, -1 for the one before. False when
+  // there's no other song to go to.
+  onSwipe?: (dir: 1 | -1) => boolean;
+  // which side this card came in from, after a swipe (1: from the right)
+  enter?: 1 | -1 | 0;
   onCore(): void;
   api: GlobeApi;
   onBlocked(): void;
@@ -170,7 +183,7 @@ export function Feature({
   const hint = useRef<Animation | null>(null);
   useEffect(() => {
     const el = spinner.current;
-    if (!el || !el.animate) return;
+    if (!el || !el.animate || enter) return; // swiping through songs: no toss each time
     const keys: Toss = [
       [0, 0, 0, 0, 0, ROCK], // floating
       [250, 1, -5, 2.5, -2.5, ROCK],
@@ -182,7 +195,7 @@ export function Feature({
     const a = play(el, keys, 250);
     hint.current = a;
     return () => a.cancel();
-  }, []);
+  }, [enter]);
   // a tap tosses it over the same way (from wherever it is now); the ⋯ menu
   // ends whatever's playing
   const tapCover = () => {
@@ -220,8 +233,144 @@ export function Feature({
     } else onRedone?.();
   };
 
+  // ---- swiping ----
+  const cardEl = useRef<HTMLDivElement | null>(null);
+  const setCard = useCallback(
+    (el: HTMLDivElement | null) => {
+      cardEl.current = el;
+      if (typeof cardRef === "function") cardRef(el);
+    },
+    [cardRef],
+  );
+  // the card's pivot: the middle of the cover, so it shrinks into its own spot
+  const origin = `${cover / 2}px ${42 + cover / 2}px`;
+  // after a swipe: slide in from that side
+  useLayoutEffect(() => {
+    const el = cardEl.current;
+    if (!enter || !el?.animate) return;
+    el.animate(
+      [
+        { transform: `translateX(${enter * Math.min(window.innerWidth, 520) * 0.7}px) rotate(${enter * 7}deg)`, opacity: 0 },
+        { transform: "none", opacity: 1 },
+      ],
+      { duration: 420, easing: "cubic-bezier(.2,.8,.25,1)" },
+    );
+  }, [enter]);
+  type Drag = { id: number; x0: number; y0: number; dx: number; dy: number; axis: "x" | "y" | null; vx: number; vy: number; lx: number; ly: number; lt: number };
+  const drag = useRef<Drag | null>(null);
+  const dragged = useRef(false); // eats the tap that ends a swipe
+  const gone = useRef(false); // on its way out: no more swiping
+  const still = flagging || sinking > 0 || notesOpen || likesOpen || !!sharing;
+  const sway = (d: Drag) => {
+    if (d.axis === "x") {
+      const x = onSwipe ? d.dx : d.dx * 0.3; // nothing to swipe to: it only gives a little
+      return `translateX(${x}px) rotate(${x * 0.035}deg)`;
+    }
+    // up, it lifts away and gets smaller; down, it barely moves
+    return d.dy < 0 ? `translateY(${d.dy}px) scale(${Math.max(0.7, 1 + d.dy / 1400)})` : `translateY(${d.dy * 0.2}px)`;
+  };
+  const settle = (from: string) => {
+    const el = cardEl.current;
+    if (!el) return;
+    el.style.transform = "";
+    el.animate?.([{ transform: from }, { transform: "none" }], { duration: 420, easing: "cubic-bezier(.3,1.35,.5,1)" });
+  };
+  // off it goes: sideways to the next song, or up and back into the Globe
+  const leave = (to: string, ms: number, easing: string) => {
+    const el = cardEl.current;
+    gone.current = true;
+    hint.current?.cancel();
+    if (!el?.animate) return;
+    const from = el.style.transform || "none";
+    el.style.transform = "";
+    el.animate([{ transform: from, opacity: 1 }, { transform: to, opacity: 0 }], { duration: ms, easing, fill: "forwards" });
+  };
+  const swipe = (dir: 1 | -1) => {
+    if (gone.current || !onSwipe || !onSwipe(dir)) return false;
+    const w = Math.min(window.innerWidth, 520);
+    leave(`translateX(${-dir * w * 1.05}px) rotate(${-dir * 12}deg)`, 240, "cubic-bezier(.4,0,.8,.6)");
+    return true;
+  };
+  const push = () => {
+    if (gone.current || !onPush) return;
+    leave("translateY(10px) scale(0.18)", 380, "cubic-bezier(.5,0,.75,.4)");
+    onPush();
+  };
+  const down = (e: React.PointerEvent) => {
+    dragged.current = false;
+    if (still || gone.current || e.button > 0 || drag.current) return;
+    drag.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, axis: null, vx: 0, vy: 0, lx: e.clientX, ly: e.clientY, lt: e.timeStamp };
+  };
+  const move = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    d.dx = e.clientX - d.x0;
+    d.dy = e.clientY - d.y0;
+    const dt = Math.max(1, e.timeStamp - d.lt);
+    d.vx = 0.6 * d.vx + 0.4 * ((e.clientX - d.lx) / dt);
+    d.vy = 0.6 * d.vy + 0.4 * ((e.clientY - d.ly) / dt);
+    d.lx = e.clientX;
+    d.ly = e.clientY;
+    d.lt = e.timeStamp;
+    if (!d.axis) {
+      if (Math.hypot(d.dx, d.dy) < 10) return;
+      d.axis = Math.abs(d.dx) > Math.abs(d.dy) ? "x" : "y";
+      dragged.current = true;
+      hint.current?.cancel();
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {}
+    }
+    if (cardEl.current) cardEl.current.style.transform = sway(d);
+  };
+  const up = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    drag.current = null;
+    if (!d.axis) return;
+    const from = sway(d);
+    const w = Math.min(window.innerWidth, 520);
+    if (e.type !== "pointercancel") {
+      if (d.axis === "x" && (Math.abs(d.dx) > w * 0.22 || (Math.abs(d.vx) > 0.45 && Math.abs(d.dx) > 30))) {
+        if (swipe(d.dx < 0 ? 1 : -1)) return;
+      }
+      if (d.axis === "y" && onPush && (d.dy < -90 || (d.vy < -0.45 && d.dy < -30))) return push();
+    }
+    settle(from);
+  };
+  const now = useRef({ swipe, push, still });
+  useLayoutEffect(() => {
+    now.current = { swipe, push, still };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = now.current;
+      if (k.still || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowRight") k.swipe(1);
+      else if (e.key === "ArrowLeft") k.swipe(-1);
+      else if (e.key === "ArrowUp") k.push();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
-    <div ref={rootRef} className="fixed inset-0 z-[480]">
+    <div
+      ref={rootRef}
+      className="fixed inset-0 z-[480]"
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onClickCapture={(e) => {
+        if (!dragged.current) return;
+        dragged.current = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+    >
       <div
         ref={backdropRef}
         className="absolute inset-0"
@@ -231,9 +380,13 @@ export function Feature({
         type="button"
         onClick={onClose}
         aria-label="Back to the globe"
-        className="absolute inset-0 cursor-default"
+        className="absolute inset-0 cursor-default touch-none"
       />
-      <div ref={cardRef} className="absolute flex flex-col gap-3.5" style={{ left, top: top - lift, width: cover, opacity: 0 }}>
+      <div
+        ref={setCard}
+        className={`absolute flex flex-col gap-3.5 ${still ? "" : "touch-none"}`}
+        style={{ left, top: top - lift, width: cover, opacity: 0, transformOrigin: origin }}
+      >
         <div
           aria-hidden
           className={`absolute -inset-x-3.5 -bottom-4 -top-2 rounded-[30px] border border-white/50 backdrop-blur-none ${dark ? "bg-white/95" : "bg-white/90"}`}
