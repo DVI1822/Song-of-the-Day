@@ -231,6 +231,35 @@ async function postedFrom() {
   return (where ? `${city}, ${where}` : city).slice(0, 80);
 }
 
+// Add a photo to today's song after it's posted, swap it, or take it off.
+// This isn't a redo: the song stays, only its photo changes. The database
+// only lets you change the photo on your own song from today.
+export async function setPostPhoto(postId: string, photoUrl: string | null): Promise<{ error?: string }> {
+  const { supabase, userId } = await getSession();
+  if (!userId) redirect("/login");
+  const photoBase = `${supabaseUrl}/storage/v1/object/public/photos/${userId}/`;
+  if (photoUrl && !photoUrl.startsWith(photoBase)) return { error: "That photo isn't yours." };
+  const { data: post } = await supabase
+    .from("posts")
+    .select("photo_url")
+    .eq("id", postId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!post) return { error: "Couldn't find your song." };
+  const { data: saved, error } = await supabase
+    .from("posts")
+    .update({ photo_url: photoUrl })
+    .eq("id", postId)
+    .select("id");
+  if (error || !saved?.length) return { error: "You can only change the photo on today's song." };
+  // the photo it had before goes now
+  const old = post.photo_url?.split("/photos/").pop();
+  if (old && old !== photoUrl?.split("/photos/").pop() && old.startsWith(`${userId}/`))
+    await supabase.storage.from("photos").remove([old]);
+  revalidatePath("/", "layout");
+  return {};
+}
+
 // Take back today's song so you can post another. One redo per day; the
 // database refuses a second one.
 export async function deleteTodayPost(postId: string): Promise<FormState> {

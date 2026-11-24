@@ -222,6 +222,9 @@ const demoApi: GlobeApi = {
   async deleteTodayPost() {
     return undefined;
   },
+  async setPostPhoto() {
+    return {};
+  },
   async searchPeople(q) {
     const term = q.trim().replace(/^@/, "").toLowerCase();
     return POOL.map((name, j) => ({ ...profile(100 + j, name), following: false })).filter(
