@@ -323,7 +323,7 @@ body {
 /* glass buttons, tabs, panels and cards become paper with a wobbly ink edge
    (nothing blurs any more: re-blurring the moving scenery every frame was too
    slow on phones) */
-[data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0):not([data-frost]) {
+[data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0) {
   background: var(--paper) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -331,7 +331,7 @@ body {
   box-shadow: 2px 3px 0 rgba(29, 36, 51, 0.18) !important;
   color: var(--ink) !important;
 }
-[data-ink] [style*="backdrop-filter"]:not(.inset-0):not([data-frost]):not(.overflow-y-auto) { overflow: visible !important; }
+[data-ink] [style*="backdrop-filter"]:not(.inset-0):not(.overflow-y-auto) { overflow: visible !important; }
 [data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0):not(.absolute):not(.fixed) { position: relative; }
 [data-ink] :is([style*="backdrop-filter"], [class*="backdrop-blur"]):not(.inset-0)::after {
   content: "";

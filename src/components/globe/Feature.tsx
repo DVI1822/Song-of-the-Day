@@ -225,7 +225,7 @@ export function Feature({
       <div
         ref={backdropRef}
         className="absolute inset-0"
-        style={{ opacity: 0, background: "rgba(251,248,240,0.22)" }}
+        style={{ opacity: 0 }}
       />
       <button
         type="button"
