@@ -71,7 +71,11 @@ export function CoreView({
   const [tab, setTab] = useState<Tab>(startTab);
   const onTabRef = useRef(onTab);
   useEffect(() => void (onTabRef.current = onTab));
-  useEffect(() => onTabRef.current?.(tab), [tab]);
+  // braces: an effect may only return a clean-up function, and onTab's
+  // value (false on Taste) became one, crashing the next tab switch
+  useEffect(() => {
+    onTabRef.current?.(tab);
+  }, [tab]);
   // the rest of the core, fetched as you arrive: picks, feels, people, taste
   const id = profile?.id ?? null;
   const [shown, setShown] = useState(id);
