@@ -18,7 +18,7 @@ import { NotifyCard } from "./Notify";
 import { LocateCard } from "./Locate";
 import { SceneWheel, SCENE_EVENT } from "./SceneWheel";
 import { CoreInside } from "./CoreInside";
-import { CoreView } from "./CoreView";
+import { CoreView, type CoreTab } from "./CoreView";
 import { Feature } from "./Feature";
 import { type CoreLook, drift, useCoreLook } from "./coreLook";
 import { skyNow } from "./storyVideo";
@@ -31,7 +31,7 @@ import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
-import { FriendsTab } from "./Panels";
+import { FriendsTab, GlobeTab } from "./Panels";
 import { InviteButton } from "./Invite";
 import { BoardTab, Leaderboard } from "./Ranks";
 import { NewsCard } from "./News";
@@ -94,30 +94,45 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 // an angle brought into -π..π
 const wrapPi = (a: number) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 
-// When you last looked at who added you, so the My friends tab can show a
-// badge for anyone new. Kept on this device only.
-const SEEN_KEY = "sotd-added-seen";
-const seenListeners = new Set<() => void>();
-const seenStore = {
-  subscribe(f: () => void) {
-    seenListeners.add(f);
-    return () => void seenListeners.delete(f);
-  },
-  get() {
-    try {
-      return localStorage.getItem(SEEN_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  },
-  server: () => "~", // sorts after every date: no badge until we're in the browser
-  set(at: string) {
-    try {
-      localStorage.setItem(SEEN_KEY, at);
-    } catch {}
-    seenListeners.forEach((f) => f());
-  },
-};
+// When you last looked, so a tab can show a badge for anything new. One for
+// the people side (who added you, added you back, likes and notes on your
+// song: My Core's People tab) and one for new songs (the Globe tab). Kept on
+// this device only.
+function makeSeen(key: string) {
+  const listeners = new Set<() => void>();
+  return {
+    subscribe(f: () => void) {
+      listeners.add(f);
+      return () => void listeners.delete(f);
+    },
+    get() {
+      try {
+        return localStorage.getItem(key) ?? "";
+      } catch {
+        return "";
+      }
+    },
+    server: () => "~", // sorts after every date: no badge until we're in the browser
+    set(at: string) {
+      try {
+        localStorage.setItem(key, at);
+      } catch {}
+      listeners.forEach((f) => f());
+    },
+  };
+}
+const seenStore = makeSeen("sotd-added-seen");
+const songsSeenStore = makeSeen("sotd-songs-seen");
+
+// the red number on a side tab
+const Badge = ({ n }: { n: number }) => (
+  <span
+    aria-label={`${n} new`}
+    className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
+  >
+    {n}
+  </span>
+);
 
 // how long a new song takes to fall in, and when you last had the Globe open
 const FALL = 0.85,
@@ -276,9 +291,20 @@ function Globe({
   const [seenBefore, setSeenBefore] = useState(seenAt);
   const afterFeat = useRef<(() => void) | null>(null); // runs once the song view has closed
   const fresh = (at: string | null | undefined) => Boolean(at) && Date.parse(at!) > seenAt;
-  const newCount =
+  // the Globe tab counts new songs; My Core counts the people side
+  const songsSeen = useSyncExternalStore(songsSeenStore.subscribe, songsSeenStore.get, songsSeenStore.server);
+  const songsSeenAt = songsSeen === "~" ? Infinity : Date.parse(songsSeen) || 0;
+  const [songsSeenBefore, setSongsSeenBefore] = useState(songsSeenAt);
+  const newSongs = friends.filter((f) => !f.hidden && Boolean(f.post) && Date.parse(f.post!.created_at) > songsSeenAt).length;
+  const newPeople =
+    addedMe.length +
     activity.filter((a) => fresh(a.at)).length +
-    friends.filter((f) => fresh(f.followed_back_at) || (!f.hidden && fresh(f.post?.created_at))).length;
+    friends.filter((f) => fresh(f.followed_back_at)).length;
+  const [coreStart, setCoreStart] = useState<CoreTab>("taste");
+  const seePeople = () => {
+    setSeenBefore(seenAt);
+    seenStore.set(new Date().toISOString());
+  };
   const [myPost, setMyPost] = useState(initialPost);
   const [mySongs, setMySongs] = useState(initialSongs);
   const [redoUsed, setRedoUsed] = useState(initialRedo);
@@ -1195,6 +1221,12 @@ function Globe({
     return null;
   };
 
+  // My Core opens on People when someone added you or liked your song
+  const openMyCore = () => {
+    setCoreStart(newPeople > 0 ? "people" : "taste");
+    openCore(null);
+  };
+
   const openTab = (name: PanelName) => {
     if (panel === name && panelOn) return closePanel();
     showTab(name);
@@ -1203,8 +1235,8 @@ function Globe({
     setChatOn(false);
     setBoardOn(false);
     if (name === "friends") {
-      setSeenBefore(seenAt);
-      seenStore.set(new Date().toISOString());
+      setSongsSeenBefore(songsSeenAt);
+      songsSeenStore.set(new Date().toISOString());
     }
     setPanel(name);
     setPanelOn(true);
@@ -1512,7 +1544,7 @@ function Globe({
       <div ref={(el) => void (R.current.chrome[2] = el)} className="absolute left-0 z-[430] flex flex-col gap-2" style={{ top: tabTop }}>
         {(
           [
-            ["friends", "Friends", 104],
+            ["friends", "Globe", 104],
           ] as const
         ).map(([name, label, height]) => (
           <PullTab
@@ -1541,29 +1573,23 @@ function Globe({
             className="relative box-border flex w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0 transition-shadow"
             style={{ height, ...glass(darkOn), ...activeTab(name) }}
           >
-            <TabIcon name={name} />
-            {(name === "friends" ? newCount + addedMe.length : 0) > 0 && (
-              <span
-                aria-label={`${newCount + addedMe.length} new`}
-                className="absolute right-[3px] top-[6px] flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold leading-none text-white"
-              >
-                {newCount + addedMe.length}
-              </span>
-            )}
+            <TabIcon name="globe" />
+            {newSongs > 0 && <Badge n={newSongs} />}
             <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
               {label}
             </span>
           </PullTab>
         ))}
         <PullTab
-          pull={{ side: "left", open: false, travel: 70, onOpen: () => openCore(null) }}
-          onClick={() => openCore(null)}
+          pull={{ side: "left", open: false, travel: 70, onOpen: openMyCore }}
+          onClick={openMyCore}
           aria-label="My Core: your songs and profile"
-          className="box-border flex h-[104px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
-          // under Chat, which sits between Friends and here
+          className="relative box-border flex h-[104px] w-[38px] flex-col items-center justify-center gap-2 rounded-r-[18px] !border-l-0"
+          // under Chat, which sits between Globe and here
           style={{ ...glass(darkOn), marginTop: 104 }}
         >
           <SignalCore className="h-4 w-4 drop-shadow-[0_1px_4px_rgba(60,90,110,0.45)]" />
+          {newPeople > 0 && <Badge n={newPeople} />}
           <span className="rotate-180 whitespace-nowrap text-[11px] font-semibold tracking-[0.06em] [writing-mode:vertical-rl]">
             My Core
           </span>
@@ -1590,7 +1616,7 @@ function Globe({
         >
           <div className="flex items-center py-1.5 pl-[18px] pr-1.5 pt-3">
             <h2 className="display text-lg">
-              Friends
+              Globe
             </h2>
             <span className="ml-3">
               <InviteButton username={me.username} />
@@ -1600,25 +1626,12 @@ function Globe({
             </button>
           </div>
           {panel === "friends" && (
-            <FriendsTab
-              api={api}
-              me={me}
-              friends={friends}
-              addedMe={addedMe}
-              activity={activity}
-              onMine={() => myPost && landed && fly(ME)}
-              seenBefore={seenBefore}
-              onShow={(f) => setHidden(f, false)}
-              onOpen={fly}
-              onAddBack={onAddBack}
-              onFollowed={onFollowed}
-              onCore={(p) => openCore(null, p)}
-            />
+            <GlobeTab friends={friends} seenBefore={songsSeenBefore} onOpen={fly} onCore={(p) => openCore(null, p)} />
           )}
         </PanelSwipe>
       )}
 
-      {/* the chat, pulled out from the left between Friends and My Core */}
+      {/* the chat, pulled out from the left between Globe and My Core */}
       <Chat
         api={api}
         me={me}
@@ -1770,6 +1783,27 @@ function Globe({
           onCenter={setCoreCenter}
           onPerson={(p) => openCore(null, p)}
           globe={coreWho ? undefined : { people: friends.length, posted: friends.filter((f) => f.post).length }}
+          startTab={coreWho ? "taste" : coreStart}
+          onTab={(t) => t === "people" && !coreWho && seePeople()}
+          friendsPane={
+            coreWho ? undefined : (
+              <FriendsTab
+                inline
+                api={api}
+                me={me}
+                friends={friends}
+                addedMe={addedMe}
+                activity={activity}
+                onMine={() => myPost && landed && fly(ME)}
+                seenBefore={seenBefore}
+                onShow={(f) => setHidden(f, false)}
+                onOpen={fly}
+                onAddBack={onAddBack}
+                onFollowed={onFollowed}
+                onCore={(p) => openCore(null, p)}
+              />
+            )
+          }
           rootRef={(el) => void (R.current.prof = el)}
           sheetRef={(el) => void (R.current.profSheet = el)}
         />

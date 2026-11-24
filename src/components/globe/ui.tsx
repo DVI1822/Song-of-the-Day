@@ -118,8 +118,16 @@ export function Face({
 }
 
 // The left tabs' icons (GlobeApp), also drawn in the key.
-export function TabIcon({ name }: { name: "friends" | "find" | "songs" }) {
+export function TabIcon({ name }: { name: "friends" | "find" | "songs" | "globe" }) {
   const p = { "aria-hidden": true, width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8 };
+  if (name === "globe")
+    return (
+      <svg {...p}>
+        <circle cx="12" cy="12" r="8.5" />
+        <ellipse cx="12" cy="12" rx="3.8" ry="8.5" />
+        <path d="M3.8 9.5h16.4M3.8 14.5h16.4" />
+      </svg>
+    );
   if (name === "friends")
     return (
       <svg {...p}>

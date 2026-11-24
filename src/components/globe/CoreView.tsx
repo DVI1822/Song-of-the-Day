@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { addDays, initials, streak, todayIn } from "@/lib/day";
 import type { CoreExtras, Post, Profile, SavedSong, Taste } from "@/lib/types";
 import type { GlobeApi } from "./api";
@@ -10,7 +10,8 @@ import { PeoplePane, Shelf, SongsPane, Tabs, TastePane } from "./CoreTabs";
 import { Safety } from "./Safety";
 import { CloseIcon, glass, glassThin } from "./ui";
 
-type Tab = "taste" | "songs" | "people";
+export type CoreTab = "taste" | "songs" | "people";
+type Tab = CoreTab;
 const TABS: [Tab, string][] = [
   ["taste", "Taste"],
   ["songs", "Songs"],
@@ -39,6 +40,9 @@ export function CoreView({
   onCenter,
   onPerson,
   globe,
+  friendsPane,
+  startTab = "taste",
+  onTab,
 }: {
   profile: Profile | null;
   posts: Post[] | null; // null while loading
@@ -58,10 +62,16 @@ export function CoreView({
   onCenter?: (y: number) => void; // where the picture sits, for the core's rings to circle
   onPerson?: (p: Profile) => void; // fly into someone else's core
   globe?: { people: number; posted: number }; // your own globe, as it is right now
+  friendsPane?: ReactNode; // your own core: everyone on your globe, who added you, finding friends
+  startTab?: Tab;
+  onTab?: (t: Tab) => void;
 }) {
   const [flagging, setFlagging] = useState(false);
   const [full, setFull] = useState(false);
-  const [tab, setTab] = useState<Tab>("taste");
+  const [tab, setTab] = useState<Tab>(startTab);
+  const onTabRef = useRef(onTab);
+  useEffect(() => void (onTabRef.current = onTab));
+  useEffect(() => onTabRef.current?.(tab), [tab]);
   // the rest of the core, fetched as you arrive: picks, feels, people, taste
   const id = profile?.id ?? null;
   const [shown, setShown] = useState(id);
@@ -334,6 +344,7 @@ export function CoreView({
             ) : (
               <p className="text-sm text-muted">Loading…</p>
             ))}
+          {tab === "people" && mine && friendsPane}
           {tab === "people" && (
             <PeoplePane
               extras={extras}

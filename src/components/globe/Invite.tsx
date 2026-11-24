@@ -8,7 +8,7 @@ import type { Friend, Profile } from "@/lib/types";
 import { Face } from "./ui";
 import type { GlobeApi } from "./api";
 
-// Invites. InviteButton sits beside the Friends header: one tap opens the
+// Invites. InviteButton sits beside the Globe header (and in My Core, People): one tap opens the
 // share sheet with your link (or copies it where there's no share sheet).
 // InviteCard, lower in the tab, lets you pick contacts (where the phone allows
 // it) and splits them into who's already here and who to invite. Browsers only
