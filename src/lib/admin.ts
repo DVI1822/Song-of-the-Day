@@ -14,9 +14,13 @@ export const ADMIN_TZ = process.env.ADMIN_TZ || "America/Denver";
 
 export function adminEmails(): string[] {
   return (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
+    .split(/[,;\s]+/)
+    .map((s) => s.replace(/^["'<]+|[">']+$/g, "").trim().toLowerCase())
     .filter(Boolean);
+}
+
+export function isAdminEmail(email: unknown): boolean {
+  return typeof email === "string" && adminEmails().includes(email.trim().toLowerCase());
 }
 
 function admin(): SupabaseClient | null {
