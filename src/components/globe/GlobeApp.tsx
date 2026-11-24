@@ -1110,6 +1110,22 @@ function Globe({
     const r = await api.deleteTodayPost(post.id);
     return r?.error;
   };
+  // A photo on today's song after it's posted (or a new one, or none): the
+  // song stays, so it doesn't use the redo.
+  const canPhoto = !!api.setPostPhoto && !launching && !!myPost && myPost.day === todayIn(me.timezone);
+  const onPhoto = async (post: Post, file: File | null) => {
+    let url: string | null = null;
+    if (file) {
+      const up = await api.uploadPhoto(me.id, await shrinkPhoto(file));
+      if (!up.url) return "Couldn't upload the photo. Try again.";
+      url = up.url;
+    }
+    const r = await api.setPostPhoto!(post.id, url);
+    if (r.error) return r.error;
+    const next = { ...post, photo_url: url };
+    setMyPost((p) => (p?.id === post.id ? next : p));
+    setMySongs((list) => list.map((p) => (p.id === post.id ? next : p)));
+  };
   const onRedone = (post: Post) => {
     setRedoUsed(true);
     afterFeat.current = () => {
@@ -1704,6 +1720,7 @@ function Globe({
           onHide={feat !== ME && friends[feat] ? () => setHidden(friends[feat], true) : undefined}
           onRedo={feat === ME && canRedo ? () => onRedo(featPost) : undefined}
           onRedone={() => onRedone(featPost)}
+          onPhoto={feat === ME && canPhoto ? (file) => onPhoto(featPost, file) : undefined}
           crown={
             feat !== ME && myPost && landed && api.ranks
               ? { on: myPick === featPost.id, set: (on: boolean) => choose(on ? featPost.id : null) }

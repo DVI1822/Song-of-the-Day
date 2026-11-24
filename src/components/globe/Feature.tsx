@@ -14,6 +14,7 @@ import { LikesSheet, NotesSheet, ReactionButtons, useReactions } from "./Reactio
 import { MoreIcon, Safety } from "./Safety";
 import { Cover, CloseIcon } from "./ui";
 import { RedoButton, Singularity } from "./Redo";
+import { PhotoButton } from "./PostPhoto";
 
 // A song, big, after the camera flies to it. Tap the cover to flip it over
 // for the comment and photo. On someone else's song, ⋯ turns the cover into
@@ -44,6 +45,7 @@ export function Feature({
   onHide,
   onRedo,
   onRedone,
+  onPhoto,
   crown,
   story,
   rootRef,
@@ -75,6 +77,8 @@ export function Feature({
   // only on your own song, today, while you still have the redo
   onRedo?: () => Promise<string | undefined>;
   onRedone?: () => void;
+  // only on your own song, today: add, swap or take off its photo (no redo used)
+  onPhoto?: (file: File | null) => Promise<string | undefined>;
   // the TopTrack crown, on a friend's song once you've posted (Ranks.tsx): a
   // fourth button in the row, and the coloured crown on top of the cover
   crown?: { on: boolean; set(on: boolean): Promise<string | null> };
@@ -524,6 +528,9 @@ export function Feature({
           <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
           {/* your one redo today, on the bottom left */}
           {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
+          {!flagging && !sinking && onPhoto && (
+            <PhotoButton has={!!post.photo_url} flipped={flipped} onPhoto={onPhoto} onAdded={tapCover} />
+          )}
         </div>
         {/* "Added to core", a moment over the bottom of the cover */}
         {toast > 0 && (

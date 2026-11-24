@@ -4,6 +4,7 @@ import {
   blockUser,
   createPost,
   deleteTodayPost,
+  setPostPhoto,
   follow,
   hideSongs,
   loadCore,
@@ -35,6 +36,8 @@ export type GlobeApi = {
   uploadPhoto(userId: string, photo: Blob): Promise<{ url?: string; error?: string }>;
   createPost(input: NewPost): Promise<{ post?: Post; error?: string }>;
   deleteTodayPost(postId: string): Promise<{ error?: string } | undefined>;
+  // add, swap or take off the photo on today's song, after it's posted
+  setPostPhoto?(postId: string, photoUrl: string | null): Promise<{ error?: string }>;
   searchPeople(q: string): Promise<(Profile & { following: boolean })[]>;
   follow(profileId: string): Promise<{ friend?: Friend; error?: string }>;
   matchContacts(emails: string[]): Promise<ContactMatch[]>;
@@ -208,6 +211,7 @@ export const serverApi: GlobeApi = {
   previewSong,
   createPost,
   deleteTodayPost,
+  setPostPhoto,
   searchPeople,
   follow,
   matchContacts,
