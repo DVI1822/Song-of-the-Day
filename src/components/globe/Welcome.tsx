@@ -45,7 +45,7 @@ export function Welcome({ api, onClose, onApp, onKey }: { api: GlobeApi; onClose
       <div
         role="dialog"
         aria-label="Welcome to TopTrack"
-        className="rise-in relative flex w-full max-w-[380px] flex-col gap-3.5 text-center rounded-[28px] border border-white/60 bg-white/[0.94] p-6 text-card-ink backdrop-blur-2xl"
+        className="rise-in relative flex w-full max-w-[380px] flex-col gap-3.5 text-center rounded-[28px] border border-white/60 bg-white/[0.94] p-6 text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.55)" }}
       >
         <h2 className="display text-[26px] leading-tight">TopTrack</h2>

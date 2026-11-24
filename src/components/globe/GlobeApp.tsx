@@ -9,7 +9,6 @@ import { WeatherSky, clockNow, seasonOverride, tempOverride, override as weather
 import { skyAt, weatherSky, type SkyLook } from "./sky";
 import { Shuffle } from "./Shuffle";
 import { Scene, seasonAt, type Look, type Season } from "./scene";
-import { frostTexture } from "./textures";
 import { Compose } from "./Compose";
 import { Chat } from "./Chat";
 import { HelpButton, Welcome, enablePush, useWelcomeSeen } from "./Welcome";
@@ -89,7 +88,6 @@ type TileEls = {
   face: HTMLButtonElement | null; // the cover's facets, hidden round the far side
   facets: (HTMLDivElement | null)[];
   shades: (HTMLDivElement | null)[];
-  coats: (HTMLDivElement | null)[]; // frost on the cover
 };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -242,7 +240,6 @@ function newEls() {
     beam: null as HTMLCanvasElement | null,
     ripples: null as HTMLCanvasElement | null,
     inkGlobe: null as HTMLCanvasElement | null,
-    frost: null as HTMLDivElement | null,
     sigCore: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
@@ -880,6 +877,7 @@ function Globe({
         w.scene.step(dt, w.weather, {
           zoom: s.zoom,
           show,
+          off: !!setting.current.doodle?.on,
           w: Lw.w,
           h: Lw.h,
           cx: Lw.cx,
@@ -1331,14 +1329,6 @@ function Globe({
         <div ref={(el) => void (R.current.doodle = el)} className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden" />
         <canvas ref={(el) => void (R.current.wxBack = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div ref={(el) => void (R.current.sunShadow = el)} className="pointer-events-none absolute rounded-full" />
-        {/* the drawn look: the ball frosts what's behind it, so the songs read
-            clearly over the scenery */}
-        <div
-          ref={(el) => void (R.current.frost = el)}
-          data-frost=""
-          className="pointer-events-none absolute rounded-full"
-          style={{ left: L.cx - L.R - 8, top: L.cy - L.R - 8, width: 2 * (L.R + 8), height: 2 * (L.R + 8), opacity: 0 }}
-        />
         <div
           ref={(el) => void (R.current.sphere = el)}
           className="pointer-events-none absolute rounded-full"
@@ -1916,15 +1906,6 @@ sim: TileSim,
         }
         const sh = te.shades[i];
         if (sh) put(sh, "background", layers + amb);
-        // frost rims the covers in winter and when it's freezing; the sun melts it back
-        const coat = te.coats[i];
-        if (coat) {
-          if (lk.frost > 0.01 && !coat.dataset.k) {
-            coat.dataset.k = "frost";
-            put(coat, "backgroundImage", `url(${frostTexture()})`);
-          }
-          put(coat, "opacity", (lk.frost > 0.01 ? lk.frost * (0.95 - 0.5 * Math.max(0, lit) * day) : 0).toFixed(3));
-        }
         put(f, "opacity", (fadeOp * lockE).toFixed(3));
       }
     }
@@ -1970,17 +1951,6 @@ sim: TileSim,
     if (r.sphere) put(r.sphere, "opacity", "0");
     if (r.sunShadow) put(r.sunShadow, "opacity", "0");
     if (r.floor) put(r.floor, "opacity", "0");
-    if (r.frost) {
-      const fs = r.frost.style;
-      put(r.frost, "opacity", op.toFixed(3));
-      put(r.frost, "transform", `scale(${s.zoom.toFixed(4)})`);
-      put(r.frost, "background", dk > 0.5 ? "rgba(22,28,40,0.34)" : "rgba(251,248,240,0.34)");
-      const blur = "blur(7px) saturate(0.85)";
-      if (fs.backdropFilter !== blur) {
-        fs.backdropFilter = blur;
-        fs.setProperty("-webkit-backdrop-filter", blur);
-      }
-    }
     drawInkGlobe(r.inkGlobe, {
       w: L.w,
       h: L.h,
@@ -2236,7 +2206,7 @@ const TileLayer = memo(function TileLayer({
     fs = W / 3,
     r0 = Math.round(0.26 * W);
   return tiles.map(({ k, wait, art, label }) => {
-    if (!els.current.has(k)) els.current.set(k, { box: null, face: null, facets: [], shades: [], coats: [] });
+    if (!els.current.has(k)) els.current.set(k, { box: null, face: null, facets: [], shades: [] });
     const te = els.current.get(k)!;
     const facets = [];
     for (let i = 0; i < 9; i++) {
@@ -2285,19 +2255,6 @@ const TileLayer = memo(function TileLayer({
                 }),
           }}
         >
-          {!wait && (
-            <div
-              ref={(el) => {
-                te.coats[i] = el;
-                forget(el);
-              }}
-              className="absolute inset-0 opacity-0"
-              style={{
-                backgroundSize: `${W}px ${W}px`,
-                backgroundPosition: `${-l0}px ${-t0}px`,
-              }}
-            />
-          )}
           {!wait && (
             <div
               ref={(el) => {

@@ -112,8 +112,8 @@ export function Compose({
         className="rise-in relative mx-3 mb-[max(12px,env(safe-area-inset-bottom))] flex w-auto flex-col gap-3.5 self-stretch rounded-[30px] px-[18px] pb-5 pt-4 text-card-ink sm:mx-auto sm:w-[420px]"
         style={{
           background: "rgba(255,255,255,0.96)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
           border: "1px solid rgba(13,42,63,0.08)",
           boxShadow: "0 -10px 50px -20px rgba(13,42,63,0.35)",
         }}

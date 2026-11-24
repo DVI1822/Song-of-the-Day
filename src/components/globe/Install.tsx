@@ -230,7 +230,7 @@ export function AppTour({ onClose: done }: { onClose(): void }) {
       <div
         role="dialog"
         aria-label="Get the app: add TopTrack to your home screen"
-        className="rise-in relative flex w-full max-w-[380px] flex-col items-center gap-3 rounded-[28px] border border-white/60 bg-white/[0.94] px-6 pb-5 pt-5 text-center text-card-ink backdrop-blur-2xl"
+        className="rise-in relative flex w-full max-w-[380px] flex-col items-center gap-3 rounded-[28px] border border-white/60 bg-white/[0.94] px-6 pb-5 pt-5 text-center text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 30px 80px -30px rgba(13,42,63,0.55)" }}
         onTouchStart={(e) => void (x0.current = e.touches[0].clientX)}
         onTouchEnd={(e) => {

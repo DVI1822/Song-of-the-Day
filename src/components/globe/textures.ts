@@ -1,6 +1,5 @@
 // Little painted things for the Globe's world: leaves, petals, seeds and
-// flowers (one atlas the weather layer draws from), and the frost that
-// settles on the songs.
+// flowers (one atlas the weather layer draws from).
 
 export const CELLS = 4; // the atlas is 4 × 4
 export const TEX = {
@@ -395,82 +394,4 @@ export function atlas(ink = false): HTMLCanvasElement {
   if (ink) inkCache = cv;
   else atlasCache = cv;
   return cv;
-}
-
-// ---------------------------------------------------------------------------
-// Frost on the songs (one tile wide, as a data URL)
-// ---------------------------------------------------------------------------
-
-let frostCache = "";
-
-function valueNoise(size: number, cells: number, seed: number) {
-  rnd = seed;
-  const g = Array.from({ length: (cells + 1) * (cells + 1) }, rand);
-  const at = (x: number, y: number) => g[(y % (cells + 1)) * (cells + 1) + (x % (cells + 1))];
-  return (px: number, py: number) => {
-    const fx = (px / size) * cells,
-      fy = (py / size) * cells;
-    const x0 = Math.floor(fx),
-      y0 = Math.floor(fy);
-    const tx = fx - x0,
-      ty = fy - y0;
-    const sx = tx * tx * (3 - 2 * tx),
-      sy = ty * ty * (3 - 2 * ty);
-    const a = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * sx;
-    const b = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * sx;
-    return a + (b - a) * sy;
-  };
-}
-
-export function frostTexture(): string {
-  if (frostCache) return frostCache;
-  const S = 96;
-  const cv = document.createElement("canvas");
-  cv.width = cv.height = S;
-  const ctx = cv.getContext("2d")!;
-  const img = ctx.createImageData(S, S);
-  // how far in from the tile's nearest edge, 0 at the edge .. 1 in the middle
-  const inset = (x: number, y: number) => Math.min(x, y, S - 1 - x, S - 1 - y) / (S / 2);
-  // a pale crystalline film, thickest round the edges
-  {
-    const n1 = valueNoise(S, 10, 5);
-    for (let y = 0; y < S; y++)
-      for (let x = 0; x < S; x++) {
-        const e = 1 - Math.min(1, inset(x, y) * 1.6);
-        const a = 0.12 + 0.6 * Math.pow(e, 1.6) * (0.6 + 0.4 * n1(x, y));
-        const i = (y * S + x) * 4;
-        img.data[i] = 236;
-        img.data[i + 1] = 244;
-        img.data[i + 2] = 255;
-        img.data[i + 3] = Math.round(255 * a);
-      }
-    ctx.putImageData(img, 0, 0);
-    rnd = 5;
-    ctx.lineCap = "round";
-    for (let i = 0; i < 260; i++) {
-      const side = Math.floor(rand() * 4);
-      const d = Math.pow(rand(), 2) * S * 0.45;
-      const t = rand() * S;
-      const [x, y] = side === 0 ? [t, d] : side === 1 ? [S - d, t] : side === 2 ? [t, S - d] : [d, t];
-      // a feathery crystal: a spine with a few barbs
-      const len = 3 + rand() * 7;
-      const a = rand() * Math.PI * 2;
-      ctx.strokeStyle = `rgba(255,255,255,${(0.35 + 0.5 * rand()).toFixed(3)})`;
-      ctx.lineWidth = 0.7 + rand() * 0.6;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
-      for (let j = 1; j <= 2; j++) {
-        const bx = x + Math.cos(a) * len * (j / 3),
-          by = y + Math.sin(a) * len * (j / 3);
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx + Math.cos(a + 0.7) * len * 0.35, by + Math.sin(a + 0.7) * len * 0.35);
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx + Math.cos(a - 0.7) * len * 0.35, by + Math.sin(a - 0.7) * len * 0.35);
-      }
-      ctx.stroke();
-    }
-  }
-  frostCache = cv.toDataURL("image/png");
-  return frostCache;
 }

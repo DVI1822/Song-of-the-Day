@@ -321,7 +321,7 @@ export function NotesSheet({
       <div
         role="dialog"
         aria-label="Notes"
-        className="rise-in relative mx-auto flex max-h-[72vh] w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-2xl"
+        className="rise-in relative mx-auto flex max-h-[72vh] w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 -20px 60px -30px rgba(13,42,63,0.45)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-center gap-2 px-5 pb-2 pt-4">
@@ -428,7 +428,7 @@ export function LikesSheet({ r, meId, title, onClose }: { r: Reactions | null; m
       <div
         role="dialog"
         aria-label="Likes"
-        className="rise-in relative mx-auto flex max-h-[72vh] w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-2xl"
+        className="rise-in relative mx-auto flex max-h-[72vh] w-full max-w-[520px] flex-col rounded-t-[28px] border border-white/60 bg-white/[0.92] text-card-ink backdrop-blur-none"
         style={{ boxShadow: "0 -20px 60px -30px rgba(13,42,63,0.45)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-center gap-2 px-5 pb-2 pt-4">
