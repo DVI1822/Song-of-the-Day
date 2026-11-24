@@ -11,7 +11,7 @@ import { CloseIcon, Face, glass } from "./ui";
 // under a friend's song. A gold crown then lands above the card, off it,
 // shakes, and confetti rains down over the song. Each crown is a point for
 // that friend. The Leaderboard tab on the right adds them up for the month,
-// today's included, as they come in. Who crowned whom is never shown.
+// taking in each day's crowns the next morning. Who crowned whom is never shown.
 
 const INK = "#0d2a3f";
 const CORAL = "#ff5e57";
@@ -234,8 +234,8 @@ export function Leaderboard({
   onCore(p: Profile): void;
 }) {
   const [scores, setScores] = useState<Score[] | null>(api.ranks ? null : []);
-  // the board is this calendar month, today included
-  const [month] = useState(() => new Date().toLocaleString(undefined, { month: "long" }));
+  // the board covers finished days, so on the 1st it still shows last month
+  const [month] = useState(() => new Date(Date.now() - 86_400_000).toLocaleString(undefined, { month: "long" }));
 
   // fetched on open, after your own crowning, and every 20s while open
   useEffect(() => {
@@ -274,7 +274,7 @@ export function Leaderboard({
       ) : (
         <>
           {top === 0 && (
-            <div className="px-2 pb-2 text-[13px] leading-snug text-muted">No points yet this month. Every crown counts the moment it&apos;s given.</div>
+            <div className="px-2 pb-2 text-[13px] leading-snug text-muted">No points yet this month. Today&apos;s crowns count tomorrow morning.</div>
           )}
           {rows.map((r, i) => (
             <button
@@ -297,13 +297,13 @@ export function Leaderboard({
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-sm font-semibold">{r.p.id === me.id ? "You" : r.p.display_name}</span>
-                {r.last > 0 && <span className="text-[11px] font-semibold leading-tight tabular-nums text-accent">+{r.last} today</span>}
+                {r.last > 0 && <span className="text-[11px] font-semibold leading-tight tabular-nums text-accent">+{r.last} yesterday</span>}
               </span>
               <span className="w-9 flex-none text-right font-bubble text-[17px] font-semibold tabular-nums">{r.month}</span>
             </button>
           ))}
           <p className="px-2 pt-2 text-[11px] leading-snug text-muted">
-            Each time someone crowns your song their TopTrack, you get a point. Every crown counts right away, and stays counted even if the song is redone. Nobody sees who crowned whom.
+            Each time someone crowns your song their TopTrack, you get a point. Points land each morning for the day before. Nobody sees who crowned whom.
           </p>
         </>
       )}
