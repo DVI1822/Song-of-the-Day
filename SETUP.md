@@ -181,34 +181,24 @@ nobody needs to connect Spotify. If you used to have whole songs on, run
 Supabase SQL Editor to delete the saved Spotify keys. `SPOTIFY_CLIENT_ID` in
 Vercel isn't used any more and can be removed.
 
-## Part 4d: Facts about your song (optional)
+## Part 4d: Server keys
 
-After you post, a few short facts about your song (how it was made, the
-story behind it, the artist) turn over under the Globe, beside a less-seen
-photo of the artist, then get pulled into a compass star button at the globe's bottom left that brings them back with a tap. Open anyone's song and the same star, on the album cover's bottom right, shows its facts. Claude reads the song's and artist's Wikipedia articles
-and may search a short list of music sites (Rolling Stone, Pitchfork, NPR,
-Genius...). Every fact has to cite the passage it came from, and any fact
-without one is thrown out. The photo comes from Wikimedia Commons, with the
-photographer credited. Each song is looked up once and kept, so it costs
-roughly 5 to 8 cents per new song.
-
-1. In Supabase's **SQL Editor**, run
-   `supabase/migrations/20261108000000_song_facts.sql`.
-2. In Supabase, open **Project Settings → API Keys**, and under **Secret
+1. In Supabase, open **Project Settings → API Keys**, and under **Secret
    keys** copy a secret key (`sb_secret_...`; create one if there isn't
    one). Keep it private: it can read and write everything.
-3. Get an Anthropic API key at <https://platform.claude.com> (**API keys →
-   Create key**) and add a little credit under **Billing**.
-4. In Vercel, open the project's **Settings → Environment Variables** and add,
+2. Get an Anthropic API key at <https://platform.claude.com> (**API keys →
+   Create key**) and add a little credit under **Billing**. It's only used
+   for the Taste Overview below.
+3. In Vercel, open the project's **Settings → Environment Variables** and add,
    for all environments:
-   - `SUPABASE_SECRET_KEY`: the key from step 2
-   - `ANTHROPIC_API_KEY`: the key from step 3
+   - `SUPABASE_SECRET_KEY`: the key from step 1
+   - `ANTHROPIC_API_KEY`: the key from step 2
 
    Then open **Deployments**, and on the newest one click **⋯ → Redeploy**.
 
-Without `ANTHROPIC_API_KEY` the facts are the opening lines of the Wikipedia
-article instead. Without `SUPABASE_SECRET_KEY` they still show but aren't
-kept, so every visit looks them up again.
+Song facts were removed. If you ran `20261108000000_song_facts.sql` before,
+run `supabase/migrations/20261124000000_drop_song_facts.sql` to drop the
+table, and remove `FACTS_MODEL` from Vercel.
 
 ## Part 4e: Your core and your taste
 
@@ -222,9 +212,9 @@ playlists, and the people on either side of your globe.
    for its genre and release year, and keeps it in `song_tags` using
    `SUPABASE_SECRET_KEY`. Long histories fill in a dozen songs at a time.
 3. The Taste Overview (a name for your sound and a few lines about it) is
-   written by Claude with the same `ANTHROPIC_API_KEY` as the song facts, and
+   written by Claude with `ANTHROPIC_API_KEY`, and
    written again after three new picks or a week. `TASTE_MODEL` overrides the
-   model (it defaults to `FACTS_MODEL`, then Haiku).
+   model (it defaults to Haiku).
 4. Optional: add `LASTFM_API_KEY` (free at last.fm/api/account/create) for
    Last.fm's tags on each song, which give the overview more to go on.
 
@@ -263,7 +253,7 @@ artists and a searchable list of everyone (with a CSV download).
 
 1. In Vercel → **Settings → Environment Variables**, add `ADMIN_EMAILS` set to
    the email you sign in to TopTrack with (more than one: separate with commas).
-   `SUPABASE_SECRET_KEY` must be set too (it already is for song facts).
+   `SUPABASE_SECRET_KEY` must be set too (Part 4d).
 2. Redeploy (or merge anything), then open `/admin` while signed in.
 
 Anyone else, signed in or not, gets the normal "page not found".

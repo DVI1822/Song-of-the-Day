@@ -49,10 +49,10 @@ export default function PrivacyPage() {
         turn notifications off or delete your account. You can turn them off any time in your phone&apos;s Settings.
       </p>
 
-      <h2>Song facts</h2>
+      <h2>Taste overview</h2>
       <p>
-        After you post, TopTrack can show a few facts about the song. To find them, the song&apos;s title and artist (never
-        anything about you) are sent to Anthropic&apos;s Claude, which searches public web pages.
+        Your core can show a short overview of your taste. To write it, the titles, artists and dates of your picks
+        (never your name or anything else about you) are sent to Anthropic&apos;s Claude.
       </p>
 
       <h2>Who sees what</h2>

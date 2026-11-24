@@ -1,7 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient as createAdmin } from "@supabase/supabase-js";
-import { cleanTitle, mainArtist, songKey } from "./facts";
+import { cleanTitle, mainArtist, songKey } from "./songkey";
 import { supabaseUrl } from "./supabase/env";
 import { createClient } from "./supabase/server";
 import type { Taste, TasteOverview } from "./types";
@@ -18,7 +18,7 @@ import type { Taste, TasteOverview } from "./types";
 // Claude from their picks and kept in taste_profiles until a few new picks
 // are in or a week has gone by.
 
-const MODEL = process.env.TASTE_MODEL || process.env.FACTS_MODEL || "claude-haiku-5-5";
+const MODEL = process.env.TASTE_MODEL || "claude-haiku-5-5";
 const LOOKUPS = 12; // songs looked up per visit
 const REWRITE_AFTER = 3; // new picks before the overview is written again
 const REWRITE_DAYS = 7;

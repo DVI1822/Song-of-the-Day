@@ -7,7 +7,6 @@ import { SignalCore } from "./SignalCore";
 import { halloween } from "./halloween";
 import type { GlobeApi } from "./api";
 import { SongPlayer } from "./Preview";
-import { FactsButton } from "./SongFacts";
 import { CoverCrown, CrownButton } from "./Ranks";
 import { ShareIcon, ShareSheet, type StoryOf } from "./ShareStory";
 import type { StorySky } from "./storyVideo";
@@ -370,8 +369,6 @@ export function Feature({
           </div>
           )}
           <Singularity size={cover} src={post.artwork_url} target={sinkRef} run={sinking} onDone={sunk} />
-          {/* the compass star with the song's facts, on the cover's bottom right */}
-          {!flagging && !sinking && <FactsButton post={post} load={api.facts} cover={cover} />}
           {/* your one redo today, on the bottom left */}
           {!flagging && !sinking && onRedo && <RedoButton error={redoError} onRedo={redo} />}
         </div>
