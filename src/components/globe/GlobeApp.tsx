@@ -1654,6 +1654,13 @@ function Globe({
               onAddBack={onAddBack}
               onFollowed={onFollowed}
               onCore={(p) => openCore(null, p)}
+              onMessage={(p) => {
+                closePanel();
+                setBoardOn(false);
+                setDmWith({ p, n: Date.now() });
+                setChatOn(true);
+              }}
+              onHide={setHidden}
             />
           )}
         </PanelSwipe>
