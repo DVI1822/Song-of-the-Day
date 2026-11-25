@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { formatDay, formatTime, todayIn } from "@/lib/day";
 import type { Activity, AddedMe, Friend, MayKnow, Post, Profile } from "@/lib/types";
 import type { GlobeApi } from "./api";
+import { ChatIcon } from "./Chat";
 import { InviteButton, InviteCard } from "./Invite";
 import { SignalCore } from "./SignalCore";
 import { SongPlayer, usePreview } from "./Preview";
@@ -127,6 +129,8 @@ export function GlobeTab({
   onAddBack,
   onFollowed,
   onCore,
+  onMessage,
+  onHide,
 }: {
   api: GlobeApi;
   friends: Friend[];
@@ -136,6 +140,8 @@ export function GlobeTab({
   onAddBack(p: AddedMe): Promise<string | null>;
   onFollowed(f: Friend): void;
   onCore(p: Profile): void;
+  onMessage(p: Profile): void; // open a conversation with them in the chat
+  onHide(f: Friend, hide: boolean): Promise<string | null>; // take them off your globe, or put them back
 }) {
   const shown = friends
     .map((f, k) => ({ f, k }))
@@ -145,6 +151,7 @@ export function GlobeTab({
   const zone = localZone();
   const pv = usePreview();
   const addRef = useRef<HTMLDivElement>(null);
+  const [addOpen, setAddOpen] = useState(true);
   const playing = pv.shuffle ? null : pv.track;
   const play = (p: Post, k: number) => {
     if (playing?.post.id === p.id) return pv.toggle();
@@ -164,6 +171,7 @@ export function GlobeTab({
               type="button"
               onClick={() => {
                 const el = addRef.current;
+                if (!addOpen) flushSync(() => setAddOpen(true));
                 el?.scrollIntoView({ behavior: "smooth", block: "start" });
                 el?.querySelector("input")?.focus({ preventScroll: true });
               }}
@@ -237,7 +245,12 @@ export function GlobeTab({
             : "No one on your globe yet. Look people up below, or tap Invite to send your link."}
         </div>
       )}
+      {friends.length > 0 && (
+        <MyGlobers friends={friends} onOpen={onOpen} onCore={onCore} onMessage={onMessage} onHide={onHide} />
+      )}
       <AddToGlobe
+        open={addOpen}
+        onToggle={() => setAddOpen(!addOpen)}
         boxRef={addRef}
         api={api}
         friends={friends}
@@ -250,10 +263,180 @@ export function GlobeTab({
   );
 }
 
+// ---------------------------------------------------------------------------
+// My Globers: everyone on your globe, by name, between today's songs and
+// "Add to my globe".
+// Beside each one, four little line icons: message them (only once they've
+// added you back, since chat is for mutual friends), go to their core, go to
+// their song (only if they've posted today) and hide them from your globe.
+// Someone you've hidden stays in the list, faded, with an eye to bring them
+// back, so a mis-tap is one tap to undo. Folds up under its header.
+// ---------------------------------------------------------------------------
+
+function MyGlobers({
+  friends,
+  onOpen,
+  onCore,
+  onMessage,
+  onHide,
+}: {
+  friends: Friend[];
+  onOpen(k: number): void;
+  onCore(p: Profile): void;
+  onMessage(p: Profile): void;
+  onHide(f: Friend, hide: boolean): Promise<string | null>;
+}) {
+  const [open, setOpen] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const all = friends.map((f, k) => ({ f, k })).sort((a, b) => a.f.display_name.localeCompare(b.f.display_name));
+  const hiddenN = friends.filter((f) => f.hidden).length;
+  const toggle = async (f: Friend) => {
+    setBusy(f.id);
+    setError(null);
+    const e = await onHide(f, !f.hidden);
+    setBusy(null);
+    if (e) setError(e);
+  };
+  return (
+    <div className="mt-2 border-t border-card-ink/10 pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-2 pb-1 text-left"
+      >
+        <span className="display text-[17px] leading-tight">My Globers</span>
+        <span className="text-[11px] font-semibold text-muted">
+          {friends.length}
+          {hiddenN > 0 && ` · ${hiddenN} hidden`}
+        </span>
+        <span className="ml-auto pr-1 text-muted">
+          <Chevron open={open} />
+        </span>
+      </button>
+      {error && <p className="px-2 pt-1 text-xs text-accent-deep">{error}</p>}
+      {open && (
+        <div className="pt-1">
+          {all.map(({ f, k }) => {
+            const first = f.display_name.split(" ")[0];
+            const off = f.hidden;
+            return (
+              <div key={f.id} className="flex h-[52px] items-center gap-0.5 pl-2">
+                <button
+                  type="button"
+                  onClick={() => onCore(f)}
+                  aria-label={`Open ${f.display_name}'s core`}
+                  className={`flex min-w-0 flex-1 items-center gap-2.5 self-stretch text-left ${off ? "opacity-45" : ""}`}
+                >
+                  <Face p={f} size={30} />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-[13px] font-semibold leading-tight">{f.display_name}</span>
+                    <span className="truncate text-[11px] text-muted">{off ? "hidden" : `@${f.username}`}</span>
+                  </span>
+                </button>
+                <RowIcon
+                  label={f.follows_me ? `Message ${first}` : `You can message ${first} once they add you back`}
+                  disabled={!f.follows_me || off}
+                  onClick={() => onMessage(f)}
+                >
+                  <ChatIcon size={15} />
+                </RowIcon>
+                <RowIcon label={`Go to ${first}'s core`} disabled={false} onClick={() => onCore(f)}>
+                  <SignalCore className="h-[15px] w-[15px]" />
+                </RowIcon>
+                {f.post && !off ? (
+                  <RowIcon label={`Go to ${first}'s song, ${f.post.title}`} disabled={false} onClick={() => onOpen(k)}>
+                    <NoteIcon />
+                  </RowIcon>
+                ) : (
+                  // keeps the columns lined up; nothing to go to yet
+                  <span aria-hidden className="h-10 w-9 flex-none" />
+                )}
+                <RowIcon
+                  label={off ? `Show ${first} on your globe again` : `Hide ${first} from your globe`}
+                  disabled={busy === f.id}
+                  pressed={off}
+                  onClick={() => toggle(f)}
+                >
+                  {off ? <EyeIcon /> : <EyeOffIcon />}
+                </RowIcon>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// a small round navy line button, like the song card's
+function RowIcon({
+  label,
+  disabled,
+  pressed,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  pressed?: boolean;
+  onClick(): void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      className="flex h-10 w-9 flex-none items-center justify-center text-card-ink disabled:opacity-25"
+    >
+      <span
+        className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border-[1.4px] border-card-ink/60 ${pressed ? "bg-card-ink/[0.08]" : ""}`}
+      >
+        {children}
+      </span>
+    </button>
+  );
+}
+
+const line = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.9,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+const NoteIcon = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" {...line}>
+    <path d="M9 18V5.5l10-2v12.5" />
+    <circle cx="6.5" cy="18" r="2.5" />
+    <circle cx="16.5" cy="16" r="2.5" />
+  </svg>
+);
+const EyeOffIcon = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" {...line}>
+    <path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c5.5 0 9 5.5 9.5 7-.3.8-1.2 2.3-2.6 3.7M6.6 6.6C4.4 8 3 10.4 2.5 12c.5 1.5 4 7 9.5 7 1.8 0 3.4-.6 4.7-1.4" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    <path d="M3.5 3.5l17 17" />
+  </svg>
+);
+const EyeIcon = () => (
+  <svg aria-hidden width="15" height="15" viewBox="0 0 24 24" {...line}>
+    <path d="M2.5 12c.5-1.5 4-7 9.5-7s9 5.5 9.5 7c-.5 1.5-4 7-9.5 7s-9-5.5-9.5-7z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
 // The Globe tab's second half: look people up by name or username and add
 // them. Before you type, it offers whoever added you (Add back) and a few
 // people you may know.
 function AddToGlobe({
+  open,
+  onToggle,
   boxRef,
   api,
   friends,
@@ -262,6 +445,8 @@ function AddToGlobe({
   onFollowed,
   onCore,
 }: {
+  open: boolean;
+  onToggle(): void;
   boxRef: React.Ref<HTMLDivElement>;
   api: GlobeApi;
   friends: Friend[];
@@ -325,51 +510,63 @@ function AddToGlobe({
   );
 
   return (
-    <div ref={boxRef} className="mt-2 scroll-mt-2 border-t border-card-ink/10 pt-3">
-      <div className="px-2 pb-2">
-        <div className="display text-[17px] leading-tight">Add to my globe</div>
-      </div>
-      <label className="mx-1 flex h-[46px] items-center gap-2 rounded-[23px] border border-card-ink/12 bg-card-ink/[0.04] px-3.5">
-        <SearchIcon />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Name or @username"
-          aria-label="Look people up by name or username"
-          autoComplete="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
-        />
-      </label>
-      {error && <p className="px-3 pt-2 text-xs text-accent-deep">{error}</p>}
-      <div className="pt-1.5">
-        {searching ? (
-          <>
-            {results?.map((p) => row(p, asked.has(p.id) ? `@${p.username} · added you` : `@${p.username}`))}
-            {results && !results.length && (
-              <div className="px-2.5 py-[18px] text-[13px] text-muted">
-                {found?.length ? "They're already on your globe" : "No one by that name yet"}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            {addedMe.length > 0 && (
+    <div ref={boxRef} className="mt-3 scroll-mt-2 border-t border-card-ink/10 pt-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-2 pb-2 text-left"
+      >
+        <span className="display text-[17px] leading-tight">Add to my globe</span>
+        <span className="ml-auto pr-1 text-muted">
+          <Chevron open={open} />
+        </span>
+      </button>
+      {open && (
+        <>
+          <label className="mx-1 flex h-[46px] items-center gap-2 rounded-[23px] border border-card-ink/12 bg-card-ink/[0.04] px-3.5">
+            <SearchIcon />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Name or @username"
+              aria-label="Look people up by name or username"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
+            />
+          </label>
+          {error && <p className="px-3 pt-2 text-xs text-accent-deep">{error}</p>}
+          <div className="pt-1.5">
+            {searching ? (
               <>
-                <Kicker>Added you · {addedMe.length}</Kicker>
-                {addedMe.map((p) => row(p, `@${p.username}`))}
+                {results?.map((p) => row(p, asked.has(p.id) ? `@${p.username} · added you` : `@${p.username}`))}
+                {results && !results.length && (
+                  <div className="px-2.5 py-[18px] text-[13px] text-muted">
+                    {found?.length ? "They're already on your globe" : "No one by that name yet"}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {addedMe.length > 0 && (
+                  <>
+                    <Kicker>Added you · {addedMe.length}</Kicker>
+                    {addedMe.map((p) => row(p, `@${p.username}`))}
+                  </>
+                )}
+                {mayKnow.length > 0 && (
+                  <>
+                    <Kicker>You may know</Kicker>
+                    {mayKnow.map((p) => row(p, mutualText(p.mutuals.length)))}
+                  </>
+                )}
               </>
             )}
-            {mayKnow.length > 0 && (
-              <>
-                <Kicker>You may know</Kicker>
-                {mayKnow.map((p) => row(p, mutualText(p.mutuals.length)))}
-              </>
-            )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
