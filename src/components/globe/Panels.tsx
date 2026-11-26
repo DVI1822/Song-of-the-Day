@@ -152,6 +152,7 @@ export function GlobeTab({
   const pv = usePreview();
   const addRef = useRef<HTMLDivElement>(null);
   const [addOpen, setAddOpen] = useState(true);
+  const [songsOpen, setSongsOpen] = useState(true);
   const playing = pv.shuffle ? null : pv.track;
   const play = (p: Post, k: number) => {
     if (playing?.post.id === p.id) return pv.toggle();
@@ -163,9 +164,15 @@ export function GlobeTab({
       {shown.length ? (
         <>
           <div className="flex items-center justify-between pr-1">
-            <Kicker>
+            <button
+              type="button"
+              onClick={() => setSongsOpen(!songsOpen)}
+              aria-expanded={songsOpen}
+              className="flex min-w-0 items-center whitespace-nowrap gap-1.5 px-2 pb-1.5 pt-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted"
+            >
               Today&apos;s songs · {shown.length} of {friends.filter((f) => !f.hidden).length}
-            </Kicker>
+              <Chevron open={songsOpen} />
+            </button>
             {/* jumps down to "Add to my globe" and opens the keyboard */}
             <button
               type="button"
@@ -175,13 +182,13 @@ export function GlobeTab({
                 el?.scrollIntoView({ behavior: "smooth", block: "start" });
                 el?.querySelector("input")?.focus({ preventScroll: true });
               }}
-              className="flex h-8 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold text-accent"
+              className="flex h-8 flex-none items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold text-accent"
             >
               <PlusIcon />
               Add people
             </button>
           </div>
-          {shown.map(({ f, k }) => {
+          {songsOpen && shown.map(({ f, k }) => {
             const p = f.post!;
             return (
               <div
@@ -245,10 +252,12 @@ export function GlobeTab({
             : "No one on your globe yet. Look people up below, or tap Invite to send your link."}
         </div>
       )}
-      {friends.length > 0 && (
-        <MyGlobers friends={friends} onOpen={onOpen} onCore={onCore} onMessage={onMessage} onHide={onHide} />
-      )}
       <AddToGlobe
+        globers={
+          friends.length > 0 && (
+            <MyGlobers friends={friends} onOpen={onOpen} onCore={onCore} onMessage={onMessage} onHide={onHide} />
+          )
+        }
         open={addOpen}
         onToggle={() => setAddOpen(!addOpen)}
         boxRef={addRef}
@@ -264,8 +273,8 @@ export function GlobeTab({
 }
 
 // ---------------------------------------------------------------------------
-// My Globers: everyone on your globe, by name, between today's songs and
-// "Add to my globe".
+// My Globers: everyone on your globe, by name, between the search ("Add to my
+// globe") and people you may know. Starts folded up.
 // Beside each one, four little line icons: message them (only once they've
 // added you back, since chat is for mutual friends), go to their core, go to
 // their song (only if they've posted today) and hide them from your globe.
@@ -286,7 +295,7 @@ function MyGlobers({
   onMessage(p: Profile): void;
   onHide(f: Friend, hide: boolean): Promise<string | null>;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false); // folded until you want it
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const all = friends.map((f, k) => ({ f, k })).sort((a, b) => a.f.display_name.localeCompare(b.f.display_name));
@@ -435,6 +444,7 @@ const EyeIcon = () => (
 // them. Before you type, it offers whoever added you (Add back) and a few
 // people you may know.
 function AddToGlobe({
+  globers,
   open,
   onToggle,
   boxRef,
@@ -445,6 +455,7 @@ function AddToGlobe({
   onFollowed,
   onCore,
 }: {
+  globers: React.ReactNode; // My Globers, which sits between the search and who you may know
   open: boolean;
   onToggle(): void;
   boxRef: React.Ref<HTMLDivElement>;
@@ -456,6 +467,7 @@ function AddToGlobe({
   onCore(p: Profile): void;
 }) {
   const [q, setQ] = useState("");
+  const [knowOpen, setKnowOpen] = useState(true);
   const [found, setFound] = useState<Found[] | null>(null);
   const [known, setKnown] = useState<MayKnow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -509,65 +521,85 @@ function AddToGlobe({
     />
   );
 
+  const suggest = !searching && (addedMe.length > 0 || mayKnow.length > 0);
+
   return (
-    <div ref={boxRef} className="mt-3 scroll-mt-2 border-t border-card-ink/10 pt-3">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center gap-2 px-2 pb-2 text-left"
-      >
-        <span className="display text-[17px] leading-tight">Add to my globe</span>
-        <span className="ml-auto pr-1 text-muted">
-          <Chevron open={open} />
-        </span>
-      </button>
-      {open && (
-        <>
-          <label className="mx-1 flex h-[46px] items-center gap-2 rounded-[23px] border border-card-ink/12 bg-card-ink/[0.04] px-3.5">
-            <SearchIcon />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Name or @username"
-              aria-label="Look people up by name or username"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
-            />
-          </label>
-          {error && <p className="px-3 pt-2 text-xs text-accent-deep">{error}</p>}
-          <div className="pt-1.5">
-            {searching ? (
-              <>
+    <>
+      <div ref={boxRef} className="mt-3 scroll-mt-2 border-t border-card-ink/10 pt-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex w-full items-center gap-2 px-2 pb-2 text-left"
+        >
+          <span className="display text-[17px] leading-tight">Add to my globe</span>
+          <span className="ml-auto pr-1 text-muted">
+            <Chevron open={open} />
+          </span>
+        </button>
+        {open && (
+          <>
+            <label className="mx-1 flex h-[46px] items-center gap-2 rounded-[23px] border border-card-ink/12 bg-card-ink/[0.04] px-3.5">
+              <SearchIcon />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Name or @username"
+                aria-label="Look people up by name or username"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
+              />
+            </label>
+            {error && <p className="px-3 pt-2 text-xs text-accent-deep">{error}</p>}
+            {searching && (
+              <div className="pt-1.5">
                 {results?.map((p) => row(p, asked.has(p.id) ? `@${p.username} · added you` : `@${p.username}`))}
                 {results && !results.length && (
                   <div className="px-2.5 py-[18px] text-[13px] text-muted">
                     {found?.length ? "They're already on your globe" : "No one by that name yet"}
                   </div>
                 )}
-              </>
-            ) : (
-              <>
-                {addedMe.length > 0 && (
-                  <>
-                    <Kicker>Added you · {addedMe.length}</Kicker>
-                    {addedMe.map((p) => row(p, `@${p.username}`))}
-                  </>
-                )}
-                {mayKnow.length > 0 && (
-                  <>
-                    <Kicker>You may know</Kicker>
-                    {mayKnow.map((p) => row(p, mutualText(p.mutuals.length)))}
-                  </>
-                )}
-              </>
+              </div>
             )}
-          </div>
-        </>
+          </>
+        )}
+      </div>
+      {globers}
+      {suggest && (
+        <div className="mt-2 border-t border-card-ink/10 pt-3">
+          <button
+            type="button"
+            onClick={() => setKnowOpen(!knowOpen)}
+            aria-expanded={knowOpen}
+            className="flex w-full items-center gap-2 px-2 pb-1 text-left"
+          >
+            <span className="display text-[17px] leading-tight">People you may know</span>
+            <span className="text-[11px] font-semibold text-muted">{addedMe.length + mayKnow.length}</span>
+            <span className="ml-auto pr-1 text-muted">
+              <Chevron open={knowOpen} />
+            </span>
+          </button>
+          {knowOpen && (
+            <div className="pt-1">
+              {addedMe.length > 0 && (
+                <>
+                  <Kicker>Added you · {addedMe.length}</Kicker>
+                  {addedMe.map((p) => row(p, `@${p.username}`))}
+                </>
+              )}
+              {mayKnow.length > 0 && (
+                <>
+                  {addedMe.length > 0 && <Kicker>You may know</Kicker>}
+                  {mayKnow.map((p) => row(p, mutualText(p.mutuals.length)))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
