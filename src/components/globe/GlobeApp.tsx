@@ -81,6 +81,8 @@ export function GlobeApp(props: Props) {
 }
 
 const ME = 99; // your own tile's slot; friends take 0..89
+// someone who hasn't posted yet: their spot is a third the size of a song
+const WAIT_SIZE = 1 / 3;
 type PanelName = "friends";
 type TileInfo = { k: number; wait: boolean; art: string; label: string };
 type TileEls = {
@@ -204,6 +206,8 @@ function newMotion(posted: boolean) {
     myLanded: posted,
     myLock: null as null | number,
     born: new Map<number, number>(),
+    // each tile's drawn size: a third while waiting for a song, then full
+    size: new Map<number, number>(),
     // songs posted since your last visit fall in from above, one by one:
     // when each starts falling, and the posts already seen this visit
     drops: new Map<number, number>(),
@@ -929,7 +933,16 @@ function Globe({
           sim.current.pull([b.k], [f[0], -f[1], f[2]], dt, 0.15 + 0.75 * back * back);
         }
       }
-      sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt);
+      // a spot still waiting for a song shrinks to a third, and grows to
+      // full size once the song arrives
+      const fr = live.current.friends;
+      const grown = 1 - Math.exp(-dt * 6);
+      for (const k of keys) {
+        const goal = (k === ME ? !s.myLanded : !fr[k]?.post) ? WAIT_SIZE : 1;
+        const now = s.size.get(k) ?? goal;
+        s.size.set(k, now + (goal - now) * grown);
+      }
+      sim.current.step(keys, half, Rb, s.featFly !== null ? 0 : dt, (k) => s.size.get(k) ?? 1);
       sim.current.water(keys, Math.min(dt, 0.1));
       draw(s, R.current, els.current, sim.current, live.current);
       drawSignalStream(s, R.current.beam, sim.current, live.current, wx.current.weather, dt);
@@ -1965,7 +1978,7 @@ sim: TileSim,
     // riding the water: up and down, and rocked a little
     const fl = sim.float(k);
     put(te.box, "transform", `rotateY(${lon.toFixed(4)}rad) rotateX(${lat.toFixed(4)}rad) translateZ(${(Rb + fl.h + lift).toFixed(2)}px) ` +
-      `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${grow.toFixed(3)})`);
+      `rotateX(${fl.a.toFixed(4)}rad) rotateY(${fl.b.toFixed(4)}rad) scale(${(grow * (s.size.get(k) ?? 1)).toFixed(3)})`);
     // well round the far side, the cover's facets are all turned away (only
     // its faint back shows): hide them outright, so the phone stops moving
     // and compositing nine layers it was never going to show
