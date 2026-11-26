@@ -11,6 +11,7 @@
 // animation does.
 
 import { camV, PERSPECTIVE, stayBlank, type Camera, type V3 } from "./math";
+import { TG_GOLD, TG_RUST, thanksgiving } from "./thanksgiving";
 
 const KEY = "tt-ink";
 let on: boolean | null = null;
@@ -31,8 +32,10 @@ export function inkMode(): boolean {
 
 export const INK: V3 = [29, 36, 51];
 export const CHALK: V3 = [236, 240, 248];
-export const CORAL: V3 = [255, 94, 87];
-export const GREEN: V3 = [120, 200, 120];
+// on Thanksgiving the coloured rings turn turkey rust and gold (thanksgiving.ts)
+const TG = thanksgiving();
+export const CORAL: V3 = TG ? TG_RUST : [255, 94, 87];
+export const GREEN: V3 = TG ? TG_GOLD : [120, 200, 120];
 
 const TAU = Math.PI * 2;
 const hash = (n: number) => {

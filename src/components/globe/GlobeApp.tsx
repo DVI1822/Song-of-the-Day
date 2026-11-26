@@ -29,6 +29,7 @@ import { Doodle } from "./doodle";
 import { settingOverride, type SettingKind } from "@/lib/setting";
 import { Wordmark } from "./Wordmark";
 import { halloween } from "./halloween";
+import { drawTurkey, thanksgiving } from "./thanksgiving";
 import { coreLight, drawSignalCore, drawSignalStream } from "./signal";
 import { CHALK, CORAL, INK, boil, css, drawInkGlobe, inkMode, wobbly } from "./ink";
 import { FriendsTab, GlobeTab } from "./Panels";
@@ -64,6 +65,7 @@ import {
 // Halloween's look never changes while the page is open
 const noSub = () => () => {};
 const noLook = () => null;
+const noTurkey = () => false;
 
 type Props = {
   me: Profile;
@@ -260,6 +262,7 @@ function newEls() {
     beam: null as HTMLCanvasElement | null,
     ripples: null as HTMLCanvasElement | null,
     inkGlobe: null as HTMLCanvasElement | null,
+    turkey: null as HTMLCanvasElement | null,
     sigCore: null as HTMLCanvasElement | null,
     chrome: [] as (HTMLElement | null)[],
     feat: null as HTMLDivElement | null,
@@ -343,6 +346,8 @@ function Globe({
   const [skyLight, setSkyLight] = useState(false);
   // Halloween's look, on the day (halloween.ts); read once we're in the browser
   const hw = useSyncExternalStore(noSub, halloween, noLook);
+  // Thanksgiving's turkey, on the day (thanksgiving.ts)
+  const tg = useSyncExternalStore(noSub, thanksgiving, noTurkey);
   const [warm, setWarm] = useState(0);
   const [focus, setFocus] = useState<number | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
@@ -1465,6 +1470,8 @@ function Globe({
         />
         <canvas ref={(el) => void (R.current.beam = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <canvas ref={(el) => void (R.current.ripples = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
+        {/* Thanksgiving's turkey: the ball is its body (thanksgiving.ts) */}
+        {tg && <canvas ref={(el) => void (R.current.turkey = el)} className="pointer-events-none absolute inset-0 h-full w-full" />}
         {/* the drawn look's ink ball (ink.ts) */}
         <canvas ref={(el) => void (R.current.inkGlobe = el)} className="pointer-events-none absolute inset-0 h-full w-full" />
         <div
@@ -2110,6 +2117,17 @@ sim: TileSim,
       t: s.t,
     });
   }
+  if (r.turkey)
+    drawTurkey(r.turkey, {
+      w: L.w,
+      h: L.h,
+      cx: L.cx,
+      cy: L.cy,
+      R: L.R + 8,
+      zoom: s.zoom,
+      op: (1 - reveal) * (1 - lensP) * Math.max(0, 1 - (s.zoom - 1) * 3),
+      t: s.t,
+    });
   if (s.sky && r.day && s.sky.bg !== s.skyBg) {
     s.skyBg = s.sky.bg;
     put(r.day, "background", s.skyBg);
