@@ -21,7 +21,7 @@ import { PhotoButton } from "./PostPhoto";
 // a place to report the song or block them. Beside the title: like it, and
 // the notes people left. On your own song today, the arrows on the cover's
 // bottom left are your one redo (Redo.tsx).
-// Swipe the card up and it's pushed back down into the Globe; swipe it left
+// Swipe the card up or down and it's pushed back into the Globe; swipe it left
 // or right and it slides away for the next (or last) song someone posted,
 // which starts playing as it comes in. Arrow keys do the same on a computer.
 export function Feature({
@@ -270,8 +270,8 @@ export function Feature({
       const x = onSwipe ? d.dx : d.dx * 0.3; // nothing to swipe to: it only gives a little
       return `translateX(${x}px) rotate(${x * 0.035}deg)`;
     }
-    // up, it lifts away and gets smaller; down, it barely moves
-    return d.dy < 0 ? `translateY(${d.dy}px) scale(${Math.max(0.7, 1 + d.dy / 1400)})` : `translateY(${d.dy * 0.2}px)`;
+    // up or down, it follows the finger and gets smaller
+    return `translateY(${d.dy}px) scale(${Math.max(0.7, 1 - Math.abs(d.dy) / 1400)})`;
   };
   const settle = (from: string) => {
     const el = cardEl.current;
@@ -295,9 +295,10 @@ export function Feature({
     leave(`translateX(${-dir * w * 1.05}px) rotate(${-dir * 12}deg)`, 240, "cubic-bezier(.4,0,.8,.6)");
     return true;
   };
-  const push = () => {
+  // dir: -1 swiped up, 1 swiped down; either way it shrinks back into its spot
+  const push = (dir: 1 | -1 = -1) => {
     if (gone.current || !onPush) return;
-    leave("translateY(10px) scale(0.18)", 380, "cubic-bezier(.5,0,.75,.4)");
+    leave(`translateY(${dir * 10}px) scale(0.18)`, 380, "cubic-bezier(.5,0,.75,.4)");
     onPush();
   };
   const down = (e: React.PointerEvent) => {
@@ -338,7 +339,8 @@ export function Feature({
       if (d.axis === "x" && (Math.abs(d.dx) > w * 0.22 || (Math.abs(d.vx) > 0.45 && Math.abs(d.dx) > 30))) {
         if (swipe(d.dx < 0 ? 1 : -1)) return;
       }
-      if (d.axis === "y" && onPush && (d.dy < -90 || (d.vy < -0.45 && d.dy < -30))) return push();
+      if (d.axis === "y" && onPush && (d.dy < -90 || (d.vy < -0.45 && d.dy < -30))) return push(-1);
+      if (d.axis === "y" && onPush && (d.dy > 90 || (d.vy > 0.45 && d.dy > 30))) return push(1);
     }
     settle(from);
   };
@@ -352,7 +354,8 @@ export function Feature({
       if (k.still || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "ArrowRight") k.swipe(1);
       else if (e.key === "ArrowLeft") k.swipe(-1);
-      else if (e.key === "ArrowUp") k.push();
+      else if (e.key === "ArrowUp") k.push(-1);
+      else if (e.key === "ArrowDown") k.push(1);
       else return;
       e.preventDefault();
     };
