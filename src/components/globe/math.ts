@@ -117,7 +117,7 @@ export function starField(n: number, seed: number, size: number, alpha: number, 
 // it rides above (or dips below) its spot, a and b how far it's rocked
 // front-to-back and side-to-side, each with its own speed.
 type Float = { h: number; hv: number; a: number; av: number; b: number; bv: number };
-type Body = { p: V3; v: V3; sp: number; f: Float };
+type Body = { p: V3; v: V3; sp: number; f: Float; rr?: number; a?: number };
 
 const dot = (u: V3, v: V3) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
 const norm = (v: V3) => {
@@ -277,13 +277,16 @@ export class TileSim {
     }
   }
 
-  step(keys: number[], half: number, Rb: number, dt: number) {
-    const h = half,
-      rr = 0.26 * 2 * h,
-      a = h - rr;
+  // size: each tile's scale (1 = full size); a spot still waiting for its
+  // song is drawn smaller, and bumps at that smaller size too
+  step(keys: number[], half: number, Rb: number, dt: number, size?: (k: number) => number) {
     const items = keys.map((k) => {
       this.pos(k);
-      return this.bodies.get(k)!;
+      const o = this.bodies.get(k)!;
+      const h = half * (size ? size(k) : 1);
+      o.rr = 0.26 * 2 * h;
+      o.a = h - o.rr;
+      return o;
     });
     if (dt > 0)
       for (const o of items) {
@@ -310,7 +313,11 @@ export class TileSim {
     const contact = (A: Body, B: Body) => {
       const cosT = Math.max(-1, Math.min(1, dot(A.p, B.p)));
       const th = Math.acos(cosT);
-      if (th * Rb > 3 * h) return null;
+      const ra = A.rr!,
+        rb = B.rr!,
+        aa = A.a!,
+        ab = B.a!;
+      if (th * Rb > 1.5 * (aa + ra + ab + rb)) return null;
       const Fa = frame(A.p),
         Fb = frame(B.p);
       const tv: V3 = [B.p[0] - cosT * A.p[0], B.p[1] - cosT * A.p[1], B.p[2] - cosT * A.p[2]];
@@ -320,13 +327,14 @@ export class TileSim {
       const phi = Math.atan2(dot(Fb.e, Fa.d), dot(Fb.e, Fa.e));
       const c = Math.cos(phi),
         sn = Math.sin(phi);
-      const PA = [
+      const sq = (a: number) => [
         [-a, -a],
         [a, -a],
         [a, a],
         [-a, a],
       ];
-      const PB = PA.map((q) => [dx + q[0] * c - q[1] * sn, dy + q[0] * sn + q[1] * c]);
+      const PA = sq(aa);
+      const PB = sq(ab).map((q) => [dx + q[0] * c - q[1] * sn, dy + q[0] * sn + q[1] * c]);
       // inner squares overlapping? (separating axis test)
       let best = Infinity,
         bn: number[] | null = null,
@@ -354,7 +362,7 @@ export class TileSim {
         nx = 0,
         ny = 0;
       if (!sep) {
-        gap = -best - 2 * rr;
+        gap = -best - ra - rb;
         nx = bn![0];
         ny = bn![1];
       } else {
@@ -375,7 +383,7 @@ export class TileSim {
         };
         test(PA, PB, false);
         test(PB, PA, true);
-        gap = md - 2 * rr;
+        gap = md - ra - rb;
       }
       return { gap, n3: [0, 1, 2].map((x) => nx * Fa.e[x] + ny * Fa.d[x]) as V3 };
     };
