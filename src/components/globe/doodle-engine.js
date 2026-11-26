@@ -233,7 +233,9 @@ function buildBack(seed){
   return blendSeam(c,Math.round(Lb*BS),Math.round(Bb*BS))}
 
 // ---------- WebGL: bends a long strip round the planet
-function makeGL(canvas){const gl=canvas.getContext('webgl2',{premultipliedAlpha:true,alpha:true});if(!gl)throw new Error('WebGL2 is not available here');
+// no multisampling or depth buffer: every layer is one full-screen quad, so
+// they'd only cost memory and a resolve pass each frame (perf, Nov 2026)
+function makeGL(canvas){const gl=canvas.getContext('webgl2',{premultipliedAlpha:true,alpha:true,antialias:false,depth:false,stencil:false});if(!gl)throw new Error('WebGL2 is not available here');
   const vs=`#version 300 es
 in vec2 p;void main(){gl_Position=vec4(p,0,1);}`;
   const fs=`#version 300 es
@@ -253,7 +255,7 @@ void main(){vec2 u=vec2(gl_FragCoord.x,res.y-gl_FragCoord.y)/k;vec2 d=u-C;float 
       gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);return t},
     free(t){if(t)gl.deleteTexture(t)},
     erase(t,o){gl.blendFunc(gl.ZERO,gl.ONE_MINUS_SRC_ALPHA);this.draw(t,o);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA)},
-    clear(){gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT)},
+    clear(){gl.viewport(0,0,canvas.width,canvas.height);gl.enable(gl.SCISSOR_TEST);gl.scissor(0,0,canvas.width,Math.max(0,canvas.height-BAND));gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT)},
     draw(t,o){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);gl.uniform1i(U.T,0);gl.uniform2f(U.res,canvas.width,canvas.height);gl.uniform1f(U.k,dpr*kc);
       gl.uniform1f(U.Rg,o.Rg);gl.uniform1f(U.off,o.off);gl.uniform1f(U.L,o.L);gl.uniform1f(U.G,o.G);gl.uniform1f(U.TH,o.TH);gl.uniform1f(U.A,o.A??1);gl.uniform2f(U.C,CW/2,GYc+Rg);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}}}
 
@@ -279,12 +281,22 @@ const severe=k=>k==='storm'||k==='downpour'||k==='blizzard';
 const isSnow=k=>k==='snow'||k==='blizzard',isRain=k=>k==='rain'||k==='storm'||k==='downpour';
 function skyXY(o){const hy=GYc-230;return[CW/2+(o.az-180)/80*CW*.5,hy-Math.max(-.3,o.el)/55*(hy-170)]}
 
+// Perf (Nov 2026): the sky is redrawn whenever the sun moves a degree, every
+// few minutes. Resizing every canvas and re-graining the paper pixel by pixel
+// each time stalled the app for ~85 ms (and wiped the WebGL layers), so the
+// canvases only resize when the screen size changes and the paper grain is
+// made once per size. Returns whether the size changed.
+let SKYSIZE='',GRAIN=null,BAND=0,litOn=true;
 function drawSky(){const w=SIZE.w,h=SIZE.h;dpr=Math.min(2,window.devicePixelRatio||1);
-  for(const c of[skyC,cloudC,glC,carC,glFC,fxC,glLC,topC]){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}
+  const sz=Math.round(w*dpr)+'x'+Math.round(h*dpr),resized=sz!==SKYSIZE;
+  if(resized){SKYSIZE=sz;GRAIN=null;litOn=true;for(const c of[skyC,cloudC,glC,carC,glFC,fxC,glLC,topC]){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}}
   kc=Math.min(w/800,h/1731);CW=w/kc;Hc=h/kc;GYc=Hc*.7;
-  ctx=skyC.getContext('2d');W=CW;H=Hc;ctx.setTransform(dpr*kc,0,0,dpr*kc,0,0);R=mulberry(137724);nz=noise1();
-  ctx.fillStyle='#fbf8f1';ctx.fillRect(0,0,CW,Hc);
-  const id=ctx.getImageData(0,0,skyC.width,skyC.height),d=id.data;for(let i=0;i<d.length;i+=4){const g=(Math.random()-.5)*9;d[i]+=g;d[i+1]+=g;d[i+2]+=g}ctx.putImageData(id,0,0);
+  // the strips start at the back skyline's top (GYc-750); nothing above it is ground
+  BAND=Math.max(0,Math.floor((GYc-Gb-10-4)*dpr*kc));
+  ctx=skyC.getContext('2d');W=CW;H=Hc;R=mulberry(137724);nz=noise1();
+  if(!GRAIN){GRAIN=newCanvas(skyC.width,skyC.height);const g=GRAIN.getContext('2d');g.fillStyle='#fbf8f1';g.fillRect(0,0,GRAIN.width,GRAIN.height);
+    const id=g.getImageData(0,0,GRAIN.width,GRAIN.height),d=id.data;for(let i=0;i<d.length;i+=4){const n=(Math.random()-.5)*9;d[i]+=n;d[i+1]+=n;d[i+2]+=n}g.putImageData(id,0,0)}
+  ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(GRAIN,0,0);ctx.setTransform(dpr*kc,0,0,dpr*kc,0,0);
   let cols=M.phase==='day'?PAL[P.pal].sky:SKYC[M.phase];
   if(overcast(M.kind))cols=cols.map(c=>mix(c,M.kind==='storm'||M.kind==='downpour'?'#6f6c80':M.kind==='rain'?'#9b98aa':M.kind==='blizzard'?'#d9dbe4':'#c4c1cc',M.kind==='fog'||M.kind==='blizzard'?.8:.6));
   // open sky: just a faint wash that thins toward the horizon
@@ -298,6 +310,7 @@ function drawSky(){const w=SIZE.w,h=SIZE.h;dpr=Math.min(2,window.devicePixelRati
     ctx.beginPath();for(let i=0;i<=40;i++){const a=i/40*6.283,rr=r*(1+.04*nz(i*.7));i?ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):ctx.moveTo(rr,0)}ctx.strokeStyle=hexA('#1d1b20',.85);ctx.lineWidth=1.8;ctx.stroke();
     if(!warm)for(let i=0;i<10;i++){const a=i/10*6.283+.2;seg(Math.cos(a)*(r+9),Math.sin(a)*(r+9),Math.cos(a)*(r+20),Math.sin(a)*(r+20),1.6)}
     ctx.restore()}
+  return resized;
 }
 function makeClouds(){const out=[];for(let i=0;i<10;i++){const s=newCanvas(340,170);ctx=s.getContext('2d');R=mulberry(500+i);nz=noise1();
     const w=rnd(150,280),n=noise1(),pts=[];const bumps=Math.round(rnd(3,6)),hA=rnd(10,16),hB=rnd(50,58);
@@ -310,7 +323,7 @@ function paintCloud(cl,col,ink){const x=cl.img.getContext('2d');x.setTransform(1
 // ---------- wiring and the frame loop
 const mk=(tag,z)=>{const e=document.createElement(tag);e.style.cssText='position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none';root.appendChild(e);return e};
 const skyC=mk('canvas'),cloudC=mk('canvas'),glC=mk('canvas'),carC=mk('canvas'),glFC=mk('canvas'),fxC=mk('canvas'),tint=mk('div'),glLC=mk('canvas'),topC=mk('canvas');
-tint.style.mixBlendMode='multiply';tint.style.transition='background-color 1.2s,opacity 1.2s';tint.style.opacity='0';const status={style:{},innerHTML:''};let SIZE={w:390,h:844};
+tint.style.mixBlendMode='multiply';tint.style.visibility='hidden';let tintT=0;tint.style.transition='background-color 1.2s,opacity 1.2s';tint.style.opacity='0';const status={style:{},innerHTML:''};let SIZE={w:390,h:844};
 let dpr,kc,Hc,GYc,Rg=P.Rg,off=0,speed=36,playing=true,curveV=rgToCurve(P.Rg);
 let TOWER=null,GLm,GLf,GLl,city,front,backTex,cloudSprites,clouds=[],drops=[],flash=0,stars=[],birds=[];
 let PILES=null,pileT=1;
@@ -322,16 +335,18 @@ function drawPiles(g){const k=.4+.6*pileT;for(const p of PILES){g.save();if(p.si
     g.beginPath();p.pts.forEach(([x,y],i)=>i?g.lineTo(x,-y):g.moveTo(x,-y));g.strokeStyle='#1d1b20';g.lineWidth=2/k**.3;g.lineCap='round';g.stroke();
     for(let i=0;i<4;i++){const q=p.pts[4+i*4];g.beginPath();g.moveTo(q[0]-8,-q[1]+10);g.quadraticCurveTo(q[0],-q[1]+6,q[0]+10,-q[1]+12);g.strokeStyle='rgba(29,27,32,.45)';g.lineWidth=1.2;g.stroke()}g.restore()}}
 function applyMood(force){const m=computeMood();const key=[m.phase,m.kind,Math.round(m.sun.el),Math.round(m.sun.az)].join();if(!force&&key===M.key){Object.assign(M,m);updateStatus();return}
-  const prevKind=M.kind;M=Object.assign(m,{key});drawSky();
+  const prevKind=M.kind;M=Object.assign(m,{key});const resized=drawSky();
   const t=TINT[M.phase];let tc=t[0],ta=t[1];if(overcast(M.kind)&&M.phase==='day'){tc=M.kind==='storm'?'#8a879c':'#c9c6d4';ta=M.kind==='storm'?.62:M.kind==='downpour'?.45:M.kind==='rain'?.3:M.kind==='blizzard'?.22:.18}
-  tint.style.backgroundColor=tc;tint.style.opacity=ta;status.style.color=(M.phase==='night'||M.phase==='twilight'||M.kind==='storm')?'#f5efe2':'#1d1b20';
+  tint.style.backgroundColor=tc;tint.style.opacity=ta;
+  // a multiply layer costs a blend of everything under it even at opacity 0, so it's switched off once it has faded out
+  clearTimeout(tintT);if(ta>0)tint.style.visibility='visible';else tintT=setTimeout(()=>{tint.style.visibility='hidden'},1300);status.style.color=(M.phase==='night'||M.phase==='twilight'||M.kind==='storm')?'#f5efe2':'#1d1b20';
   const ccol=M.kind==='storm'?'#6a6780':M.kind==='downpour'?'#8d8a9e':M.kind==='rain'?'#b1aebf':overcast(M.kind)?'#dcd8e2':'#ffffff';
   cloudSprites.forEach(c=>paintCloud(c,ccol,M.kind==='fog'?.35:.8));
   const nC={clear:1,partly:4,cloudy:9,rain:9,downpour:10,storm:22,snow:8,blizzard:10,fog:4}[M.kind];
   if(prevKind!==M.kind||clouds.length!==nC){clouds=[];for(let i=0;i<nC;i++)clouds.push(M.kind==='storm'?{s:cloudSprites[i%cloudSprites.length],x:(i%6)/6*(CW+340)-200+Math.random()*80,y:-60+Math.floor(i/6)*Math.max(120,(GYc-520)/3)+Math.random()*60,v:Math.random()*8+6,sc:1.3+Math.random()*.6}:{s:cloudSprites[i%cloudSprites.length],x:Math.random()*(CW+300)-150,y:GYc-920+Math.random()*360,v:Math.random()*8+4,sc:.7+Math.random()*.6})}
-  const nD={rain:160,storm:240,downpour:460,snow:220,blizzard:420}[M.kind]||0;drops=[];for(let i=0;i<nD;i++)drops.push({x:Math.random()*CW,y:Math.random()*Hc,v:M.kind==='snow'?Math.random()*30+30:M.kind==='blizzard'?Math.random()*80+90:M.kind==='downpour'?Math.random()*300+900:Math.random()*300+600,w:Math.random()*6});
-  if(isSnow(M.kind)&&!isSnow(prevKind))pileT=prevKind===undefined?1:0;makePiles();
-  stars=[];for(let i=0;i<70;i++)stars.push({x:Math.random()*CW,y:Math.random()*(GYc-520),r:Math.random()*1.6+.6,tw:Math.random()*6});
+  const nD={rain:160,storm:240,downpour:460,snow:220,blizzard:420}[M.kind]||0;if(resized||prevKind!==M.kind||drops.length!==nD){drops=[];for(let i=0;i<nD;i++)drops.push({x:Math.random()*CW,y:Math.random()*Hc,v:M.kind==='snow'?Math.random()*30+30:M.kind==='blizzard'?Math.random()*80+90:M.kind==='downpour'?Math.random()*300+900:Math.random()*300+600,w:Math.random()*6})}
+  if(isSnow(M.kind)&&!isSnow(prevKind))pileT=prevKind===undefined?1:0;if(resized||prevKind!==M.kind)makePiles();
+  if(resized||!stars.length){stars=[];for(let i=0;i<70;i++)stars.push({x:Math.random()*CW,y:Math.random()*(GYc-520),r:Math.random()*1.6+.6,tw:Math.random()*6})}
   updateStatus()}
 function updateStatus(){}
 
@@ -339,7 +354,7 @@ function frame(dt,t){
   if(playing&&!drag)off=(off+speed*dt)%L;if(!drag&&Math.abs(fling)>1){off+=fling*dt;fling*=Math.pow(.05,dt)}
   off=(off%L+L)%L;const offF=(off*1.35)%Lf,offB=(off*.5)%Lb;const cx=CW/2,cy=GYc+Rg;
   GLm.clear();GLm.draw(backTex,{Rg:Rg+10,off:offB,L:Lb,G:Gb,TH:THb,A:.75});GLm.draw(city.tex,{Rg,off,L,G,TH});GLf.clear();GLf.draw(front.tex,{Rg:Rg-FRONT,off:offF,L:Lf,G:Gf,TH:THf});
-  const la=LIGHTS[M.phase]*(overcast(M.kind)&&M.phase==='day'?.3:1);GLl.clear();if(la>0){GLl.draw(city.ltex,{Rg,off,L,G,TH,A:la});GLl.erase(front.mask,{Rg:Rg-FRONT,off:offF,L:Lf,G:Gf,TH:THf});GLl.draw(front.ltex,{Rg:Rg-FRONT,off:offF,L:Lf,G:Gf,TH:THf,A:la})}
+  const la=LIGHTS[M.phase]*(overcast(M.kind)&&M.phase==='day'?.3:1);if(la>0||litOn){GLl.clear();litOn=la>0}if(la>0){GLl.draw(city.ltex,{Rg,off,L,G,TH,A:la});GLl.erase(front.mask,{Rg:Rg-FRONT,off:offF,L:Lf,G:Gf,TH:THf});GLl.draw(front.ltex,{Rg:Rg-FRONT,off:offF,L:Lf,G:Gf,TH:THf,A:la})}
   const cc=cloudC.getContext('2d');cc.setTransform(1,0,0,1,0,0);cc.clearRect(0,0,cloudC.width,cloudC.height);cc.setTransform(dpr*kc,0,0,dpr*kc,0,0);
   for(const c of clouds){if(playing)c.x+=c.v*dt*(severe(M.kind)?2.5:1);if(c.x>CW+200)c.x=-340;cc.drawImage(c.s.img,c.x,c.y,340*c.sc,170*c.sc)}
   let f=fxC.getContext('2d');f.setTransform(1,0,0,1,0,0);f.clearRect(0,0,fxC.width,fxC.height);f.setTransform(dpr*kc,0,0,dpr*kc,0,0);
@@ -1210,6 +1225,8 @@ function buildAll(){TOWER=null;SMOKE=[];EVS=[];CAMPS=[];ANIMS=[];LAKES=[];GONDOL
   if(city){GLm.free(city.tex);GLl.free(city.ltex);GLf.free(front.tex);GLl.free(front.ltex);GLl.free(front.mask);GLm.free(backTex)}
   city={tex:GLm.tex(c.strip),ltex:GLl.tex(c.lights),cars:c.cars};front={tex:GLf.tex(fr.strip),ltex:GLl.tex(fr.lights),mask:GLl.tex(fr.strip),walkers:[]};backTex=GLm.tex(bk);fillEv()}
 let built=null,ready=false;
+// the scene drifts ~20 px a second, so it's drawn 30 times a second, not 60 (perf, Nov 2026)
+const STEP=1/30-.004;let acc=0;
 GLm=makeGL(glC);GLf=makeGL(glFC);GLl=makeGL(glLC);cloudSprites=makeClouds();birds=makeBirds();
 return{
   // which scene: coast, farm, suburbs, desert, woods, mountain or city
@@ -1217,7 +1234,7 @@ return{
   // the app's real sun (degrees), weather kind, place and clock
   setInput(o){Object.assign(INPUT,o);if(o.lat!=null)LOC={lat:o.lat,lon:o.lon};if(ready)applyMood(false)},
   resize(w,h){if(w===SIZE.w&&h===SIZE.h&&ready)return;SIZE={w,h};applyMood(true);ready=true},
-  frame(dt,t){if(!ready||!built)return;frame(Math.max(0,Math.min(.05,dt)),t)},
+  frame(dt,t){if(!ready||!built)return;acc+=Math.max(0,dt);if(acc<STEP)return;const d=Math.min(.1,acc);acc=0;frame(d,t)},
   scene(){return SCENE},
 };
 }
